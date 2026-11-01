@@ -1,6 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
-const http = http = require('http');
+const http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -217,7 +217,6 @@ bot.on('message', async (ctx) => {
     if (!db.users) db.users = {};
     if (!db.allowedUsers) db.allowedUsers = {};
 
-    // অ্যাডমিন যদি নির্দিষ্ট কোনো ইউজারের অর্ডারের জন্য লাইক ডিটেইলস লিখে পাঠান (বা বাটন প্রম্পটের পর)
     if (userId === ADMIN_ID.toString()) {
         const adminSession = db.adminInputSession && db.adminInputSession[userId] ? db.adminInputSession[userId] : null;
         if (adminSession && adminSession.step === 'awaiting_order_details') {
@@ -237,15 +236,13 @@ bot.on('message', async (ctx) => {
                 const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name: `" + session.nickname + "`\n│ 🛡 UID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ ❤️ Previous Likes: " + prevLikes + "\n│ 💖 Current Likes: " + currLikes + "\n│ 🚀 Added Likes: " + addedLikes + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।\n🙏 ধন্যবাদ!";
 
                 try {
-                    // কাস্টমারের লোডিং মেসেজ আপডেট করা
                     await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]])
                     });
 
-                    // অ্যাডমিন প্যানেলের নোটিফিকেশন মেসেজটি আপডেট করে কমপ্লিট দেখিয়ে দেওয়া
                     try {
-                        await ctx.telegram.editMessageText(ADMIN_ID, session.adminMsgId, null, ctx.message.reply_to_message ? ctx.message.reply_to_message.text + "\n\n**[STATUS: COMPLETED ✅]**" : "🔔 **ORDER COMPLETED SUCCESSFULLY ✅**\n🆔 Customer ID: `" + targetUserId + "`", { parse_mode: 'Markdown' });
+                        await ctx.telegram.editMessageText(ADMIN_ID, session.adminMsgId, null, "🔔 **NEW ORDER PENDING APPROVAL!** 🔔\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Customer: Admin Action\n🆔 Customer ID: `" + targetUserId + "`\n\n📦 Product: `" + session.product + "`\n👤 Game Name: `" + session.nickname + "`\n🎮 Game UID: `" + session.uid + "`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n**[STATUS: COMPLETED ✅]**", { parse_mode: 'Markdown' });
                     } catch (err) {}
 
                     delete db.adminSessions[targetUserId];
@@ -904,7 +901,6 @@ bot.action('confirm_order', async (ctx) => {
     }, 4500);
 });
 
-// অ্যাডমিন যখন Enter Details বাটনে ক্লিক করবেন
 bot.action(/admin_input_(.+)/, async (ctx) => {
     const targetUserId = ctx.match[1];
     const userId = ctx.from.id.toString();
