@@ -19,20 +19,21 @@ function loadDatabase() {
     try {
         if (fs.existsSync(DB_FILE)) {
             const data = fs.readFileSync(DB_FILE, 'utf8');
-            if (data.trim() === '') return { users: {}, balances: {}, sessions: {}, numbers: {}, customProducts: [], allowedUsers: {} };
+            if (data.trim() === '') return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {} };
             const parsed = JSON.parse(data);
             if (!parsed.users) parsed.users = {};
             if (!parsed.balances) parsed.balances = {};
             if (!parsed.sessions) parsed.sessions = {};
             if (!parsed.numbers) parsed.numbers = {};
-            if (!parsed.customProducts) parsed.customProducts = [];
+            if (!parsed.categories) parsed.categories = {};
+            if (!parsed.customProducts) parsed.customProducts = {};
             if (!parsed.allowedUsers) parsed.allowedUsers = {};
             return parsed;
         }
     } catch (e) { 
         console.error('DB Load Error:', e); 
     }
-    return { users: {}, balances: {}, sessions: {}, numbers: {}, customProducts: [], allowedUsers: {} };
+    return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {} };
 }
 
 function saveDatabase(data) {
@@ -211,7 +212,8 @@ bot.on('message', async (ctx) => {
     if (!db.balances) db.balances = {};
     if (!db.sessions) db.sessions = {};
     if (!db.numbers) db.numbers = {};
-    if (!db.customProducts) db.customProducts = [];
+    if (!db.categories) db.categories = {};
+    if (!db.customProducts) db.customProducts = {};
     if (!db.users) db.users = {};
     if (!db.allowedUsers) db.allowedUsers = {};
 
@@ -276,17 +278,34 @@ bot.on('message', async (ctx) => {
             ]));
         }
         if (text === '➕ Add Product') {
-            db.sessions[userId] = { step: 'admin_add_product' };
-            saveDatabase(db);
-            return ctx.reply("📦 **নতুন প্রোডাক্ট অ্যাড করুন**\n\nপ্রোডাক্টের নাম এবং দাম একসাথে লিখে পাঠান:\n*(উদাহরণ: `Guild Glory Bot 150৳`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+            const currentSub = db.sessions[userId] && db.sessions[userId].activeCategory ? db.sessions[userId].activeCategory : null;
+            if (currentSub) {
+                db.sessions[userId] = { step: 'admin_add_sub_product', category: currentSub };
+                saveDatabase(db);
+                return ctx.reply("📦 **প্যাকেজ অ্যাড করুন (" + currentSub + ")**\n\nপ্যাকেজের নাম এবং দাম একসাথে লিখে পাঠান:\n*(উদাহরণ: `15 Days Likes - ৳150`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+            } else {
+                db.sessions[userId] = { step: 'admin_add_category' };
+                saveDatabase(db);
+                return ctx.reply("📦 **মেইন ক্যাটাগরি বা প্রোডাক্ট অ্যাড করুন**\n\nনতুন ক্যাটাগরির নাম লিখে পাঠান:\n*(উদাহরণ: `Guild Glory Bot`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+            }
         }
         if (text === '❌ Remove Product') {
-            if (db.customProducts.length === 0) return ctx.reply('⚠️ বর্তমানে কোনো কাস্টম প্রোডাক্ট অ্যাড করা নেই।');
-            let listText = '🗑️ **রিমুভ করার জন্য প্রোডাক্টের সঠিক নামটি লিখে পাঠান:**\n\n';
-            db.customProducts.forEach((p, index) => { listText += (index + 1) + '. `' + p + '`\n'; });
-            db.sessions[userId] = { step: 'admin_remove_product' };
-            saveDatabase(db);
-            return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+            const currentSub = db.sessions[userId] && db.sessions[userId].activeCategory ? db.sessions[userId].activeCategory : null;
+            if (currentSub && db.customProducts[currentSub] && db.customProducts[currentSub].length > 0) {
+                let listText = '🗑️ **(' + currentSub + ') থেকে রিমুভ করার জন্য প্যাকেজের সঠিক নামটি লিখে পাঠান:**\n\n';
+                db.customProducts[currentSub].forEach((p, index) => { listText += (index + 1) + '. `' + p.name + '`\n'; });
+                db.sessions[userId] = { step: 'admin_remove_sub_product', category: currentSub };
+                saveDatabase(db);
+                return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+            } else {
+                const catKeys = Object.keys(db.categories || {});
+                if (catKeys.length === 0) return ctx.reply('⚠️ বর্তমানে কোনো কাস্টম ক্যাটাগরি বা প্রোডাক্ট অ্যাড করা নেই।');
+                let listText = '🗑️ **রিমুভ করার জন্য ক্যাটাগরির সঠিক নামটি লিখে পাঠান:**\n\n';
+                catKeys.forEach((c, index) => { listText += (index + 1) + '. `' + c + '`\n'; });
+                db.sessions[userId] = { step: 'admin_remove_category' };
+                saveDatabase(db);
+                return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+            }
         }
         if (text === '📊 Total Users') {
             const allowedIds = Object.keys(db.allowedUsers || {});
@@ -308,6 +327,49 @@ bot.on('message', async (ctx) => {
             db.sessions[userId] = { step: 'admin_broadcast_prompt' };
             saveDatabase(db);
             return ctx.reply("📢 **সকল ইউজারে ব্রডকাস্ট মেসেজ পাঠান**\n\nযে এনাউন্সমেন্ট বা মেসেজটি সব ইউজারের কাছে পাঠাতে চান তা লিখে চ্যাটে পাঠান:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+        }
+    }
+
+    if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_add_category') {
+        db.categories[text] = true;
+        if (!db.customProducts[text]) db.customProducts[text] = [];
+        delete db.sessions[userId];
+        saveDatabase(db);
+        return ctx.reply('✅ সফলভাবে নতুন ক্যাটাগরি অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+    }
+
+    if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_category') {
+        if (db.categories[text]) {
+            delete db.categories[text];
+            delete db.customProducts[text];
+            delete db.sessions[userId];
+            saveDatabase(db);
+            return ctx.reply('🗑️ ক্যাটাগরি সফলভাবে রিমুভ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        } else {
+            return ctx.reply('❌ এই নামের কোনো ক্যাটাগরি পাওয়া যায়নি। সঠিক নামটি লিখে পাঠান।');
+        }
+    }
+
+    if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_add_sub_product') {
+        const cat = db.sessions[userId].category;
+        if (!db.customProducts[cat]) db.customProducts[cat] = [];
+        db.customProducts[cat].push({ name: text });
+        delete db.sessions[userId];
+        saveDatabase(db);
+        return ctx.reply('✅ সফলভাবে `' + cat + '`-এর ভেতরে নতুন প্যাকেজ অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+    }
+
+    if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_sub_product') {
+        const cat = db.sessions[userId].category;
+        const list = db.customProducts[cat] || [];
+        const index = list.findIndex(p => p.name.toLowerCase() === text.toLowerCase());
+        if (index > -1) {
+            list.splice(index, 1);
+            delete db.sessions[userId];
+            saveDatabase(db);
+            return ctx.reply('🗑️ প্যাকেজ সফলভাবে রিমুভ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        } else {
+            return ctx.reply('❌ এই নামের কোনো প্যাকেজ পাওয়া যায়নি। সঠিক নামটি লিখে পাঠান।');
         }
     }
 
@@ -404,25 +466,6 @@ bot.on('message', async (ctx) => {
         return ctx.reply('✅ সফলভাবে ' + method.toUpperCase() + ' নম্বর আপডেট করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     }
 
-    if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_add_product') {
-        db.customProducts.push(text);
-        delete db.sessions[userId];
-        saveDatabase(db);
-        return ctx.reply('✅ সফলভাবে নতুন প্রোডাক্ট অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
-    }
-
-    if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_product') {
-        const index = db.customProducts.indexOf(text);
-        if (index > -1) {
-            db.customProducts.splice(index, 1);
-            delete db.sessions[userId];
-            saveDatabase(db);
-            return ctx.reply('🗑️ প্রোডাক্ট সফলভাবে রিমুভ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
-        } else {
-            return ctx.reply('❌ এই নামের কোনো প্রোডাক্ট পাওয়া যায়নি। সঠিক নামটি লিখে পাঠান।');
-        }
-    }
-
     const session = db.sessions[userId];
     if (session && session.step === 'awaiting_deposit_amount') {
         const amount = parseFloat(text);
@@ -485,13 +528,18 @@ bot.on('message', async (ctx) => {
     }
 
     if (text === '🛍️ Shop Now') {
+        if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
+            db.sessions[userId].activeCategory = null;
+            saveDatabase(db);
+        }
         let inlineButtons = [
             [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
         ];
 
-        if (db.customProducts.length > 0) {
-            db.customProducts.forEach((p, idx) => {
-                inlineButtons.push([Markup.button.callback('⭐ ' + p, 'custom_prod_' + idx)]);
+        const catKeys = Object.keys(db.categories || {});
+        if (catKeys.length > 0) {
+            catKeys.forEach((c) => {
+                inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
             });
         }
 
@@ -613,7 +661,6 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
     });
 });
 
-// ১০০% নিশ্চিত ও ঝামেলাহীন পদ্ধতি: বাটনে ক্লিক করলেই নাম্বারটি চ্যাটে আলাদা মেসেজ হিসেবে চলে আসবে
 bot.action(/copy_num_(.+)/, async (ctx) => {
     const num = ctx.match[1];
     await ctx.answerCbQuery('📋 নিচের মেসেজ থেকে নম্বরটি কপি করুন!', { show_alert: false });
@@ -639,14 +686,20 @@ bot.action('set_nagad_prompt', async (ctx) => {
 });
 
 bot.action('shop_now_back', async (ctx) => {
+    const userId = ctx.from.id.toString();
     const db = loadDatabase();
+    if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
+        db.sessions[userId].activeCategory = null;
+        saveDatabase(db);
+    }
     let inlineButtons = [
         [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
     ];
 
-    if (db.customProducts.length > 0) {
-        db.customProducts.forEach((p, idx) => {
-            inlineButtons.push([Markup.button.callback('⭐ ' + p, 'custom_prod_' + idx)]);
+    const catKeys = Object.keys(db.categories || {});
+    if (catKeys.length > 0) {
+        catKeys.forEach((c) => {
+            inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
         });
     }
 
@@ -658,26 +711,70 @@ bot.action('shop_now_back', async (ctx) => {
     });
 });
 
-bot.action(/custom_prod_(.+)/, async (ctx) => {
-    const index = parseInt(ctx.match[1]);
+bot.action('cat_ff_likes', async (ctx) => {
+    const userId = ctx.from.id.toString();
     const db = loadDatabase();
-    const prodName = db.customProducts[index] || 'Custom Product';
-    await ctx.answerCbQuery('⭐ ' + prodName + ' সিলেক্ট করা হয়েছে!');
-    await ctx.editMessageText("📦 **Product:** `" + prodName + "`\n\nএই প্রোডাক্টটি নিতে বা অর্ডার করতে অ্যাডমিনের সাথে যোগাযোগ করুন অথবা পরবর্তী স্টেপ ফলো করুন।", {
+    if (userId === ADMIN_ID.toString()) {
+        if (!db.sessions[userId]) db.sessions[userId] = {};
+        db.sessions[userId].activeCategory = 'Free Fire Likes';
+        saveDatabase(db);
+    }
+
+    let inlineButtons = [
+        [Markup.button.callback('⚡ 220 Likes - ৳8', 'pkg_like_220')],
+        [Markup.button.callback('🚀 6000 Likes - ৳300', 'pkg_like_6000')]
+    ];
+
+    if (db.customProducts && db.customProducts['Free Fire Likes']) {
+        db.customProducts['Free Fire Likes'].forEach((p, idx) => {
+            inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
+        });
+    }
+
+    inlineButtons.push([Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]);
+
+    await ctx.editMessageText('🔥 **Free Fire Likes Packages**\n\nআপনার পছন্দের লাইক প্যাকেজটি সিলেক্ট করুন:', {
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔙 Back to Shop 🛍️', 'shop_now_back')]
-        ])
+        ...Markup.inlineKeyboard(inlineButtons)
     });
 });
 
-bot.action('cat_ff_likes', async (ctx) => {
-    await ctx.editMessageText('🔥 **Free Fire Likes Packages**\n\nআপনার পছন্দের লাইক প্যাকেজটি সিলেক্ট করুন:', {
+bot.action(/custom_cat_(.+)/, async (ctx) => {
+    const catName = ctx.match[1];
+    const userId = ctx.from.id.toString();
+    const db = loadDatabase();
+    if (userId === ADMIN_ID.toString()) {
+        if (!db.sessions[userId]) db.sessions[userId] = {};
+        db.sessions[userId].activeCategory = catName;
+        saveDatabase(db);
+    }
+
+    let inlineButtons = [];
+    if (db.customProducts && db.customProducts[catName]) {
+        db.customProducts[catName].forEach((p, idx) => {
+            inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
+        });
+    }
+
+    inlineButtons.push([Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]);
+
+    await ctx.editMessageText("📂 **" + catName + "**\n\nআপনার পছন্দের প্যাকেজটি সিলেক্ট করুন:", {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(inlineButtons)
+    });
+});
+
+bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
+    const catName = ctx.match[1];
+    const index = parseInt(ctx.match[2]);
+    const db = loadDatabase();
+    const prod = db.customProducts[catName] && db.customProducts[catName][index] ? db.customProducts[catName][index] : { name: 'Custom Package' };
+    
+    await ctx.answerCbQuery('⭐ ' + prod.name + ' সিলেক্ট করা হয়েছে!');
+    await ctx.editMessageText("📦 **Product / Package:** `" + prod.name + "`\n\nএই সার্ভিসটি নিতে বা অর্ডার করতে অ্যাডমিনের সাথে যোগাযোগ করুন অথবা পরবর্তী স্টেপ ফলো করুন।", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-            [Markup.button.callback('⚡ 220 Likes - ৳8', 'pkg_like_220')],
-            [Markup.button.callback('🚀 6000 Likes - ৳300', 'pkg_like_6000')],
-            [Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]
+            [Markup.button.callback('🔙 Back to Shop 🛍️', 'shop_now_back')]
         ])
     });
 });
@@ -775,14 +872,14 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
 bot.action('back_start_inline', async (ctx) => {
     const userId = ctx.from.id.toString();
     const db = loadDatabase();
-    if (db.sessions) { delete db.sessions[userId]; saveDatabase(db); }
+    if (db.sessions && db.sessions[userId]) { delete db.sessions[userId]; saveDatabase(db); }
     await ctx.editMessageText('✨ মূল মেনুতে ফিরে এসেছেন। নিচের মেনু থেকে আপনার সার্ভিসটি বেছে নিন:', { parse_mode: 'Markdown' }).catch(() => {});
 });
 
 bot.action('back_start', async (ctx) => {
     const userId = ctx.from.id.toString();
     const db = loadDatabase();
-    if (db.sessions) { delete db.sessions[userId]; saveDatabase(db); }
+    if (db.sessions && db.sessions[userId]) { delete db.sessions[userId]; saveDatabase(db); }
     await ctx.reply('🔙 মূল মেনুতে ফিরে এসেছেন:', { ...getMainKeyboard(userId) });
 });
 
