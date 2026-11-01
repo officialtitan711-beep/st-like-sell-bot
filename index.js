@@ -8,90 +8,133 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
 let userBalances = {};
-let awaitingUidForCheck = {};
+let userSessions = {};
 
-// ✨ /start কমান্ড এবং ফোর্স সাবস্ক্রাইব চেক (Force Subscribe System)
-bot.start(async (ctx) => {
-    const userId = ctx.from.id;
-    
-    if (userId.toString() !== ADMIN_ID.toString()) {
-        try {
-            const chatMember = await bot.telegram.getChatMember(CHANNEL_ID, userId);
-            if (chatMember.status === 'left' || chatMember.status === 'kicked') {
-                return ctx.reply(
-                    '⚠️ **অ্যাক্সেস ডিনায়েলড!**\n\nবটটি ব্যবহার করার জন্য আপনাকে অবশ্যই আমাদের অফিশিয়াল টেলিগ্রাম চ্যানেল ও ইউটিউব চ্যানেল সাবস্ক্রাইব করতে হবে। নিচে থেকে জয়েন করে ভেরিফাই করুন:',
-                    Markup.inlineKeyboard([
-                        [Markup.button.url('📢 Join Telegram Channel', 'https://t.me/shohan2004')],
-                        [Markup.button.url('🔴 Subscribe YouTube', YOUTUBE_URL)],
-                        [Markup.button.callback('🔄 Verify Membership', 'verify_sub')]
-                    ])
-                );
-            }
-        } catch (e) {
-            console.log('Start check error:', e);
-        }
-    }
-
-    sendMainMenu(ctx);
-});
-
-// 🔄 ভেরিফাই বাটন হ্যান্ডলার
-bot.action('verify_sub', async (ctx) => {
-    const userId = ctx.from.id;
+// 🛡️ টেলিগ্রাম চ্যানেল সাবস্ক্রিপশন চেক
+async function checkUserSubscription(ctx, userId) {
+    if (userId.toString() === ADMIN_ID.toString()) return true;
     try {
         const chatMember = await bot.telegram.getChatMember(CHANNEL_ID, userId);
-        if (chatMember.status === 'left' || chatMember.status === 'kicked') {
-            return ctx.answerCbQuery('❌ আপনি এখনো টেলিগ্রাম চ্যানেলে জয়েন করেননি!', { show_alert: true });
-        }
-        await ctx.answerCbQuery('🎉 অভিনন্দন! ভেরিফিকেশন সফল হয়েছে।');
-        await ctx.deleteMessage();
-        sendMainMenu(ctx);
+        if (chatMember.status === 'left' || chatMember.status === 'kicked') return false;
+        return true;
     } catch (e) {
-        await ctx.answerCbQuery('❌ দয়া করে আগে চ্যানেলে জয়েন করুন!', { show_alert: true });
+        return false;
     }
-});
+}
 
-// 💎 স্টাইলিশ মূল মেনু ড্যাশবোর্ড
-function sendMainMenu(ctx) {
-    const userId = ctx.from.id.toString();
-    
+// 📢 ফোর্সিং সাবস্ক্রাইব মেসেজ
+async function sendForceSubMessage(ctx) {
+    const text = '⚠️ **অ্যাক্সেস ডিনায়েলড!**\n\nবটটি ব্যবহার করার জন্য আপনাকে অবশ্যই আমাদের অফিশিয়াল টেলিগ্রাম চ্যানেল ও ইউটিউব চ্যানেল সাবস্ক্রাইব করতে হবে। চ্যানেল জয়েন করার পর নিচের **🔄 𝐕𝐞𝐫𝐢𝐟𝐲 𝐌𝐞𝐦𝐛𝐞𝐫𝐬𝐡𝐢𝐩** বাটনে ক্লিক করুন:';
+    const keyboard = Markup.inlineKeyboard([
+        [Markup.button.url('📢 Join Telegram Channel', 'https://t.me/shohan2004')],
+        [Markup.button.url('🔴 Subscribe YouTube', YOUTUBE_URL)],
+        [Markup.button.callback('🔄 𝐕𝐞𝐫𝐢𝐟𝐲 𝐌𝐞𝐦𝐛𝐞𝐫𝐬𝐡𝐢𝐩', 'verify_sub')]
+    ]);
+    await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+}
+
+// ✨ মূল নিচের পার্মানেন্ট মেনু (Reply Keyboard) জেনারেটর
+function getMainKeyboard(userId) {
     let keyboard = [
-        [Markup.button.callback('🛍️ Shop / Buy Likes', 'buy_likes'), Markup.button.callback('🔍 Check FF UID', 'check_uid')],
-        [Markup.button.callback('💰 Add Balance', 'deposit'), Markup.button.callback('👤 My Profile', 'profile')],
-        [Markup.button.callback('📜 Order History', 'history'), Markup.button.callback('📞 Support Desk', 'support')]
+        ['🛍️ Shop / Buy Likes', '🔍 Check FF UID'],
+        ['💰 Add Balance', '👤 My Profile'],
+        ['📜 Order History', '📞 Support Desk']
     ];
 
-    // 👑 সিক্রেট অ্যাডমিন প্যানেল (শুধুমাত্র আপনার আইডিতে শো করবে)
-    if (userId === ADMIN_ID.toString()) {
+    if (userId.toString() === ADMIN_ID.toString()) {
         keyboard.push(
-            [Markup.button.callback('➕ Add Product', 'admin_add_product'), Markup.button.callback('📦 Manage Products', 'admin_manage')],
-            [Markup.button.callback('💳 Deposit Requests', 'admin_deposits'), Markup.button.callback('⚙️ Bot Settings', 'admin_settings')]
+            ['➕ Add Product', '📦 Manage Products'],
+            ['💳 Deposit Requests', '⚙️ Bot Settings']
         );
     }
 
-    ctx.reply('✨ **ST LIKE ~ SELL BOT**-এ আপনাকে স্বাগতম! ✨\n\n👇 আপনার পছন্দের সার্ভিসটি নিচের বাটন থেকে সিলেক্ট করুন:', {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(keyboard)
-    });
+    return Markup.keyboard(keyboard).resize();
 }
 
-// 🔍 ফ্রি ফায়ার UID নেম চেকার সিস্টেম
-bot.action('check_uid', (ctx) => {
+// ✨ /start কমান্ড
+bot.start(async (ctx) => {
     const userId = ctx.from.id;
-    awaitingUidForCheck[userId] = true;
-    ctx.reply('🎮 **Free Fire UID Checker**\n\n✍️ যে প্লেয়ারের নাম চেক করতে চান, তার সঠিক **UID** (যেমন: `9884223138`) নিচে চ্যাটে লিখে পাঠান:', {
+    if (!(await checkUserSubscription(ctx, userId))) {
+        return sendForceSubMessage(ctx);
+    }
+    
+    await ctx.reply('✨ **ST LIKE ~ SELL BOT**-এ আপনাকে স্বাগতম! ✨\n\n👇 আপনার পছন্দের সার্ভিসটি নিচের মেনু বাটন থেকে সিলেক্ট করুন:', {
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel', 'back_start')]])
+        ...getMainKeyboard(userId)
     });
 });
 
-// 📥 টেক্সট ইনপুট এবং API ফেচিং লজিক
+// 🔄 ভেরিফাই বাটন
+bot.action('verify_sub', async (ctx) => {
+    const userId = ctx.from.id;
+    if (!(await checkUserSubscription(ctx, userId))) {
+        return ctx.answerCbQuery('❌ আপনি এখনো টেলিগ্রাম চ্যানেলে জয়েন করেননি! দয়া করে আগে জয়েন করুন।', { show_alert: true });
+    }
+
+    await ctx.answerCbQuery('🎉 অভিনন্দন! ভেরিফিকেশন সফল হয়েছে।');
+    try { await ctx.deleteMessage(); } catch (e) {}
+    
+    await ctx.reply('✨ মেনু সচল করা হয়েছে:', { ...getMainKeyboard(userId) });
+});
+
+// 📥 টেক্সট কমান্ড বা নিচের মেনুর বাটনগুলোর হ্যান্ডলার
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id;
+    if (!(await checkUserSubscription(ctx, userId))) return sendForceSubMessage(ctx);
+
     const text = ctx.message.text.trim();
 
-    if (awaitingUidForCheck[userId]) {
-        delete awaitingUidForCheck[userId];
+    // ১. শপ / বাই লাইকস ক্লিক করলে
+    if (text === '🛍️ Shop / Buy Likes') {
+        return ctx.reply('🛍️ **Product Categories**\n\nদয়া করে আপনার পছন্দের ক্যাটাগরি সিলেক্ট করুন:', {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🔥 Free Fire Likes', 'cat_ff_likes')],
+                [Markup.button.callback('🔙 Main Menu', 'back_start')]
+            ])
+        });
+    }
+
+    // ২. চেক এফএফ ইউআইডি ক্লিক করলে
+    if (text === '🔍 Check FF UID') {
+        userSessions[userId] = { step: 'awaiting_uid' };
+        return ctx.reply('🎮 **Free Fire UID Checker**\n\n✍️ যে প্লেয়ারের নাম চেক করতে চান, তার সঠিক **UID** (যেমন: `9884223138`) নিচে চ্যাটে লিখে পাঠান:', {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel', 'back_start')]])
+        });
+    }
+
+    // ৩. ব্যালেন্স এড
+    if (text === '💰 Add Balance') {
+        return ctx.reply('💳 **ডিপোজিট সেকশন**\n\nপেমেন্ট করার জন্য নিচের মেথডগুলো থেকে আপনার পছন্দের মাধ্যমটি সিলেক্ট করুন:',
+            Markup.inlineKeyboard([
+                [Markup.button.callback('bKash', 'pay_bkash'), Markup.button.callback('Nagad', 'pay_nagad')],
+                [Markup.button.callback('Rocket', 'pay_rocket'), Markup.button.callback('Binance', 'pay_binance')]
+            ])
+        );
+    }
+
+    // ৪. প্রোফাইল
+    if (text === '👤 My Profile') {
+        const balance = userBalances[userId] || 145.0;
+        return ctx.reply(`👤 **MY PROFILE**\n\n🆔 Telegram ID: \`${userId}\`\n💰 ব্যালেন্স: \`${balance} BDT\`\n📦 মোট অর্ডার: \`১ টি\`\n❤️ মোট লাইক: \`২১৩ টি\``, { parse_mode: 'Markdown' });
+    }
+
+    // ৫. অর্ডার হিস্ট্রি
+    if (text === '📜 Order History') {
+        return ctx.reply('📜 **Order History**\n\nআপনার পূর্ববর্তী সফল অর্ডারগুলোর তালিকা নিচে দেওয়া হলো:\n\n✨ ডেইলি লাইকস (+220 Likes) - সফল ✅');
+    }
+
+    // ৬. সাপোর্ট ডেস্ক্রিপশন
+    if (text === '📞 Support Desk') {
+        return ctx.reply('📞 **Support Desk**\n\nআপনার যেকোনো সমস্যা বা প্রশ্ন এখানে লিখে পাঠান, অ্যাডমিন খুব শীঘ্রই আপনার সাথে যোগাযোগ করবেন।');
+    }
+
+    // UID ইনপুট প্রসেসিং
+    const session = userSessions[userId];
+    if (session && session.step === 'awaiting_uid') {
+        session.step = 'review_order';
+        session.uid = text;
 
         const waitMsg = await ctx.reply('⏳ সার্ভার থেকে প্লেয়ারের তথ্য যাচাই করা হচ্ছে, দয়া করে অপেক্ষা করুন...');
 
@@ -101,86 +144,173 @@ bot.on('text', async (ctx) => {
             
             await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
 
+            let nickname = 'Unknown Player';
             if (response.data && (response.data.success || response.data.status)) {
-                const nickname = response.data.nickname || response.data.name || 'Unknown';
-                await ctx.reply(`🎉 **Free Fire Account Found!**\n\n🆔 **UID:** \`${text}\`\n👤 **Player Name:** \`${nickname}\``, {
-                    parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu', 'back_start')]])
-                });
-            } else {
-                await ctx.reply(`❌ কোনো প্লেয়ার খুঁজে পাওয়া যায়নি বা ইনভ্যালিড UID!\n\nদয়া করে সঠিক UID দিয়ে পুনরায় চেষ্টা করুন।`, {
-                    ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu', 'back_start')]])
-                });
+                nickname = response.data.nickname || response.data.name || 'Unknown';
             }
+
+            session.nickname = nickname;
+            const userBal = userBalances[userId] || 145.0;
+            session.price = 8;
+            session.product = '220 Free Fire Likes';
+            session.region = 'BD';
+
+            const slipText = 
+`╭━━━━━━━━━━━━━━━━━━━━━━━╮
+│  ✨ 𝖲𝖳 𝖫𝖨𝖪𝖤 ~ 𝖲𝖤𝖫𝖫 𝖡𝖮𝖳 ✨  │
+╰━━━━━━━━━━━━━━━━━━━━━━━╯
+👤 **কাস্টমার ইনফো:**
+• নাম: ${ctx.from.first_name || 'User'}
+• ইউজারনেম: ${ctx.from.username ? '@' + ctx.from.username : 'N/A'}
+• টেলিগ্রাম আইডি: \`${userId}\`
+
+━━━━━━━━━━━━━━━━━━━━━━━
+🎮 **গেম অ্যাকাউন্ট ডিটেইলস:**
+• গেমের রিয়েল নাম: \`${nickname}\`
+• গেমের UID: \`${text}\`
+
+━━━━━━━━━━━━━━━━━━━━━━━
+📦 **অর্ডার ও পেমেন্ট সামারি:**
+• প্যাকেজ: ${session.product}
+• সার্ভার / রিজিওন: 🇧🇩 ${session.region}
+• প্যাকেজের দাম: ৳${session.price}
+• আপনার বর্তমান ব্যালেন্স: ৳${userBal}
+• কাটবে মোট: ৳${session.price}
+━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ অনুগ্রহ করে তথ্যগুলো মিলিয়ে নিচে **Confirm** বাটনে ক্লিক করুন।`;
+
+            await ctx.reply(slipText, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('✅ Confirm Order', 'confirm_order'), Markup.button.callback('❌ Cancel', 'back_start')]
+                ])
+            });
+
         } catch (error) {
             await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
-            await ctx.reply(`⚠️ নেম চেকার এপিআই কানেক্ট করতে সমস্যা হয়েছে। দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।`, {
-                ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu', 'back_start')]])
-            });
+            await ctx.reply(`⚠️ নেম চেকার এপিআই কানেক্ট করতে সমস্যা হয়েছে। দয়া করে সঠিক UID দিয়ে আবার চেষ্টা করুন।`);
         }
         return;
     }
 });
 
-// ⚡ লাইক অর্ডার ও প্রসেসিং অ্যানিমেশন
-bot.action('buy_likes', async (ctx) => {
-    let msg = await ctx.reply('⏳ লাইক পাঠানোর প্রক্রিয়া শুরু হচ্ছে...');
+// 🔥 ক্যাটাগরি ও প্যাকেজ হ্যান্ডলার
+bot.action('cat_ff_likes', async (ctx) => {
+    const userId = ctx.from.id;
+    if (!(await checkUserSubscription(ctx, userId))) return sendForceSubMessage(ctx);
+
+    ctx.editMessageText('🔥 **Free Fire Likes Packages**\n\nআপনার পছন্দের লাইক প্যাকেজটি সিলেক্ট করুন:', {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('⚡ 220 Likes - ৳8', 'pkg_like_220')],
+            [Markup.button.callback('🚀 6000 Likes - ৳300', 'pkg_like_6000')],
+            [Markup.button.callback('🔙 Back', 'shop_menu')]
+        ])
+    });
+});
+
+bot.action(/pkg_like_(220|6000)/, async (ctx) => {
+    const userId = ctx.from.id;
+    if (!(await checkUserSubscription(ctx, userId))) return sendForceSubMessage(ctx);
+
+    const amount = ctx.match[1];
+    const price = amount === '220' ? 8 : 300;
+    userSessions[userId] = { product: `${amount} Free Fire Likes`, price: price };
+
+    ctx.editMessageText(`🌍 **Server / Region Selection**\n\nপ্যাকেজ: \`${amount} Likes\` (${price} BDT)\nদয়া করে গেমের সার্ভার বা রিজিওন সিলেক্ট করুন:`, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('🇧🇩 BD (Bangladesh)', 'region_bd'), Markup.button.callback('🇮🇩 Indonesia', 'region_id')],
+            [Markup.button.callback('🔙 Back', 'cat_ff_likes')]
+        ])
+    });
+});
+
+bot.action(/region_(bd|id)/, async (ctx) => {
+    const userId = ctx.from.id;
+    if (!(await checkUserSubscription(ctx, userId))) return sendForceSubMessage(ctx);
+
+    const region = ctx.match[1].toUpperCase();
+    if (userSessions[userId]) userSessions[userId].region = region;
+    userSessions[userId].step = 'awaiting_uid';
+
+    ctx.editMessageText(`🎮 **Enter Game UID (${region})**\n\n✍️ অনুগ্রহ করে প্লেয়ারের সঠিক **UID** (যেমন: \`9884223138\`) নিচে চ্যাটে লিখে পাঠান:`, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel', 'back_start')]])
+    });
+});
+
+// ⚡ ইউনিক অ্যানিমেশন ও অর্ডার কনফার্মেশন
+bot.action('confirm_order', async (ctx) => {
+    const userId = ctx.from.id;
+    if (!(await checkUserSubscription(ctx, userId))) return sendForceSubMessage(ctx);
+
+    const session = userSessions[userId];
+    if (!session) return ctx.answerCbQuery('❌ সেশন মেয়াদোত্তীর্ণ হয়েছে।', { show_alert: true });
+
+    let msg = await ctx.reply('⏳ অর্ডারের রিকোয়েস্ট প্রসেসিং হচ্ছে...\n\n[▒▒▒▒▒▒▒▒▒▒] 10%');
     
     setTimeout(async () => {
-        await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, '🔄 সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...');
+        await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, '🔄 সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n[████▒▒▒▒▒▒] 40%').catch(() => {});
     }, 1500);
 
     setTimeout(async () => {
-        await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, '📊 লাইক কাউন্ট মিলিয়ে দেখা হচ্ছে...');
+        await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, '⚡ গেমের সাথে লাইক সিনক্রোনাইজ হচ্ছে...\n\n[████████▒▒] 80%').catch(() => {});
     }, 3000);
 
     setTimeout(async () => {
-        await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, '✅ **সফলভাবে লাইক পাঠানো সম্পন্ন হয়েছে!**\n\n❤️ আগের লাইক: `1995`\n❤️ বর্তমান লাইক: `2215`\n➕ যুক্ত হয়েছে: `+220`', { parse_mode: 'Markdown' });
+        userBalances[userId] = (userBalances[userId] || 145.0) - session.price;
+
+        await ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, 
+            `✅ **সফলভাবে অর্ডার কমপ্লিট!**\n\n[██████████] 100%\n\n📦 প্যাকেজ: \`${session.product}\`\n🆔 UID: \`${session.uid}\`\n👤 নাম: \`${session.nickname}\`\n💰 অবশিষ্ট ব্যালেন্স: \`৳${userBalances[userId]}\``, 
+            { parse_mode: 'Markdown' }
+        );
+
+        const adminNotifyText = 
+`🔔 **NEW ORDER PLACED!** 🔔
+━━━━━━━━━━━━━━━━━━━
+👤 কাস্টমার: ${ctx.from.first_name} (@${ctx.from.username || 'N/A'})
+🆔 কাস্টমার আইডি: \`${userId}\`
+📦 প্রোডাক্ট: \`${session.product}\` (${session.region})
+🎮 গেম UID: \`${session.uid}\`
+👤 গেম নেম: \`${session.nickname}\`
+💵 মূল্য: \`৳${session.price}\`
+━━━━━━━━━━━━━━━━━━━`;
+
+        await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback(`✅ Approve [${userId}]`, `admin_app_${userId}`), Markup.button.callback(`❌ Cancel [${userId}]`, `admin_can_${userId}`)]
+            ])
+        }).catch(() => {});
+
+        delete userSessions[userId];
     }, 4500);
 });
 
-// 💳 ডিপোজিট সেকশন
-bot.action('deposit', (ctx) => {
-    ctx.reply(
-        '💳 **ডিপোজিট সেকশন**\n\nপেমেন্ট করার জন্য নিচের মেথডগুলো থেকে আপনার পছন্দের মাধ্যমটি সিলেক্ট করুন:',
-        Markup.inlineKeyboard([
-            [Markup.button.callback('bKash', 'pay_bkash'), Markup.button.callback('Nagad', 'pay_nagad')],
-            [Markup.button.callback('Rocket', 'pay_rocket'), Markup.button.callback('Binance', 'pay_binance')],
-            [Markup.button.callback('🔙 Main Menu', 'back_start')]
-        ])
-    );
+bot.action(/admin_app_(.+)/, async (ctx) => {
+    const targetUserId = ctx.match[1];
+    await ctx.answerCbQuery('✅ অর্ডারটি অ্যাপ্রুভ করা হয়েছে!');
+    await ctx.editMessageText(ctx.callbackQuery.message.text + '\n\n**[STATUS: APPROVED ✅]**', { parse_mode: 'Markdown' });
+    await bot.telegram.sendMessage(targetUserId, '🎉 আপনার অর্ডারটি সফলভাবে অ্যাডমিন কর্তৃক কনফার্ম ও প্রসেস করা হয়েছে!').catch(() => {});
 });
 
-bot.action(/pay_(.+)/, (ctx) => {
-    const method = ctx.match[1].toUpperCase();
-    ctx.reply(`📌 **${method} Deposit System**\n\n১. সেন্ড মানি করুন: \`01772665599\`\n২. টাকা পাঠানোর পর **TrxID** অথবা পেমেন্টের স্ক্রিনশট এখানে পাঠিয়ে দিন।`);
+bot.action(/admin_can_(.+)/, async (ctx) => {
+    const targetUserId = ctx.match[1];
+    await ctx.answerCbQuery('❌ অর্ডারটি বাতিল করা হয়েছে!');
+    await ctx.editMessageText(ctx.callbackQuery.message.text + '\n\n**[STATUS: CANCELLED ❌]**', { parse_mode: 'Markdown' });
+    await bot.telegram.sendMessage(targetUserId, '❌ দুঃখিত, আপনার অর্ডারটি বাতিল (Cancelled) করা হয়েছে। বিস্তারিত জানতে সাপোর্টে যোগাযোগ করুন।').catch(() => {});
 });
 
-// 👤 প্রোফাইল সেকশন
-bot.action('profile', (ctx) => {
+bot.action('back_start', async (ctx) => {
     const userId = ctx.from.id;
-    const balance = userBalances[userId] || 145.0;
-    ctx.reply(`👤 **MY PROFILE**\n\n🆔 Telegram ID: \`${userId}\`\n💰 ব্যালেন্স: \`${balance} BDT\`\n📦 মোট অর্ডার: \`১ টি\`\n❤️ মোট লাইক: \`২১৩ টি\``, { parse_mode: 'Markdown' });
+    delete userSessions[userId];
+    await ctx.reply('🔙 মূল মেনুতে ফিরে এসেছেন:', { ...getMainKeyboard(userId) });
 });
 
-// 📞 সাপোর্ট ডেস্ক্রিপশন
-bot.action('support', (ctx) => {
-    ctx.reply('📞 **Support Desk**\n\nআপনার যেকোনো সমস্যা বা প্রশ্ন এখানে লিখে পাঠান, অ্যাডমিন খুব শীঘ্রই আপনার সাথে যোগাযোগ করবেন।');
-});
-
-// 📜 হিস্ট্রি
-bot.action('history', (ctx) => {
-    ctx.reply('📜 **Order History**\n\nআপনার পূর্ববর্তী সফল অর্ডারগুলোর তালিকা নিচে দেওয়া হলো:\n\n✨ ডেইলি লাইকস (+220 Likes) - সফল ✅');
-});
-
-bot.action('back_start', (ctx) => {
-    sendMainMenu(ctx);
-});
-
-// 🚀 রেন্ডার (Render) সার্ভার সচল রাখার জন্য Express সার্ভার
 const express = require('express');
 const app = express();
-app.get('/', (req, res) => res.send('ST LIKE ~ SELL BOT is running perfectly! 🔥'));
+app.get('/', (req, res) => res.send('ST LIKE ~ SELL BOT is running with Reply Keyboard! 🔥'));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
