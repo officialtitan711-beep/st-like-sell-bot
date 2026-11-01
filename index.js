@@ -1,6 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
-const http = http = require('http');
+const http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -168,7 +168,7 @@ bot.use(async (ctx, next) => {
     } catch (err) { console.error('Middleware Error:', err); }
 });
 
-// ✨ [ডিজাইন ১] বটে যখন ইউজার এন্ট্রি নিবে (Welcome Message)
+// ✨ বটে যখন ইউজার এন্ট্রি নিবে (Welcome Message)
 bot.start(async (ctx) => {
     const userId = ctx.from.id.toString();
     const isSubscribed = await checkUserSubscription(userId);
@@ -246,7 +246,6 @@ bot.on('message', async (ctx) => {
                 const userBal = db.balances[targetUserId] || 0;
                 const lines = text.split('\n');
                 
-                // অ্যাডমিনের দেওয়া ৩টি লাইন (Previous, Current, Added)
                 const prevLikes = lines[0] || '---';
                 const currLikes = lines[1] || '---';
                 const addedLikes = lines[2] || '---';
@@ -328,7 +327,7 @@ bot.on('message', async (ctx) => {
         return ctx.reply(`✅ ব্রডকাস্ট সফল! অনুমোদিত মোট \`${successCount}\` জন ইউজারের কাছে মেসেজ পাঠানো হয়েছে।`, { parse_mode: 'Markdown' });
     }
 
-    // --- [ডিজাইন ২] ব্যালেন্স যখন অ্যাড হবে (English Format) ---
+    // --- ব্যালেন্স যখন অ্যাড হবে ---
     if (userId === ADMIN_ID.toString() && db.sessions[userId]?.step === 'admin_balance_prompt') {
         const parts = text.split(' ');
         if (parts.length >= 2) {
@@ -520,7 +519,7 @@ Your account balance has been successfully updated! ✨
 ━━━━━━━━━━━━━━━━━━━`;
 
         await bot.telegram.sendMessage(ADMIN_ID, customerInfo, { parse_mode: 'Markdown' }).catch(()=>{});
-        await ctx.telegram.forwardMessage(ADMIN_ID, ctx.chat.id, ctx.message.message_id).catch(()=>{});
+        await bot.telegram.forwardMessage(ADMIN_ID, ctx.chat.id, ctx.message.message_id).catch(()=>{});
     }
 
     // --- কাস্টমার মেনু অপশন ---
@@ -816,15 +815,16 @@ bot.action('confirm_order', async (ctx) => {
         delete db.sessions[userId];
         saveDatabase(db);
 
-        // অ্যাডমিন প্যানেলে সুন্দর টেমপ্লেট বক্স পাঠানো
+        // অ্যাডমিন প্যানেলে আপনার পছন্দের নতুন লেআউট অনুযায়ী নোটিফিকেশন পাঠানো
         const adminNotifyText = 
 `🔔 **NEW ORDER PENDING APPROVAL!** 🔔
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 কাস্টমার: ${ctx.from.first_name} (@${ctx.from.username || 'N/A'})
+👤 কাস্টমার: ${ctx.from.first_name}
 🆔 কাস্টমার আইডি: \`${userId}\`
+
 📦 প্রোডাক্ট: \`${session.product}\` (${session.region})
-🎮 গেম UID: \`${session.uid}\`
 👤 গেম নেম: \`${session.nickname}\`
+🎮 গেম UID: \`${session.uid}\`
 💵 মূল্য: \`৳${session.price}\`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👉 **অর্ডার কমপ্লিট করতে এই মেসেজে Reply (রিপ্লাই) করে ঠিক নিচে ৩টি সংখ্যা লিখে পাঠান:**
