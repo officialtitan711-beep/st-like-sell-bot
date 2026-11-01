@@ -1,5 +1,7 @@
 const { Telegraf, Markup } = require('telegraf');
-const axios = require('axios');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
 require('dotenv').config();
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -10,7 +12,7 @@ const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir
 let userBalances = {};
 let userSessions = {};
 
-// 🛡️ টেলিগ্রাম চ্যানেল সাবস্ক্রিপশন চেক
+// 🛡️ রিয়েল-টাইম টেলিগ্রাম চ্যানেল সাবস্ক্রিপশন চেক
 async function checkUserSubscription(ctx, userId) {
     if (userId.toString() === ADMIN_ID.toString()) return true;
     try {
@@ -51,6 +53,39 @@ function getMainKeyboard(userId) {
     return Markup.keyboard(keyboard).resize();
 }
 
+// 🔍 আপনার দেওয়া নিখুঁত UID চেকিং ফাংশন (যা দিয়ে রিয়েল নাম চলে আসবে)
+function checkFreeFireUID(uid) {
+    return new Promise((resolve) => {
+        const url = `https://akmtopup.com/api/checkuid?uid=${uid}`;
+
+        https.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    let nickname = parsed.nickname || parsed.message || parsed.name || parsed.username || parsed.AccountName;
+
+                    if (nickname && nickname.trim() !== '') {
+                        resolve(nickname);
+                    } else {
+                        resolve('Unknown Player');
+                    }
+                } catch (e) {
+                    resolve('Unknown Player');
+                }
+            });
+        }).on('error', () => {
+            resolve('Unknown Player');
+        });
+    });
+}
+
 // ✨ /start কমান্ড
 bot.start(async (ctx) => {
     const userId = ctx.from.id;
@@ -77,7 +112,7 @@ bot.action('verify_sub', async (ctx) => {
     await ctx.reply('✨ মেনু সচল করা হয়েছে:', { ...getMainKeyboard(userId) });
 });
 
-// 📥 টেক্সট কমান্ড বা নিচের মেনুর বাটনগুলোর হ্যান্ডলার
+// 📥 টেক্সট কমান্ড ও নিচের মেনুর বাটনগুলোর হ্যান্ডলার
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id;
     if (!(await checkUserSubscription(ctx, userId))) return sendForceSubMessage(ctx);
@@ -97,7 +132,7 @@ bot.on('text', async (ctx) => {
 
     // ২. চেক এফএফ ইউআইডি ক্লিক করলে
     if (text === '🔍 Check FF UID') {
-        userSessions[userId] = { step: 'awaiting_uid' };
+        userSessions[userId] = { step: 'awaiting_uid_only' };
         return ctx.reply('🎮 **Free Fire UID Checker**\n\n✍️ যে প্লেয়ারের নাম চেক করতে চান, তার সঠিক **UID** (যেমন: `9884223138`) নিচে চ্যাটে লিখে পাঠান:', {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel', 'back_start')]])
@@ -132,28 +167,29 @@ bot.on('text', async (ctx) => {
 
     // UID ইনপুট প্রসেসিং
     const session = userSessions[userId];
-    if (session && session.step === 'awaiting_uid') {
-        session.step = 'review_order';
-        session.uid = text;
+    if (session && (session.step === 'awaiting_uid' || session.step === 'awaiting_uid_only')) {
+        const isOnlyCheck = session.step === 'awaiting_uid_only';
+        const uid = text;
 
         const waitMsg = await ctx.reply('⏳ সার্ভার থেকে প্লেয়ারের তথ্য যাচাই করা হচ্ছে, দয়া করে অপেক্ষা করুন...');
 
         try {
-            const apiUrl = `https://akmtopup.com/api/checkuid?uid=${text}`;
-            const response = await axios.get(apiUrl, { timeout: 15000 });
-            
+            const nickname = await checkFreeFireUID(uid);
             await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
 
-            let nickname = 'Unknown Player';
-            if (response.data && (response.data.success || response.data.status)) {
-                nickname = response.data.nickname || response.data.name || 'Unknown';
+            if (isOnlyCheck) {
+                delete userSessions[userId];
+                return ctx.reply(`🎉 **Free Fire Account Found!**\n\n🆔 **UID:** \`${uid}\`\n👤 **Player Name:** \`${nickname}\``, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu', 'back_start')]])
+                });
             }
 
+            // অর্ডার ফ্লো স্লিপ জেনারেটর
+            session.step = 'review_order';
+            session.uid = uid;
             session.nickname = nickname;
             const userBal = userBalances[userId] || 145.0;
-            session.price = 8;
-            session.product = '220 Free Fire Likes';
-            session.region = 'BD';
 
             const slipText = 
 `╭━━━━━━━━━━━━━━━━━━━━━━━╮
@@ -167,7 +203,7 @@ bot.on('text', async (ctx) => {
 ━━━━━━━━━━━━━━━━━━━━━━━
 🎮 **গেম অ্যাকাউন্ট ডিটেইলস:**
 • গেমের রিয়েল নাম: \`${nickname}\`
-• গেমের UID: \`${text}\`
+• গেমের UID: \`${uid}\`
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 📦 **অর্ডার ও পেমেন্ট সামারি:**
