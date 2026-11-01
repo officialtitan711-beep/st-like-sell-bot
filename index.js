@@ -126,7 +126,9 @@ function checkFreeFireUID(uid) {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json' }
         }, (res) => {
             let data = '';
-            res.on('data', (chunk) => { data += chunk; });
+            res.on('data', (chunk) => { 
+                data += chunk; 
+            });
             res.on('end', () => {
                 try {
                     const parsed = JSON.parse(data);
@@ -136,7 +138,7 @@ function checkFreeFireUID(uid) {
                     } else {
                         resolve('Unknown Player');
                     }
-                } catch (e) { 
+                } catch (err) { 
                     resolve('Unknown Player'); 
                 }
             });
