@@ -9,7 +9,8 @@ const ADMIN_ID = process.env.ADMIN_ID || '5932254012';
 const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
-const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com';
+// এখানে রেন্ডারের এক্সাক্ট লাইভ ইউআরএল লিংকটি সরাসরি সেট করে দেওয়া হয়েছে
+const RENDER_URL = 'https://st-like-sell-bot.onrender.com';
 const PORT = process.env.PORT || 3000;
 const DB_FILE = 'database.json';
 
@@ -62,13 +63,13 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     let keyboard;
 
     if (isPendingAdminAccess) {
-        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন।\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
+        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন።\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
         keyboard = Markup.inlineKeyboard([
             [Markup.button.url('💬 Message Admin 🚀', 'https://t.me/sonu1813')],
             [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')]
         ]);
     } else {
-        text = "🚨 **SECURITY LOCK & FORCE SUBSCRIBE** 🚨\n\nআমাদের প্রিমিয়াম বট ব্যবহার করতে হলে অবশ্যই অফিশিয়াল চ্যানেলে যুক্ত থাকতে হবে!\n\n🔥 **ধাপসমূহ:**\n1️⃣ প্রথমে টেলিগ্রাম চ্যানেলে জয়েন করুন।\n2️⃣ ইউটিউব চ্যানেল সাবস্ক্রাইব করুন।\n3️⃣ সবশেষে ভেরিফাই বাটনে ক্লিক করুন।";
+        text = "🚨 **SECURITY LOCK & FORCE SUBSCRIBE** 🚨\n\nআমাদের প্রিমিয়াম বট ব্যবহার করতে হলে অবশ্যই অফিশিয়াল চ্যানেলে যুক্ত থাকতে হবে!\n\n🔥 **ধাপসমূহ:**\n1️⃣ প্রথমে টেলিগ্রাম চ্যানেলে জয়েন করুন।\n2️⃣ ইউটিউব চ্যানেল সাবস্ক্রাইব করুন।\n3️⃣ সবশেষে ভেরিফাই বাটনে ক্লিক করুন።";
         keyboard = Markup.inlineKeyboard([
             [Markup.button.url('📢 Join Telegram Channel 🚀', 'https://t.me/shohan2004')],
             [Markup.button.url('🔴 Subscribe YouTube 🎬', YOUTUBE_URL)],
