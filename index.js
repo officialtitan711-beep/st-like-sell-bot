@@ -616,7 +616,10 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
 bot.action(/copy_num_(.+)/, async (ctx) => {
     const num = ctx.match[1];
     try {
-        await ctx.answerCbQuery('📋 সফলভাবে কপি হয়েছে: ' + num, { copy_text: num });
+        await ctx.answerCbQuery('📋 সফলভাবে কপি হয়েছে: ' + num, {
+            type: 'copy',
+            text: num
+        });
     } catch (e) {
         await ctx.answerCbQuery('📋 নম্বর: ' + num, { show_alert: true });
     }
