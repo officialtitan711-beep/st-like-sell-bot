@@ -461,12 +461,12 @@ Your account balance has been successfully updated! ✨
 ║     📥 NEW DEPOSIT / TrxID      ║
 ╚═════════════════════════════════╝
 ┌─────────────────────────────────┐
-│ 👤 নাম: ${ctx.from.first_name || 'N/A'}                │
-│ 🔗 ইউজারনেম: ${ctx.from.username ? '@' + ctx.from.username : 'N/A'}          │
-│ 🆔 ID: \`${userId}\`                  │
-│ 💳 মাধ্যম: ${method.toUpperCase()}                  │
-│ 💵 পরিমাণ: \`${amount} BDT\`          │
-│ 🔑 TrxID: \`${trxId}\`                │
+│ 👤 নাম: ${ctx.from.first_name || 'N/A'}
+│ 🔗 ইউজারনেম: ${ctx.from.username ? '@' + ctx.from.username : 'N/A'}
+│ 🆔 ID: \`${userId}\`
+│ 💳 মাধ্যম: ${method.toUpperCase()}
+│ 💵 পরিমাণ: \`${amount} BDT\`
+│ 🔑 TrxID: \`${trxId}\`
 └─────────────────────────────────┘
 
 💡 ইউজার TrxID পাঠিয়েছেন। চেক করে ব্যালেন্স অ্যাড করে দিন।`;
