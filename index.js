@@ -88,7 +88,7 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
 
 function getMainKeyboard(userId) {
     let keyboard = [
-        ['🛍️ All Products', '🔍 Check FF UID'],
+        ['🛍️ Shop Now', '🔍 Check FF UID'],
         ['💰 Add Balance', '👤 My Profile'],
         ['📜 Order History', '📞 Support Desk']
     ];
@@ -484,18 +484,22 @@ bot.on('message', async (ctx) => {
         await bot.telegram.forwardMessage(ADMIN_ID, ctx.chat.id, ctx.message.message_id).catch(()=>{});
     }
 
-    if (text === '🛍️ All Products') {
-        let productMsg = "🛍️ **All Available Products & Services**\n\n🔥 **1. Free Fire Likes:**\n• 220 Likes - ৳8\n• 6000 Likes - ৳300\n\n";
+    if (text === '🛍️ Shop Now') {
+        let inlineButtons = [
+            [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
+        ];
+
         if (db.customProducts.length > 0) {
-            productMsg += "⭐ **2. Special & Guild Products:**\n";
-            db.customProducts.forEach((p, idx) => { productMsg += "• " + (idx + 1) + ". " + p + "\n"; });
+            db.customProducts.forEach((p, idx) => {
+                inlineButtons.push([Markup.button.callback('⭐ ' + p, 'custom_prod_' + idx)]);
+            });
         }
-        return ctx.reply(productMsg, {
+
+        inlineButtons.push([Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]);
+
+        return ctx.reply("🛍️ **All Available Products & Services**\n\n👇 আপনার পছন্দের সার্ভিসটি নিতে নিচের বাটনগুলোতে ক্লিক করুন:", {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')],
-                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-            ])
+            ...Markup.inlineKeyboard(inlineButtons)
         });
     }
 
@@ -581,7 +585,7 @@ bot.on('message', async (ctx) => {
             await ctx.reply(slipText, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
-                    [Markup.button.callback('✅ Confirm Order 🚀', 'confirm_order'), Markup.button.callback('🔙 Back ↩️', 'cat_ff_likes')]
+                    [Markup.button.callback('✅ Confirm Order 🚀', 'confirm_order'), Markup.button.callback('🔙 Back ↩️', 'shop_now_back')]
                 ])
             });
 
@@ -601,7 +605,7 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
     db.sessions[userId] = { step: 'awaiting_deposit_amount', method: method };
     saveDatabase(db);
 
-    await ctx.editMessageText("✦⚡──────────────⚡✦\n📥 **" + method.toUpperCase() + " DEPOSIT** 📥\n✦⚡──────────────⚡✦\nকত টাকা ডিপোজিট করতে চান? \nনিচে শুধু সংখ্যাটি লিখে পাঠান (যেমন: `100`) ✍️", {
+    await ctx.editMessageText("✦⚡──────────────⚡✦\n📥 **" + method.toUpperCase() + " DEPOSIT** 📥\n✦⚡──────────────⚡✦\nকত টাকা ডিপোজিট করতে চান? \nনিচে শুধু সংখ্যাটি লিখে পাঠান যেমন: `100` ✍️", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]
@@ -611,7 +615,11 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
 
 bot.action(/copy_num_(.+)/, async (ctx) => {
     const num = ctx.match[1];
-    await ctx.answerCbQuery('📋 নম্বর কপি সফল: ' + num, { show_alert: true });
+    try {
+        await ctx.answerCbQuery('📋 সফলভাবে কপি হয়েছে: ' + num, { copy_text: num });
+    } catch (e) {
+        await ctx.answerCbQuery('📋 নম্বর: ' + num, { show_alert: true });
+    }
 });
 
 bot.action('set_bkash_prompt', async (ctx) => {
@@ -632,13 +640,46 @@ bot.action('set_nagad_prompt', async (ctx) => {
     await ctx.editMessageText('📱 অনুগ্রহ করে নতুন **নগদ নম্বরটি** লিখে চ্যাটে পাঠান:', { parse_mode: 'Markdown' });
 });
 
+bot.action('shop_now_back', async (ctx) => {
+    const db = loadDatabase();
+    let inlineButtons = [
+        [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
+    ];
+
+    if (db.customProducts.length > 0) {
+        db.customProducts.forEach((p, idx) => {
+            inlineButtons.push([Markup.button.callback('⭐ ' + p, 'custom_prod_' + idx)]);
+        });
+    }
+
+    inlineButtons.push([Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]);
+
+    await ctx.editMessageText("🛍️ **All Available Products & Services**\n\n👇 আপনার পছন্দের সার্ভিসটি নিতে নিচের বাটনগুলোতে ক্লিক করুন:", {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(inlineButtons)
+    });
+});
+
+bot.action(/custom_prod_(.+)/, async (ctx) => {
+    const index = parseInt(ctx.match[1]);
+    const db = loadDatabase();
+    const prodName = db.customProducts[index] || 'Custom Product';
+    await ctx.answerCbQuery('⭐ ' + prodName + ' সিলেক্ট করা হয়েছে!');
+    await ctx.editMessageText("📦 **Product:** `" + prodName + "`\n\nএই প্রোডাক্টটি নিতে বা অর্ডার করতে অ্যাডমিনের সাথে যোগাযোগ করুন অথবা পরবর্তী স্টেপ ফলো করুন।", {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Back to Shop 🛍️', 'shop_now_back')]
+        ])
+    });
+});
+
 bot.action('cat_ff_likes', async (ctx) => {
     await ctx.editMessageText('🔥 **Free Fire Likes Packages**\n\nআপনার পছন্দের লাইক প্যাকেজটি সিলেক্ট করুন:', {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('⚡ 220 Likes - ৳8', 'pkg_like_220')],
             [Markup.button.callback('🚀 6000 Likes - ৳300', 'pkg_like_6000')],
-            [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
+            [Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]
         ])
     });
 });
@@ -681,7 +722,7 @@ bot.action('confirm_order', async (ctx) => {
     const userId = ctx.from.id.toString();
     const db = loadDatabase();
     const session = db.sessions && db.sessions[userId] ? db.sessions[userId] : null;
-    if (!session) return ctx.answerCbQuery('❌ সেশন মেয়াদোত্তীর্ণ হয়েছে।', { show_alert: true });
+    if (!session) return ctx.answerCbQuery('❌ সেশন মেয়াদোত্তীর্ণ হয়েছে। নির্বাচন করুন।', { show_alert: true });
 
     const userBal = db.balances[userId] || 0;
     if (userBal < session.price) {
