@@ -30,12 +30,18 @@ function loadDatabase() {
             if (!parsed.allowedUsers) parsed.allowedUsers = {};
             return parsed;
         }
-    } catch (e) { console.error('DB Load Error:', e); }
+    } catch (e) { 
+        console.error('DB Load Error:', e); 
+    }
     return { users: {}, balances: {}, sessions: {}, numbers: {}, customProducts: [], allowedUsers: {} };
 }
 
 function saveDatabase(data) {
-    try { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('DB Save Error:', e); }
+    try { 
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); 
+    } catch (e) { 
+        console.error('DB Save Error:', e); 
+    }
 }
 
 // 🛡️ রিয়েল-টাইম টেলিগ্রাম চ্যানেল সাবস্ক্রিপশন চেক
@@ -130,9 +136,13 @@ function checkFreeFireUID(uid) {
                     } else {
                         resolve('Unknown Player');
                     }
-                } catch (e) { resolve('Unknown Player'); }
+                } catch (e) { 
+                    resolve('Unknown Player'); 
+                }
             });
-        }).on('error', () => { resolve('Unknown Player'); });
+        }).on('error', () => { 
+            resolve('Unknown Player'); 
+        });
     });
 }
 
@@ -165,7 +175,9 @@ bot.use(async (ctx, next) => {
             }
         }
         await next();
-    } catch (err) { console.error('Middleware Error:', err); }
+    } catch (err) { 
+        console.error('Middleware Error:', err); 
+    }
 });
 
 // ✨ বটে যখন ইউজার এন্ট্রি নিবে (Welcome Message)
