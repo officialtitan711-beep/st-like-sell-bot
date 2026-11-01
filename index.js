@@ -4,7 +4,8 @@ const http = require('http');
 const https = require('https');
 require('dotenv').config();
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+// নিরাপদ টোকেন কনফিগারেশন (যাতে কোনোভাবেই ক্র্যাশ না করে)
+const BOT_TOKEN = process.env.BOT_TOKEN || '8395471740:AAF-v0dAgc36nL7sb1G5Dy6IzHmsCUlwe80';
 const ADMIN_ID = process.env.ADMIN_ID || '5932254012';
 const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
@@ -12,6 +13,8 @@ const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com';
 const PORT = process.env.PORT || 3000;
 const DB_FILE = 'database.json';
+
+const bot = new Telegraf(BOT_TOKEN);
 
 // ডাটাবেজ হ্যান্ডলিং
 function loadDatabase() {
@@ -29,7 +32,7 @@ function saveDatabase(data) {
     try { fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('DB Save Error:', e); }
 }
 
-// 🛡️ রিয়েল-টাইম টেলিগ্রাম চ্যানেল সাবস্ক্রিপশন চেক (লিভ নিলেই ধরা পড়বে)
+// 🛡️ রিয়েল-টাইম টেলিগ্রাম চ্যানেল সাবস্ক্রিপশন চেক
 async function checkUserSubscription(userId) {
     if (userId.toString() === ADMIN_ID.toString()) return true;
     try {
@@ -43,9 +46,9 @@ async function checkUserSubscription(userId) {
     }
 }
 
-// 📢 ফোর্সিং সাবস্ক্রাইব মেসেজ (যখনই চ্যানেল থেকে লিভ নিবে বা নতুন আসবে)
+// 📢 ফোর্সিং সাবস্ক্রাইব মেসেজ
 async function sendForceSubMessage(ctx) {
-    const text = `⚠️ **অ্যাক্সেস ডিনায়েলড & সিকিউরিটি অ্যালার্ট!**\n\nআমাদের এই প্রিমিয়াম ফ্রি ফায়ার লাইক ও সার্ভিস বটের ফুল এক্সেস পেতে হলে আপনাকে অবশ্যই আমাদের অফিশিয়াল টেলিগ্রাম চ্যানেলে জয়েন থাকতে হবে।\n\n👉 **নিয়মাবলী:**\n1️⃣ প্রথমে নিচের **📢 Join Telegram Channel** এ ক্লিক করে আমাদের চ্যানেলে জয়েন করুন।\n2️⃣ ইউটিউব চ্যানেল সাবস্ক্রাইব করতে পারেন (ঐচ্ছিক)।\n3️⃣ সবশেষে **🔄 𝐕𝐞𝐫𝐢𝐟𝐲 𝐌𝐞𝐦𝐛𝐞𝐫𝐬𝐡𝐢𝐩** বাটনে ক্লিক করুন।\n\n*(সতর্কতা: পরবর্তীতে চ্যানেল থেকে লিভ নিলে বট আর কাজ করবে না!)*`;
+    const text = `⚠️ **অ্যাক্সেস ডিনায়েলড & সিকিউরিটি অ্যালার্ট!**\n\nআমাদের এই প্রিমিয়াম ফ্রি ফায়ার লাইক ও সার্ভিস বটের ফুল এক্সেস পেতে হলে আপনাকে অবশ্যই আমাদের অফিশিয়াল টেলিগ্রাম চ্যানেলে জয়েন থাকতে হবে।\n\n👉 **নিয়মাবলী:**\n1️⃣ প্রথমে নিচের **📢 Join Telegram Channel** এ ক্লিক করে আমাদের চ্যানেলে জয়েন করুন।\n2️⃣ ইউটিউব চ্যানেল সাবস্ক্রাইব করতে পারেন (ঐচ্ছিক)।\n3️⃣ সবশেষে **🔄 𝐕𝐞𝐫𝐢𝐟𝐲 𝐌𝐞𝐦𝐛𝐞𝐫𝐬𝐡𝐢𝐩** বাটনে ক্লিক করুন।`;
     
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.url('📢 Join Telegram Channel', 'https://t.me/shohan2004')],
@@ -81,7 +84,7 @@ function getMainKeyboard(userId) {
     return Markup.keyboard(keyboard).resize();
 }
 
-// 🔍 UID চেকিং ফাংশন (AKM Topup API)
+// 🔍 UID চেকিং ফাংশন
 function checkFreeFireUID(uid) {
     return new Promise((resolve) => {
         const url = `https://akmtopup.com/api/checkuid?uid=${uid}`;
@@ -105,24 +108,16 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// 🛡️ গ্লোবাল মিডলওয়্যার (প্রতিবার যেকোনো কমান্ড বা মেসেজে চ্যানেলে আছে কি না চেক করবে)
+// 🛡️ গ্লোবাল মিডলওয়্যার
 bot.use(async (ctx, next) => {
     try {
         if (ctx && ctx.from) {
             const userId = ctx.from.id.toString();
-            
-            // অ্যাডমিন হলে বাইপাস
             if (userId === ADMIN_ID) return next();
 
-            // যদি ভেরিফাই বাটন বা /start কমান্ড হয়, তবে পাস করবে
-            if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_sub') {
-                return next();
-            }
-            if (ctx.message && ctx.message.text && ctx.message.text.startsWith('/start')) {
-                return next();
-            }
+            if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_sub') return next();
+            if (ctx.message && ctx.message.text && ctx.message.text.startsWith('/start')) return next();
 
-            // রিয়েল-টাইম চ্যানেল মেম্বারশিপ চেক (একমাস বা এক বছর পরেও লিভ নিলে ধরা পড়বে)
             const isSubscribed = await checkUserSubscription(userId);
             if (!isSubscribed) {
                 return sendForceSubMessage(ctx);
@@ -287,7 +282,7 @@ bot.action('cat_ff_likes', async (ctx) => {
         ...Markup.inlineKeyboard([
             [Markup.button.callback('⚡ 220 Likes - ৳8', 'pkg_like_220')],
             [Markup.button.callback('🚀 6000 Likes - ৳300', 'pkg_like_6000')],
-            [Markup.button.callback('🔙 Back', 'shop_menu')]
+            [Markup.button.callback('🔙 Back', 'back_start')]
         ])
     });
 });
