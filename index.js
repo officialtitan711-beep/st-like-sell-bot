@@ -446,7 +446,7 @@ bot.on('message', async (ctx) => {
         session.step = 'awaiting_trxid';
         saveDatabase(db);
 
-        const slipText = "•.¸¸.•*´¨`*•.¸¸.•*´¨`*•.¸¸.•*´¨`*•.¸¸\n💖 **" + method.toUpperCase() + " DEPOSIT PORTAL** 💖\n•.¸¸.•*´¨`*•.¸¸.•*´¨`*•.¸¸.•*´¨`*•.¸¸\n\n💰 **ডিপোজিট পরিমাণ:** `✨ " + amount + ".0 BDT`\n\n1️⃣ 📱 " + method.toUpperCase() + " অ্যাপ ওপেন করুন।\n2️⃣ 💸 **Send Money** অপশন সিলেক্ট করুন।\n3️⃣ 🎯 নিচের অফিশিয়াল নম্বরে টাকা পাঠান।\n4️⃣ 📝 পেমেন্ট শেষে TrxID কপি করে রাখুন।\n5️⃣ 💬 এখানে ট্রানজেকশন আইডি বা স্ক্রিনশট দিন।\n\n📞 **নম্বর:** `" + rawNumber + "`\n*(ট্যাপ করলেই নম্বর কপি হবে)*\n─────────────────────────────────────\n⚠️ **সতর্কবার্তা:** ভুল নম্বরে টাকা পাঠালে তা ফেরতযোগ্য নয়!";
+        const slipText = "╔═════════════════════════════════╗\n║     💰 " + method.toUpperCase() + " DEPOSIT PORTAL 💰     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💵 ডিপোজিট পরিমাণ: `" + amount + ".0 BDT`\n├─────────────────────────────────┤\n│ 1️⃣ " + method.toUpperCase() + " অ্যাপ ওপেন করুন।\n│ 2️⃣ Send Money অপশন সিলেক্ট করুন।\n│ 3️⃣ নিচের অফিশিয়াল নম্বরে টাকা পাঠান।\n│ 4️⃣ পেমেন্ট শেষে TrxID কপি করুন।\n├─────────────────────────────────┤\n│ 📞 নম্বর: `" + rawNumber + "`\n└─────────────────────────────────┘\n⚠️ **সতর্কবার্তা:** ভুল নম্বরে টাকা পাঠালে তা ফেরতযোগ্য নয়!";
 
         return ctx.reply(slipText, {
             parse_mode: 'Markdown',
@@ -515,7 +515,7 @@ bot.on('message', async (ctx) => {
     }
 
     if (text === '💰 Add Balance') {
-        const depositMenuText = "### 💰 **ADD BALANCE & DEPOSIT DESK** 💰\n#####################################\n💎 **সর্বনিম্ন ডিপোজিট:** `100.0 BDT` 💵\n👇 নিচের পেমেন্ট মেথডগুলোতে ক্লিক করে প্রক্রিয়া শুরু করুন:\n#####################################";
+        const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💎 সর্বনিম্ন ডিপোজিট: `100.0 BDT`     │\n│ 👇 নিচের মেথড সিলেক্ট করুন:       │\n└─────────────────────────────────┘";
         return ctx.reply(depositMenuText, { 
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -605,7 +605,7 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
     db.sessions[userId] = { step: 'awaiting_deposit_amount', method: method };
     saveDatabase(db);
 
-    await ctx.editMessageText("✦⚡──────────────⚡✦\n📥 **" + method.toUpperCase() + " DEPOSIT** 📥\n✦⚡──────────────⚡✦\nকত টাকা ডিপোজিট করতে চান? \nনিচে শুধু সংখ্যাটি লিখে পাঠান যেমন: `100` ✍️", {
+    await ctx.editMessageText("╔═════════════════════════════════╗\n║     📥 " + method.toUpperCase() + " DEPOSIT 📥     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ কত টাকা ডিপোজিট করতে চান?       │\n│ নিচে শুধু সংখ্যাটি লিখে পাঠান   │\n│ উদাহরণস্বরূপ: `100`              │\n└─────────────────────────────────┘", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]
@@ -613,16 +613,11 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
     });
 });
 
+// ১০০% নিশ্চিত ও ঝামেলাহীন পদ্ধতি: বাটনে ক্লিক করলেই নাম্বারটি চ্যাটে আলাদা মেসেজ হিসেবে চলে আসবে
 bot.action(/copy_num_(.+)/, async (ctx) => {
     const num = ctx.match[1];
-    try {
-        await ctx.answerCbQuery('📋 সফলভাবে কপি হয়েছে: ' + num, {
-            type: 'copy',
-            text: num
-        });
-    } catch (e) {
-        await ctx.answerCbQuery('📋 নম্বর: ' + num, { show_alert: true });
-    }
+    await ctx.answerCbQuery('📋 নিচের মেসেজ থেকে নম্বরটি কপি করুন!', { show_alert: false });
+    await ctx.reply("📋 **আপনার পেমেন্ট নম্বর:**\n`" + num + "`\n*(এই নম্বরের ওপর ট্যাপ বা লং-প্রেস করে এক ক্লিকে কপি করে নিন)*", { parse_mode: 'Markdown' });
 });
 
 bot.action('set_bkash_prompt', async (ctx) => {
