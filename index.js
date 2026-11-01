@@ -578,7 +578,7 @@ Your account balance has been successfully updated! ✨
 ⚡═════════════════════════════════⚡
 🆔 Telegram ID: \`${userId}\`
 💰 একাউন্ট ব্যালেন্স: \`৳${balance}\` 💳
-📦 মোট সফল অর্ডার: \`০ টি\` 📦
+📦 মোট সফল অর্ডার: \`০ টি আইডি\` 📦
 ❤️ মোট লাইক পয়েন্ট: \`০ টি\` 🔥
 ⚡═════════════════════════════════⚡`;
 
@@ -768,7 +768,7 @@ bot.action(/region_(bd|id)/, async (ctx) => {
         saveDatabase(db);
     }
 
-    await ctx.editMessageText(`🎮 **Enter Game UID (${region})**\n\n✍️ অনুগ্রহ করে প্লেয়ারের সঠিক **UID** (যেমন: `9884223138`) নিচে চ্যাটে লিখে পাঠান:`, {
+    await ctx.editMessageText(`🎮 **Enter Game UID (${region})**\n\n✍️ অনুগ্রহ করে প্লেয়ারের সঠিক **UID** (যেমন: \`9884223138\`) নিচে চ্যাটে লিখে পাঠান:`, {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Back ↩️', 'cat_ff_likes')]])
     });
