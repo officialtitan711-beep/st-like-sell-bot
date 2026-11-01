@@ -1,6 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
-const http = require('http');
+const http = http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -217,9 +217,50 @@ bot.on('message', async (ctx) => {
     if (!db.users) db.users = {};
     if (!db.allowedUsers) db.allowedUsers = {};
 
+    // অ্যাডমিন যদি নির্দিষ্ট কোনো ইউজারের অর্ডারের জন্য লাইক ডিটেইলস লিখে পাঠান (বা বাটন প্রম্পটের পর)
+    if (userId === ADMIN_ID.toString()) {
+        const adminSession = db.adminInputSession && db.adminInputSession[userId] ? db.adminInputSession[userId] : null;
+        if (adminSession && adminSession.step === 'awaiting_order_details') {
+            const targetUserId = adminSession.targetUserId;
+            const session = db.adminSessions && db.adminSessions[targetUserId] ? db.adminSessions[targetUserId] : null;
+
+            delete db.adminInputSession[userId];
+            saveDatabase(db);
+
+            if (session) {
+                const userBal = db.balances[targetUserId] || 0;
+                const lines = text.split('\n');
+                const prevLikes = lines[0] || '---';
+                const currLikes = lines[1] || '---';
+                const addedLikes = lines[2] || '---';
+
+                const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name: `" + session.nickname + "`\n│ 🛡 UID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ ❤️ Previous Likes: " + prevLikes + "\n│ 💖 Current Likes: " + currLikes + "\n│ 🚀 Added Likes: " + addedLikes + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।\n🙏 ধন্যবাদ!";
+
+                try {
+                    // কাস্টমারের লোডিং মেসেজ আপডেট করা
+                    await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]])
+                    });
+
+                    // অ্যাডমিন প্যানেলের নোটিফিকেশন মেসেজটি আপডেট করে কমপ্লিট দেখিয়ে দেওয়া
+                    try {
+                        await ctx.telegram.editMessageText(ADMIN_ID, session.adminMsgId, null, ctx.message.reply_to_message ? ctx.message.reply_to_message.text + "\n\n**[STATUS: COMPLETED ✅]**" : "🔔 **ORDER COMPLETED SUCCESSFULLY ✅**\n🆔 Customer ID: `" + targetUserId + "`", { parse_mode: 'Markdown' });
+                    } catch (err) {}
+
+                    delete db.adminSessions[targetUserId];
+                    saveDatabase(db);
+                    return ctx.reply('✅ সফলভাবে ইউজার `' + targetUserId + '`-এর অর্ডার কমপ্লিট করা হয়েছে!', { parse_mode: 'Markdown' });
+                } catch (e) {
+                    return ctx.reply('❌ কাস্টমারের মেসেজ আপডেট করা যায়নি।');
+                }
+            }
+        }
+    }
+
     if (userId === ADMIN_ID.toString() && ctx.message.reply_to_message) {
         const repliedText = ctx.message.reply_to_message.text || ctx.message.reply_to_message.caption || '';
-        const match = repliedText.match(/ID:\s*`(\d+)`/) || repliedText.match(/আইডি:\s*`(\d+)`/);
+        const match = repliedText.match(/ID[^`]*`(\d+)`/) || repliedText.match(/আইডি[^`]*`(\d+)`/);
         if (match && match[1]) {
             const targetUserId = match[1];
             const session = db.adminSessions && db.adminSessions[targetUserId] ? db.adminSessions[targetUserId] : null;
@@ -234,22 +275,20 @@ bot.on('message', async (ctx) => {
                 const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name: `" + session.nickname + "`\n│ 🛡 UID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ ❤️ Previous Likes: " + prevLikes + "\n│ 💖 Current Likes: " + currLikes + "\n│ 🚀 Added Likes: " + addedLikes + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।\n🙏 ধন্যবাদ!";
 
                 try {
-                    await bot.telegram.editMessageText(targetUserId, session.customerMessageId, null, finalSuccessBox, { 
+                    await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]])
                     });
+
+                    try {
+                        await ctx.telegram.editMessageText(ADMIN_ID, ctx.message.reply_to_message.message_id, null, repliedText + "\n\n**[STATUS: COMPLETED ✅]**", { parse_mode: 'Markdown' });
+                    } catch (err) {}
+
                     delete db.adminSessions[targetUserId];
                     saveDatabase(db);
                     return ctx.reply('✅ সফলভাবে ইউজার `' + targetUserId + '`-এর অর্ডার কমপ্লিট ও নোটিফিকেশন পাঠানো হয়েছে!', { parse_mode: 'Markdown' });
                 } catch (e) {
                     return ctx.reply('❌ কাস্টমারের মেসেজ আপডেট করা যায়নি। হয়তো মেসেজটি অনেক পুরোনো।');
-                }
-            } else {
-                try {
-                    await bot.telegram.sendMessage(targetUserId, "💬 **অ্যাডমিনের উত্তর:**\n\n" + text, { parse_mode: 'Markdown' });
-                    return ctx.reply('✅ ইউজারে মেসেজ পাঠানো সফল হয়েছে!');
-                } catch (e) {
-                    return ctx.reply('❌ মেসেজ পাঠানো যায়নি।');
                 }
             }
         }
@@ -489,7 +528,7 @@ bot.on('message', async (ctx) => {
         session.step = 'awaiting_trxid';
         saveDatabase(db);
 
-        const slipText = "╔═════════════════════════════════╗\n║     💰 " + method.toUpperCase() + " DEPOSIT PORTAL 💰     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💵 ডিপোজিট পরিমাণ: `" + amount + ".0 BDT`\n├─────────────────────────────────┤\n│ 1️⃣ " + method.toUpperCase() + " অ্যাপ ওপেন করুন।\n│ 2️⃣ Send Money অপশন সিলেক্ট করুন।\n│ 3️⃣ নিচের অফিশিয়াল নম্বরে টাকা পাঠান।\n│ 4️⃣ পেমেন্ট শেষে TrxID কপি করুন।\n├─────────────────────────────────┤\n│ 📞 নম্বর: `" + rawNumber + "`\n└─────────────────────────────────┘\n⚠️ **সতর্কবার্তা:** ভুল নম্বরে টাকা পাঠালে তা ফেরতযোগ্য নয়!";
+        const slipText = "╔═════════════════════════════════╗\n║     💰 " + method.toUpperCase() + " DEPOSIT PORTAL 💰     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💵 Deposit Amount: `" + amount + ".0 BDT`\n├─────────────────────────────────┤\n│ 1️⃣ Open " + method.toUpperCase() + " App.\n│ 2️⃣ Select Send Money option.\n│ 3️⃣ Send money to official number.\n│ 4️⃣ Copy TrxID after payment.\n├─────────────────────────────────┤\n│ 📞 Number: `" + rawNumber + "`\n└─────────────────────────────────┘\n⚠️ **সতর্কবার্তা:** ভুল নম্বরে টাকা পাঠালে তা ফেরতযোগ্য নয়!";
 
         return ctx.reply(slipText, {
             parse_mode: 'Markdown',
@@ -507,7 +546,7 @@ bot.on('message', async (ctx) => {
         delete db.sessions[userId];
         saveDatabase(db);
 
-        const customerInfo = "╔═════════════════════════════════╗\n║     📥 NEW DEPOSIT / TrxID      ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 নাম: " + (ctx.from.first_name || 'N/A') + "\n│ 🔗 ইউজারনেম: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n│ 🆔 ID: `" + userId + "`\n│ 💳 মাধ্যম: " + method.toUpperCase() + "\n│ 💵 পরিমাণ: `" + amount + " BDT`\n│ 🔑 TrxID: `" + trxId + "`\n└─────────────────────────────────┘\n\n💡 ইউজার TrxID পাঠিয়েছেন। চেক করে ব্যালেন্স অ্যাড করে দিন।";
+        const customerInfo = "╔═════════════════════════════════╗\n║     📥 NEW DEPOSIT / TrxID      ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'N/A') + "\n│ 🔗 Username: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n│ 🆔 ID: `" + userId + "`\n│ 💳 Method: " + method.toUpperCase() + "\n│ 💵 Amount: `" + amount + " BDT`\n│ 🔑 TrxID: `" + trxId + "`\n└─────────────────────────────────┘\n\n💡 ইউজার TrxID পাঠিয়েছেন। চেক করে ব্যালেন্স অ্যাড করে দিন।";
 
         await bot.telegram.sendMessage(ADMIN_ID, customerInfo, { parse_mode: 'Markdown' }).catch(()=>{});
 
@@ -522,7 +561,7 @@ bot.on('message', async (ctx) => {
     }
 
     if (userId !== ADMIN_ID.toString()) {
-        const customerInfo = "📥 **NEW CUSTOMER MESSAGE!** 📥\n━━━━━━━━━━━━━━━━━━━\n👤 নাম: " + (ctx.from.first_name || 'N/A') + "\n🔗 ইউজারনেম: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n🆔 ID: `" + userId + "`\n━━━━━━━━━━━━━━━━━━━";
+        const customerInfo = "📥 **NEW CUSTOMER MESSAGE!** 📥\n━━━━━━━━━━━━━━━━━━━\n👤 Name: " + (ctx.from.first_name || 'N/A') + "\n🔗 Username: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n🆔 ID: `" + userId + "`\n━━━━━━━━━━━━━━━━━━━";
         await bot.telegram.sendMessage(ADMIN_ID, customerInfo, { parse_mode: 'Markdown' }).catch(()=>{});
         await bot.telegram.forwardMessage(ADMIN_ID, ctx.chat.id, ctx.message.message_id).catch(()=>{});
     }
@@ -563,7 +602,7 @@ bot.on('message', async (ctx) => {
     }
 
     if (text === '💰 Add Balance') {
-        const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💎 সর্বনিম্ন ডিপোজিট: `100.0 BDT`     │\n│ 👇 নিচের মেথড সিলেক্ট করুন:       │\n└─────────────────────────────────┘";
+        const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n│ 👇 Select payment method below: │\n└─────────────────────────────────┘";
         return ctx.reply(depositMenuText, { 
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -575,7 +614,7 @@ bot.on('message', async (ctx) => {
 
     if (text === '👤 My Profile') {
         const balance = db.balances[userId] || 0;
-        const profileBoxText = "⚡═════════════════════════════════⚡\n👤          **USER PROFILE**         👤\n⚡═════════════════════════════════⚡\n🆔 Telegram ID: `" + userId + "`\n💰 একাউন্ট ব্যালেন্স: `৳" + balance + "` 💳\n📦 মোট সফল অর্ডার: `০ টি আইডি` 📦\n❤️ মোট লাইক পয়েন্ট: `০ টি` 🔥\n⚡═════════════════════════════════⚡";
+        const profileBoxText = "⚡═════════════════════════════════⚡\n👤          **USER PROFILE**         👤\n⚡═════════════════════════════════⚡\n🆔 Telegram ID: `" + userId + "`\n💰 Account Balance: `৳" + balance + "` 💳\n📦 Total Success Orders: `0 IDs` 📦\n❤️ Total Likes Points: `0 Points` 🔥\n⚡═════════════════════════════════⚡";
         return ctx.reply(profileBoxText, { 
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -607,7 +646,7 @@ bot.on('message', async (ctx) => {
     if (sessionUid && (sessionUid.step === 'awaiting_uid' || sessionUid.step === 'awaiting_uid_only')) {
         const isOnlyCheck = sessionUid.step === 'awaiting_uid_only';
         const uid = text;
-        const waitMsg = await ctx.reply('⏳ সার্ভার থেকে প্লেয়ারের তথ্য যাচাই করা হচ্ছে, দয়া করে অপেক্ষা করুন...');
+        const waitMsg = await ctx.reply('⏳ Verifying player info from server, please wait...');
 
         try {
             const nickname = await checkFreeFireUID(uid);
@@ -628,7 +667,7 @@ bot.on('message', async (ctx) => {
             saveDatabase(db);
 
             const userBal = db.balances[userId] || 0;
-            const slipText = "[★]=================================[★]\n📦 **ORDER REVIEW & CONFIRMATION** 📦\n[★]=================================[★]\n👤 **কাস্টমার ইনফো:**\n• নাম: " + (ctx.from.first_name || 'User') + "\n• টেলিগ্রাম আইডি: `" + userId + "`\n\n🎮 **গেম অ্যাকাউন্ট ডিটেইলস:**\n• গেমের নাম: `" + nickname + "`\n• গেমের UID: `" + uid + "`\n\n💳 **পেমেন্ট সামারি:**\n• প্যাকেজ: " + sessionUid.product + "\n• সার্ভার: 🇧🇩 " + sessionUid.region + "\n• মূল্য: ৳" + sessionUid.price + "\n• আপনার ব্যালেন্স: ৳" + userBal + "\n[★]=================================[★]\n⚠️ তথ্যগুলো ভালোভাবে মিলিয়ে নিচের **Confirm Order** বাটনে ক্লিক করুন!";
+            const slipText = "[★]=================================[★]\n📦 **ORDER REVIEW & CONFIRMATION** 📦\n[★]=================================[★]\n👤 **Customer Info:**\n• Name: " + (ctx.from.first_name || 'User') + "\n• Telegram ID: `" + userId + "`\n\n🎮 **Game Account Details:**\n• Game Name: `" + nickname + "`\n• Game UID: `" + uid + "`\n\n💳 **Payment Summary:**\n• Package: " + sessionUid.product + "\n• Server: 🇧🇩 " + sessionUid.region + "\n• Price: ৳" + sessionUid.price + "\n• Your Balance: ৳" + userBal + "\n[★]=================================[★]\n⚠️ তথ্যগুলো ভালোভাবে মিলিয়ে নিচের **Confirm Order** বাটনে ক্লিক করুন!";
 
             await ctx.reply(slipText, {
                 parse_mode: 'Markdown',
@@ -653,7 +692,7 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
     db.sessions[userId] = { step: 'awaiting_deposit_amount', method: method };
     saveDatabase(db);
 
-    await ctx.editMessageText("╔═════════════════════════════════╗\n║     📥 " + method.toUpperCase() + " DEPOSIT 📥     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ কত টাকা ডিপোজিট করতে চান?       │\n│ নিচে শুধু সংখ্যাটি লিখে পাঠান   │\n│ উদাহরণস্বরূপ: `100`              │\n└─────────────────────────────────┘", {
+    await ctx.editMessageText("╔═════════════════════════════════╗\n║     📥 " + method.toUpperCase() + " DEPOSIT 📥     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ How much do you want to deposit?│\n│ Send only the amount number     │\n│ Example: `100`                  │\n└─────────────────────────────────┘", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]
@@ -824,14 +863,14 @@ bot.action('confirm_order', async (ctx) => {
         return ctx.answerCbQuery('❌ আপনার অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই!', { show_alert: true });
     }
 
-    await ctx.editMessageText('⏳ অর্ডারের রিকোয়েস্ট প্রসেসিং হচ্ছে...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 10% ]', { parse_mode: 'Markdown' });
+    await ctx.editMessageText('⏳ Order request is processing...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 10% ]', { parse_mode: 'Markdown' });
     
     setTimeout(async () => {
-        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🔄 সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n▪️▪️▪️▪️▫️▫️▫️▫️▫️▫️ [ 40% ]', { parse_mode: 'Markdown' }).catch(() => {});
+        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🔄 Connecting with the server...\n\n▪️▪️▪️▪️▫️▫️▫️▫️▫️▫️ [ 40% ]', { parse_mode: 'Markdown' }).catch(() => {});
     }, 1500);
 
     setTimeout(async () => {
-        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ গেমের সাথে লাইক সিনক্রোনাইজ হচ্ছে...\n\n▪️▪️▪️▪️▪️▪️▪️▪️▫️▫️ [ 85% ] (Hold)', { parse_mode: 'Markdown' }).catch(() => {});
+        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ Synchronizing likes with game...\n\n▪️▪️▪️▪️▪️▪️▪️▪️▫️▫️ [ 85% ] (Hold)', { parse_mode: 'Markdown' }).catch(() => {});
     }, 3000);
 
     setTimeout(async () => {
@@ -839,8 +878,20 @@ bot.action('confirm_order', async (ctx) => {
         db.balances[userId] -= session.price;
         
         if (!db.adminSessions) db.adminSessions = {};
+        
+        const adminNotifyText = "🔔 **NEW ORDER PENDING APPROVAL!** 🔔\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Customer: " + ctx.from.first_name + "\n🆔 Customer ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Game Name: `" + session.nickname + "`\n🎮 Game UID: `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👇 নিচের বাটনে ক্লিক করে লাইকের হিসাব (Previous, Current, Added) লিখে দিন:";
+
+        const sentAdminMsg = await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('✏️ Enter Details (টুকিটাকি লিখুন)', 'admin_input_' + userId)],
+                [Markup.button.callback('❌ Cancel', 'admin_can_' + userId)]
+            ])
+        }).catch(() => {});
+
         db.adminSessions[userId] = {
-            customerMessageId: ctx.callbackQuery.message.message_id,
+            loadingMessageId: ctx.callbackQuery.message.message_id,
+            adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
             product: session.product,
             nickname: session.nickname,
             uid: session.uid,
@@ -850,22 +901,40 @@ bot.action('confirm_order', async (ctx) => {
         delete db.sessions[userId];
         saveDatabase(db);
 
-        const adminNotifyText = "🔔 **NEW ORDER PENDING APPROVAL!** 🔔\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 কাস্টমার: " + ctx.from.first_name + "\n🆔 কাস্টমার আইডি: `" + userId + "`\n\n📦 প্রোডাক্ট: `" + session.product + "` (" + session.region + ")\n👤 গেম নেম: `" + session.nickname + "`\n🎮 গেম UID: `" + session.uid + "`\n💵 মূল্য: `৳" + session.price + "`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👉 **অর্ডার কমপ্লিট করতে এই মেসেজে Reply (রিপ্লাই) করে ঠিক নিচে ৩টি সংখ্যা লিখে পাঠান:**\n1. আগের লাইক (Previous Likes)\n2. বর্তমান লাইক (Current Likes)\n3. যোগ হয়েছে (Added Likes)";
-
-        await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('❌ Cancel [' + userId + ']', 'admin_can_' + userId)]
-            ])
-        }).catch(() => {});
-
     }, 4500);
+});
+
+// অ্যাডমিন যখন Enter Details বাটনে ক্লিক করবেন
+bot.action(/admin_input_(.+)/, async (ctx) => {
+    const targetUserId = ctx.match[1];
+    const userId = ctx.from.id.toString();
+    const db = loadDatabase();
+    if (!db.adminInputSession) db.adminInputSession = {};
+    db.adminInputSession[userId] = { step: 'awaiting_order_details', targetUserId: targetUserId };
+    saveDatabase(db);
+
+    await ctx.answerCbQuery('✍️ চ্যাটে আগের লাইক, বর্তমান লাইক এবং যোগ হওয়া লাইক আলাদা লাইনে লিখে পাঠান!');
+    await ctx.reply("📝 **অর্ডার কমপ্লিট করার জন্য তথ্য দিন:**\n\nদয়া করে চ্যাটে ঠিক নিচে ৩টি সংখ্যা আলাদা লাইনে লিখে পাঠান:\n1. আগের লাইক (Previous Likes)\n2. বর্তমান লাইক (Current Likes)\n3. যোগ হয়েছে (Added Likes)\n\n*(উদাহরণস্বরূপ):\n188\n218\n25*", { parse_mode: 'Markdown' });
 });
 
 bot.action(/admin_can_(.+)/, async (ctx) => {
     const targetUserId = ctx.match[1];
     await ctx.answerCbQuery('❌ অর্ডারটি বাতিল করা হয়েছে!');
-    await ctx.editMessageText(ctx.callbackQuery.message.text + '\n\n**[STATUS: CANCELLED ❌]**', { parse_mode: 'Markdown' });
+    await ctx.editMessageText(ctx.callbackQuery.message.text + "\n\n**[STATUS: CANCELLED ❌]**", { parse_mode: 'Markdown' });
+    
+    const db = loadDatabase();
+    if (db.adminSessions && db.adminSessions[targetUserId]) {
+        const loadingMsgId = db.adminSessions[targetUserId].loadingMessageId;
+        if (loadingMsgId) {
+            await bot.telegram.editMessageText(targetUserId, loadingMsgId, null, "╔═════════════════════════════════╗\n║      ❌ ORDER CANCELLED         ║\n╚═════════════════════════════════╝\n⚠️ দুঃখিত, আপনার এই অর্ডারটি বাতিল করা হয়েছে।", {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]])
+            }).catch(() => {});
+        }
+        delete db.adminSessions[targetUserId];
+        saveDatabase(db);
+    }
+
     await bot.telegram.sendMessage(targetUserId, '❌ দুঃখিত, আপনার অর্ডারটি বাতিল করা হয়েছে। বিস্তারিত জানতে সাপোর্টে যোগাযোগ করুন।').catch(() => {});
 });
 
