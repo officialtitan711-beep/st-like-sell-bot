@@ -62,7 +62,7 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     let keyboard;
 
     if (isPendingAdminAccess) {
-        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন।\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
+        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন。\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
         keyboard = Markup.inlineKeyboard([
             [Markup.button.url('💬 Message Admin 🚀', 'https://t.me/sonu1813')],
             [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')]
@@ -316,7 +316,7 @@ bot.on('message', async (ctx) => {
             if (currentSub) {
                 db.sessions[userId] = { step: 'admin_add_sub_product', category: currentSub };
                 saveDatabase(db);
-                return ctx.reply("📦 **প্যাকেজ অ্যাড করুন (" + currentSub + ")**\n\nনাম ও দাম পাঠান:\n*(উদাহরণ: `15 Days Likes - ৳150`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply("📦 **প্যাকেজ বা বাটন অ্যাড করুন (" + currentSub + ")**\n\nনাম ও দাম পাঠান:\n*(উদাহরণ: `15 Days Likes - ৳150`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
             } else {
                 db.sessions[userId] = { step: 'admin_add_category' };
                 saveDatabase(db);
@@ -325,17 +325,23 @@ bot.on('message', async (ctx) => {
         }
         if (text === '❌ Remove Product') {
             const currentSub = db.sessions[userId] && db.sessions[userId].activeCategory ? db.sessions[userId].activeCategory : null;
-            if (currentSub && db.customProducts[currentSub] && db.customProducts[currentSub].length > 0) {
-                let listText = '🗑️ **(' + currentSub + ') থেকে রিমুভ করার জন্য প্যাকেজের সঠিক নামটি লিখে পাঠান:**\n\n';
-                db.customProducts[currentSub].forEach((p, index) => { listText += (index + 1) + '. `' + p.name + '`\n'; });
+            if (currentSub) {
+                let listText = '🗑️ **(' + currentSub + ') থেকে যে বাটন বা প্যাকেজটি রিমুভ করতে চান, সেটির নাম লিখে পাঠান:**\n\n';
+                if (currentSub === 'Free Fire Likes') {
+                    listText += '1. `220 Likes - ৳8`\n2. `6000 Likes - ৳300`\n';
+                }
+                if (db.customProducts[currentSub] && db.customProducts[currentSub].length > 0) {
+                    db.customProducts[currentSub].forEach((p, index) => { 
+                        listText += (index + 3) + '. `' + p.name + '`\n'; 
+                    });
+                }
                 db.sessions[userId] = { step: 'admin_remove_sub_product', category: currentSub };
                 saveDatabase(db);
                 return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
             } else {
                 const catKeys = Object.keys(db.categories || {});
-                if (catKeys.length === 0) return ctx.reply('⚠️ বর্তমানে কোনো কাস্টম ক্যাটাগরি বা প্রোডাক্ট অ্যাড করা নেই।');
-                let listText = '🗑️ **রিমুভ করার জন্য ক্যাটাগরির সঠিক নামটি লিখে পাঠান:**\n\n';
-                catKeys.forEach((c, index) => { listText += (index + 1) + '. `' + c + '`\n'; });
+                let listText = '🗑️ **সম্পূর্ণ ক্যাটাগরি রিমুভ করতে সঠিক নামটি লিখে পাঠান:**\n\n1. `Free Fire Likes`\n';
+                catKeys.forEach((c, index) => { listText += (index + 2) + '. `' + c + '`\n'; });
                 db.sessions[userId] = { step: 'admin_remove_category' };
                 saveDatabase(db);
                 return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
@@ -373,6 +379,11 @@ bot.on('message', async (ctx) => {
     }
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_category') {
+        if (text.toLowerCase() === 'free fire likes') {
+            delete db.sessions[userId];
+            saveDatabase(db);
+            return ctx.reply('⚠️ ডিফল্ট "Free Fire Likes" ক্যাটাগরি সম্পূর্ণ মুছে ফেলা যায় না, তবে এর ভেতরের প্যাকেজ রিমুভ করতে পারবেন।', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        }
         if (db.categories[text]) {
             delete db.categories[text];
             delete db.customProducts[text];
@@ -389,25 +400,32 @@ bot.on('message', async (ctx) => {
         if (!db.customProducts[cat]) db.customProducts[cat] = [];
         db.customProducts[cat].push({ name: text });
         
-        // সিরিয়াল যেন সবসময় ঠিক থাকে (অটো সর্টিং লজিক - ছোট থেকে বড় বা সংখ্যা অনুযায়ী)
         db.customProducts[cat].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
         delete db.sessions[userId];
         saveDatabase(db);
-        return ctx.reply('✅ সফলভাবে `' + cat + '`-এর ভেতরে নতুন প্যাকেজ সিরিয়াল অনুযায়ী অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        return ctx.reply('✅ সফলভাবে `' + cat + '`-এর ভেতরে নতুন প্যাকেজ বা বাটন সিরিয়াল অনুযায়ী অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     }
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_sub_product') {
         const cat = db.sessions[userId].category;
+        
+        if (cat === 'Free Fire Likes' && (text.includes('220') || text.includes('6000'))) {
+            delete db.sessions[userId];
+            saveDatabase(db);
+            return ctx.reply('⚠️ ডিফল্ট ফ্রি ফায়ার লাইক প্যাকেজগুলো ডিলিট করা নিষিদ্ধ। তবে আপনার অ্যাড করা কাস্টম প্যাকেজ বা বাটনগুলো রিমুভ করতে পারবেন।', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        }
+
         const list = db.customProducts[cat] || [];
         const index = list.findIndex(p => p.name.toLowerCase() === text.toLowerCase());
         if (index > -1) {
             list.splice(index, 1);
+            db.customProducts[cat] = list;
             delete db.sessions[userId];
             saveDatabase(db);
-            return ctx.reply('🗑️ প্যাকেজ সফলভাবে রিমুভ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+            return ctx.reply('🗑️ ভুল বাটন বা প্যাকেজটি সফলভাবে রিমুভ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
         } else {
-            return ctx.reply('❌ এই নামের কোনো প্যাকেজ পাওয়া যায়নি। সঠিক নামটি লিখে পাঠান।');
+            return ctx.reply('❌ এই নামের কোনো প্যাকেজ বা বাটন পাওয়া যায়নি। সঠিক নামটি লিখে পাঠান।');
         }
     }
 
@@ -609,7 +627,6 @@ bot.on('message', async (ctx) => {
 
         const catKeys = Object.keys(db.categories || {});
         if (catKeys.length > 0) {
-            // ক্যাটাগরিগুলোও যেন সিরিয়াল অনুযায়ী সাজানো থাকে
             catKeys.sort().forEach((c) => {
                 inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
             });
@@ -809,7 +826,6 @@ bot.action('cat_ff_likes', async (ctx) => {
     ];
 
     if (db.customProducts && db.customProducts['Free Fire Likes']) {
-        // সিরিয়াল যেন সবসময় ছোট থেকে বড় বা সাজানো থাকে
         db.customProducts['Free Fire Likes'].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts['Free Fire Likes'].forEach((p, idx) => {
             inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
@@ -836,7 +852,6 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
 
     let inlineButtons = [];
     if (db.customProducts && db.customProducts[catName]) {
-        // ক্যাটাগরির ভেতরেও প্রোডাক্টগুলো সিরিয়াল অনুযায়ী সাজানো থাকবে
         db.customProducts[catName].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts[catName].forEach((p, idx) => {
             inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
@@ -1012,7 +1027,7 @@ const server = http.createServer((req, res) => {
     if (req.url === webhookPath && req.method === 'POST') {
         bot.webhookCallback(webhookPath)(req, res);
     } else if (req.url === '/ping') {
-        res.writeHead(200, { 'Type': 'text/plain' });
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK');
     } else {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
