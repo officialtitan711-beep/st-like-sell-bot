@@ -232,11 +232,42 @@ bot.on('message', async (ctx) => {
     if (!db.users) db.users = {};
     if (!db.allowedUsers) db.allowedUsers = {};
     if (!db.pendingMsgs) db.pendingMsgs = {};
+    if (!db.adminReplySessions) db.adminReplySessions = {};
 
     const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
     // ADMIN REPLY & ORDER COMPLETION HANDLING
     if (userId === ADMIN_ID.toString()) {
+        // Checking if admin is replying via custom reply session (triggered by Reply button)
+        const replySession = db.adminReplySessions[userId];
+        if (replySession) {
+            const targetUserId = replySession.targetUserId;
+            delete db.adminReplySessions[userId];
+            saveDatabase(db);
+
+            try {
+                const adminReplyBox = "╔═════════════════════════════════╗\n" +
+                                        "║   👑 OFFICIAL ADMIN REPLY 👑    ║\n" +
+                                        "╚═════════════════════════════════╝\n" +
+                                        "┌─────────────────────────────────┐\n" +
+                                        "│ " + (ctx.message.text || ctx.message.caption || '📎 [Attachment / File]') + "\n" +
+                                        "└─────────────────────────────────┘\n" +
+                                        "✨ আপনার সহযোগিতায় সবসময় আমরা পাশে আছি।";
+
+                if (ctx.message.text) {
+                    await bot.telegram.sendMessage(targetUserId, adminReplyBox, { parse_mode: 'Markdown' });
+                } else if (ctx.message.photo) {
+                    const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+                    await bot.telegram.sendPhoto(targetUserId, photoId, { caption: adminReplyBox, parse_mode: 'Markdown' });
+                } else {
+                    await bot.telegram.copyMessage(targetUserId, ctx.chat.id, ctx.message.message_id);
+                }
+                return ctx.reply('╔═════════════════════════════════╗\n║  🚀 অ্যাডমিন রিপ্লাই সফল সেন্ড!  ║\n╚═════════════════════════════════╝', { parse_mode: 'Markdown' });
+            } catch (e) {
+                return ctx.reply('❌ মেসেজ পাঠানো যায়নি। ইউজার কি বট ব্লক করেছে?');
+            }
+        }
+
         const adminSession = db.adminInputSession && db.adminInputSession[userId] ? db.adminInputSession[userId] : null;
         if (adminSession && adminSession.step === 'awaiting_order_details') {
             const targetUserId = adminSession.targetUserId;
@@ -273,7 +304,7 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // Admin replying to customer support via reply feature with UNIQUE DESIGN
+        // Admin replying to customer support via Telegram reply feature fallback
         if (ctx.message.reply_to_message) {
             const repliedText = ctx.message.reply_to_message.text || ctx.message.reply_to_message.caption || '';
             const match = repliedText.match(/ID[^`]*`(\d+)`/) || repliedText.match(/আইডি[^`]*`(\d+)`/);
@@ -771,19 +802,41 @@ bot.on('message', async (ctx) => {
         });
     }
 
-    // GENERAL FREE TEXT OR SUPPORT MESSAGE
+    // GENERAL FREE TEXT OR SUPPORT MESSAGE WITH DESIGNED BOX & REPLY BUTTON
     if (userId !== ADMIN_ID.toString()) {
-        const customerInfo = "╔═════════════════════════════════╗\n║    📥 NEW CUSTOMER MESSAGE      ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'N/A') + "\n│ 🔗 Username: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n│ 🆔 ID: `" + userId + "`\n└─────────────────────────────────┘";
+        const customerName = ctx.from.first_name || 'N/A';
+        const customerUsername = ctx.from.username ? '@' + ctx.from.username : 'N/A';
+        const customerMsgContent = ctx.message.text || ctx.message.caption || '📎 [Attachment / File / Photo]';
+
+        const adminSupportBox = "╔═════════════════════════════════╗\n" +
+                                  "║    📥 NEW CUSTOMER MESSAGE      ║\n" +
+                                  "╚═════════════════════════════════╝\n" +
+                                  "┌─────────────────────────────────┐\n" +
+                                  "│ 👤 Name: " + customerName + "\n" +
+                                  "│ 🔗 Username: " + customerUsername + "\n" +
+                                  "│ 🆔 ID: `" + userId + "`\n" +
+                                  "├─────────────────────────────────┤\n" +
+                                  "│ 💬 Message:\n" +
+                                  "│ " + customerMsgContent + "\n" +
+                                  "└─────────────────────────────────┘";
         
         try {
-            await bot.telegram.sendMessage(ADMIN_ID, customerInfo, { parse_mode: 'Markdown' });
             if (ctx.message.photo) {
                 const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-                await bot.telegram.sendPhoto(ADMIN_ID, photoId, { caption: ctx.message.caption || '' });
-            } else if (ctx.message.text) {
-                await bot.telegram.sendMessage(ADMIN_ID, "💬 Message: " + ctx.message.text);
+                await bot.telegram.sendPhoto(ADMIN_ID, photoId, { 
+                    caption: adminSupportBox, 
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('💬 Reply 🚀', 'admin_reply_' + userId)]
+                    ])
+                });
             } else {
-                await bot.telegram.copyMessage(ADMIN_ID, ctx.chat.id, ctx.message.message_id);
+                await bot.telegram.sendMessage(ADMIN_ID, adminSupportBox, { 
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('💬 Reply 🚀', 'admin_reply_' + userId)]
+                    ])
+                });
             }
         } catch (e) {
             console.error('Support forward error:', e);
@@ -809,6 +862,20 @@ bot.on('message', async (ctx) => {
             ])
         });
     }
+});
+
+bot.action(/admin_reply_(.+)/, async (ctx) => {
+    const targetUserId = ctx.match[1];
+    const adminId = ctx.from.id.toString();
+    if (adminId !== ADMIN_ID.toString()) return;
+
+    const db = loadDatabase();
+    if (!db.adminReplySessions) db.adminReplySessions = {};
+    db.adminReplySessions[adminId] = { targetUserId: targetUserId };
+    saveDatabase(db);
+
+    await ctx.answerCbQuery('✍️ এখন চ্যাটে আপনার রিপ্লাই মেসেজটি লিখে পাঠান!');
+    await ctx.reply("╔═════════════════════════════════╗\n║       💬 ADMIN REPLY            ║\n╚═════════════════════════════════╝\n✍️ ইউ আইডি: `" + targetUserId + "`\n\n👇 কাস্টমারের কাছে পাঠানোর জন্য আপনার উত্তরটি লিখে পাঠান:", { parse_mode: 'Markdown' });
 });
 
 bot.action(/dep_(bkash|nagad)/, async (ctx) => {
