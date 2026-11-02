@@ -89,19 +89,19 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
 
 function getMainKeyboard(userId) {
     let keyboard = [
-        [Markup.button.text('🛍️ Buy FF Likes')],
-        [Markup.button.text('👤 My Profile'), Markup.button.text('💳 Deposit')],
-        [Markup.button.text('🎁 Refer'), Markup.button.text('🆘 Support')]
+        ['🛍️ Shop Now', '🔍 Check FF UID'],
+        ['💰 Add Balance', '👤 My Profile'],
+        ['📜 Order History', '📞 Support Desk']
     ];
 
     if (userId.toString() === ADMIN_ID.toString()) {
         keyboard.push(
-            [Markup.button.text('-----------------------------------')],
-            [Markup.button.text('➕ Add Bot'), Markup.button.text('❌ Remove Bot')],
-            [Markup.button.text('➕ Add Product'), Markup.button.text('❌ Remove Product')],
-            [Markup.button.text('💳 Add/Minus Balance'), Markup.button.text('📱 Set Payment Numbers')],
-            [Markup.button.text('📊 Total Users'), Markup.button.text('📩 Send Message')],
-            [Markup.button.text('📢 All Users Msg')]
+            ['-----------------------------------'],
+            ['➕ Add Bot', '❌ Remove Bot'],
+            ['➕ Add Product', '❌ Remove Product'],
+            ['💳 Add/Minus Balance', '📱 Set Payment Numbers'],
+            ['📊 Total Users', '📩 Send Message'],
+            ['📢 All Users Msg']
         );
     }
     return Markup.keyboard(keyboard).resize();
@@ -389,6 +389,7 @@ bot.on('message', async (ctx) => {
         if (!db.customProducts[cat]) db.customProducts[cat] = [];
         db.customProducts[cat].push({ name: text });
         
+        // সিরিয়াল যেন সবসময় ঠিক থাকে (অটো সর্টিং লজিক - ছোট থেকে বড় বা সংখ্যা অনুযায়ী)
         db.customProducts[cat].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
         delete db.sessions[userId];
@@ -597,21 +598,20 @@ bot.on('message', async (ctx) => {
         });
     }
 
-    if (text === '🛍️ Buy FF Likes') {
+    if (text === '🛍️ Shop Now') {
         if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
             db.sessions[userId].activeCategory = null;
             saveDatabase(db);
         }
         let inlineButtons = [
-            [Markup.button.callback('🟢 Daily Likes ⚡', 'cat_ff_likes')]
+            [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
         ];
 
         const catKeys = Object.keys(db.categories || {});
         if (catKeys.length > 0) {
-            const colorEmojis = ['🔵', '🟣', '🟠', '🟡', '🟤', '🟢', '🔴', '✨', '💎', '🚀'];
-            catKeys.sort().forEach((c, idx) => {
-                const randomColor = colorEmojis[idx % colorEmojis.length];
-                inlineButtons.push([Markup.button.callback(randomColor + ' ' + c, 'custom_cat_' + c)]);
+            // ক্যাটাগরিগুলোও যেন সিরিয়াল অনুযায়ী সাজানো থাকে
+            catKeys.sort().forEach((c) => {
+                inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
             });
         }
 
@@ -634,12 +634,13 @@ bot.on('message', async (ctx) => {
         });
     }
 
-    if (text === '💳 Deposit') {
+    if (text === '💰 Add Balance') {
         const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n└─────────────────────────────────┘";
         return ctx.reply(depositMenuText, { 
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.callback('🌸 bKash', 'dep_bkash'), Markup.button.callback('🧨 Nagad', 'dep_nagad')]
+                [Markup.button.callback('bKash 🌸', 'dep_bkash'), Markup.button.callback('Nagad 🧨', 'dep_nagad')],
+                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
             ])
         });
     }
@@ -650,13 +651,12 @@ bot.on('message', async (ctx) => {
         return ctx.reply(profileBoxText, { 
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.callback('🟢 Like History', 'like_history'), Markup.button.callback('🔵 Deposit', 'deposit_action')],
                 [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
             ])
         });
     }
 
-    if (text === '📜 Like History' || text === '📜 Order History') {
+    if (text === '📜 Order History') {
         const historyBoxText = "🎯-----------------------------------🎯\n📜 **PURCHASE & ORDER HISTORY** 📜\n🎯-----------------------------------🎯\n❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!";
         return ctx.reply(historyBoxText, {
             parse_mode: 'Markdown',
@@ -666,7 +666,7 @@ bot.on('message', async (ctx) => {
         });
     }
 
-    if (text === '🆘 Support' || text === '📞 Support Desk') {
+    if (text === '📞 Support Desk') {
         const supportInstructionBox = "╔═════════════════════════════════╗\n" +
                                        "║       📞 SUPPORT DESK 📞        ║\n" +
                                        "╚═════════════════════════════════╝\n" +
@@ -679,15 +679,6 @@ bot.on('message', async (ctx) => {
                                        "│ যোগাযোগ করবেন। 👇              │\n" +
                                        "└─────────────────────────────────┘";
         return ctx.reply(supportInstructionBox, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-            ])
-        });
-    }
-
-    if (text === '🎁 Refer') {
-        return ctx.reply('🎁 **Refer & Earn**\n\nআপনার রেফারেল লিংকের মাধ্যমে বন্ধুদের ইনভাইট করে দারুণ বোনাস জিতে নিন!', {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
@@ -753,27 +744,6 @@ bot.action(/dep_(bkash|nagad)/, async (ctx) => {
     });
 });
 
-bot.action('deposit_action', async (ctx) => {
-    const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n└─────────────────────────────────┘";
-    await ctx.editMessageText(depositMenuText, { 
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🌸 bKash', 'dep_bkash'), Markup.button.callback('🧨 Nagad', 'dep_nagad')],
-            [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-        ])
-    });
-});
-
-bot.action('like_history', async (ctx) => {
-    const historyBoxText = "🎯-----------------------------------🎯\n📜 **PURCHASE & ORDER HISTORY** 📜\n🎯-----------------------------------🎯\n❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!";
-    await ctx.editMessageText(historyBoxText, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-        ])
-    });
-});
-
 bot.action(/copy_num_(.+)/, async (ctx) => {
     const num = ctx.match[1];
     await ctx.answerCbQuery('📋 Number copied!', { show_alert: false });
@@ -806,15 +776,13 @@ bot.action('shop_now_back', async (ctx) => {
         saveDatabase(db);
     }
     let inlineButtons = [
-        [Markup.button.callback('🟢 Daily Likes ⚡', 'cat_ff_likes')]
+        [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
     ];
 
     const catKeys = Object.keys(db.categories || {});
     if (catKeys.length > 0) {
-        const colorEmojis = ['🔵', '🟣', '🟠', '🟡', '🟤', '🟢', '🔴', '✨', '💎', '🚀'];
-        catKeys.sort().forEach((c, idx) => {
-            const randomColor = colorEmojis[idx % colorEmojis.length];
-            inlineButtons.push([Markup.button.callback(randomColor + ' ' + c, 'custom_cat_' + c)]);
+        catKeys.sort().forEach((c) => {
+            inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
         });
     }
 
@@ -841,11 +809,10 @@ bot.action('cat_ff_likes', async (ctx) => {
     ];
 
     if (db.customProducts && db.customProducts['Free Fire Likes']) {
-        const subColorEmojis = ['✨', '💎', '🔥', '⭐', '🌟', '⚡'];
+        // সিরিয়াল যেন সবসময় ছোট থেকে বড় বা সাজানো থাকে
         db.customProducts['Free Fire Likes'].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts['Free Fire Likes'].forEach((p, idx) => {
-            const subColor = subColorEmojis[idx % subColorEmojis.length];
-            inlineButtons.push([Markup.button.callback(subColor + ' ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
+            inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
         });
     }
 
@@ -869,11 +836,10 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
 
     let inlineButtons = [];
     if (db.customProducts && db.customProducts[catName]) {
-        const subColorEmojis = ['✨', '💎', '🔥', '⭐', '🌟', '⚡'];
+        // ক্যাটাগরির ভেতরেও প্রোডাক্টগুলো সিরিয়াল অনুযায়ী সাজানো থাকবে
         db.customProducts[catName].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts[catName].forEach((p, idx) => {
-            const subColor = subColorEmojis[idx % subColorEmojis.length];
-            inlineButtons.push([Markup.button.callback(subColor + ' ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
+            inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
         });
     }
 
@@ -997,7 +963,7 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
 bot.action(/admin_can_(.+)/, async (ctx) => {
     const targetUserId = ctx.match[1];
     await ctx.answerCbQuery('❌ Order cancelled!');
-    await ctx.editMessageText(ctx.callbackQuery.message.text + "\n\n**[STATUS: COMPLETED ✅]**", { parse_mode: 'Markdown' });
+    await ctx.editMessageText(ctx.callbackQuery.message.text + "\n\n**[STATUS: CANCELLED ❌]**", { parse_mode: 'Markdown' });
     
     const dbObj = loadDatabase();
     if (dbObj.adminSessions && dbObj.adminSessions[targetUserId]) {
@@ -1046,7 +1012,7 @@ const server = http.createServer((req, res) => {
     if (req.url === webhookPath && req.method === 'POST') {
         bot.webhookCallback(webhookPath)(req, res);
     } else if (req.url === '/ping') {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.writeHead(200, { 'Type': 'text/plain' });
         res.end('OK');
     } else {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
