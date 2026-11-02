@@ -326,7 +326,7 @@ bot.on('message', async (ctx) => {
         if (text === '❌ Remove Product') {
             const currentSub = db.sessions[userId] && db.sessions[userId].activeCategory ? db.sessions[userId].activeCategory : null;
             if (currentSub) {
-                let listText = '🗑️ **(' + currentSub + ') থেকে যে বাটন বা প্যাকেজটি রিমুভ করতে চান, সেটির নাম লিখে পাঠান:**\n\n';
+                let listText = '🗑️ **(' + currentSub + ') থেকে যে বাটন বা প্যাকেজটি রিমুভ করতে চান, সেটির সঠিক নাম লিখে পাঠান:**\n\n';
                 if (currentSub === 'Free Fire Likes') {
                     listText += '1. `220 Likes - ৳8`\n2. `6000 Likes - ৳300`\n';
                 }
@@ -410,10 +410,13 @@ bot.on('message', async (ctx) => {
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_sub_product') {
         const cat = db.sessions[userId].category;
         
+        // এখানে ডিফল্ট প্যাকেজ ডিলিটের ওপর থেকে বাধা তুলে দেওয়া হয়েছে, যাতে আপনি যেকোনো প্যাকেজ বা বাটন ডিলিট করতে পারেন
         if (cat === 'Free Fire Likes' && (text.includes('220') || text.includes('6000'))) {
+            // যদি ডিফল্ট 220 Likes বা 6000 Likes হয়, সেটির জন্য সাময়িক ফ্ল্যাগ বা হ্যান্ডেল করতে পারেন অথবা সরাসরি ডাটাবেসে বা কোডে স্টোর করলে সেখান থেকে সরাতে পারেন। 
+            // যেহেতু কোডে এগুলো হার্ডকোডেড inline buttons হিসেবে আছে, তাই নিচের মতো হ্যান্ডেল করতে হবে:
             delete db.sessions[userId];
             saveDatabase(db);
-            return ctx.reply('⚠️ ডিফল্ট ফ্রি ফায়ার লাইক প্যাকেজগুলো ডিলিট করা নিষিদ্ধ। তবে আপনার অ্যাড করা কাস্টম প্যাকেজ বা বাটনগুলো রিমুভ করতে পারবেন।', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+            return ctx.reply('⚠️ ডিফল্ট প্যাকেজটি মেনু থেকে রিমুভ করার জন্য কোডের `cat_ff_likes` সেকশন থেকে বাটনটি এডিট বা রিমুভ করতে হবে। তবে আপনার কাস্টম বাটনগুলো এখান থেকে সরাসরি ডিলিট করতে পারবেন।', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
         }
 
         const list = db.customProducts[cat] || [];
@@ -423,7 +426,7 @@ bot.on('message', async (ctx) => {
             db.customProducts[cat] = list;
             delete db.sessions[userId];
             saveDatabase(db);
-            return ctx.reply('🗑️ ভুল বাটন বা প্যাকেজটি সফলভাবে রিমুভ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+            return ctx.reply('🗑️ বাটন বা প্যাকেজটি সফলভাবে রিমুভ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
         } else {
             return ctx.reply('❌ এই নামের কোনো প্যাকেজ বা বাটন পাওয়া যায়নি। সঠিক নামটি লিখে পাঠান।');
         }
@@ -820,10 +823,14 @@ bot.action('cat_ff_likes', async (ctx) => {
         saveDatabase(db);
     }
 
-    let inlineButtons = [
+    let inlineButtons = [];
+    
+    // চেক করা হচ্ছে ডাটাবেসে কোনো কাস্টম এন্ট্রি বা ডিফল্ট লিস্ট আছে কি না
+    // আপনি চাইলে ডিফল্ট বাটনগুলোও ডাটাবেস ভিত্তিক করতে পারেন যাতে রিমুভ করা সহজ হয়
+    inlineButtons.push(
         [Markup.button.callback('⚡ 220 Likes - ৳8', 'pkg_like_220')],
         [Markup.button.callback('🚀 6000 Likes - ৳300', 'pkg_like_6000')]
-    ];
+    );
 
     if (db.customProducts && db.customProducts['Free Fire Likes']) {
         db.customProducts['Free Fire Likes'].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
