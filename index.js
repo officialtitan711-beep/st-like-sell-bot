@@ -19,7 +19,7 @@ function loadDatabase() {
     try {
         if (fs.existsSync(DB_FILE)) {
             const data = fs.readFileSync(DB_FILE, 'utf8');
-            if (data.trim() === '') return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {} };
+            if (data.trim() === '') return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {} };
             const parsed = JSON.parse(data);
             if (!parsed.users) parsed.users = {};
             if (!parsed.balances) parsed.balances = {};
@@ -28,12 +28,13 @@ function loadDatabase() {
             if (!parsed.categories) parsed.categories = {};
             if (!parsed.customProducts) parsed.customProducts = {};
             if (!parsed.allowedUsers) parsed.allowedUsers = {};
+            if (!parsed.pendingMsgs) parsed.pendingMsgs = {};
             return parsed;
         }
     } catch (e) { 
         console.error('DB Load Error:', e); 
     }
-    return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {} };
+    return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {} };
 }
 
 function saveDatabase(data) {
@@ -60,6 +61,7 @@ async function checkUserSubscription(userId) {
 async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     let text;
     let keyboard;
+    const userId = ctx.from ? ctx.from.id.toString() : (ctx.chat ? ctx.chat.id.toString() : null);
 
     if (isPendingAdminAccess) {
         text = "╔═════════════════════════════════╗\n║      ⏳ 50% ACCESS PENDING      ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 🎉 **Congratulations!**          │\n│ আপনি **ST Like Bot**-এর ৫০% এক্সেস   │\n│ সফলভাবে পেয়েছেন। ✨               │\n├─────────────────────────────────┤\n│ ⚠️ বাকী ৫০% এক্সেস পেতে নিচের     │\n│ বাটনে ক্লিক করে অ্যাডমিনকে মেসেজ   │\n│ করে পারমিশন নিয়ে নিন।           │\n│ 👑 **Admin:** `@sonu1813`         │\n└─────────────────────────────────┘";
@@ -76,13 +78,27 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     }
 
     try {
+        let sentMsg;
         if (ctx.callbackQuery) {
-            await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
+            sentMsg = await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard });
         } else {
-            await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+            sentMsg = await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+        }
+
+        if (isPendingAdminAccess && userId && sentMsg) {
+            const db = loadDatabase();
+            if (!db.pendingMsgs) db.pendingMsgs = {};
+            db.pendingMsgs[userId] = sentMsg.message_id;
+            saveDatabase(db);
         }
     } catch (e) {
-        await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+        const sentMsg = await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard });
+        if (isPendingAdminAccess && userId && sentMsg) {
+            const db = loadDatabase();
+            if (!db.pendingMsgs) db.pendingMsgs = {};
+            db.pendingMsgs[userId] = sentMsg.message_id;
+            saveDatabase(db);
+        }
     }
 }
 
@@ -215,6 +231,7 @@ bot.on('message', async (ctx) => {
     if (!db.customProducts) db.customProducts = {};
     if (!db.users) db.users = {};
     if (!db.allowedUsers) db.allowedUsers = {};
+    if (!db.pendingMsgs) db.pendingMsgs = {};
 
     const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
@@ -457,14 +474,26 @@ bot.on('message', async (ctx) => {
         delete db.sessions[userId];
         saveDatabase(db);
 
-        // Auto-update message when admin grants 100% access
+        // Edit the existing 50% pending message to 100% granted message
         const grantedText = "╔═════════════════════════════════╗\n║      🌟 100% ACCESS GRANTED     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 🎉 **Congratulations!**          │\n│ আপনি **ST Like Bot**-এর ১০০% এক্সেস   │\n│ সফলভাবে পেয়েছেন। ✨               │\n├─────────────────────────────────┤\n│ 👇 বট ব্যবহার করতে অবশ্যই নিচের   │\n│ **Verify Access Now** বাটনটিতে   │\n│ ক্লিক করুন:                      │\n└─────────────────────────────────┘";
         const grantedKeyboard = Markup.inlineKeyboard([
             [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')]
         ]);
 
-        bot.telegram.sendMessage(targetId, grantedText, { parse_mode: 'Markdown', ...grantedKeyboard }).catch(()=>{});
-        return ctx.reply('✅ পারমিশন সফলভাবে দেওয়া হয়েছে এবং ইউজারের কাছে ১০০% এক্সেস নোটিফিকেশন চলে গেছে।', { parse_mode: 'Markdown' });
+        if (db.pendingMsgs && db.pendingMsgs[targetId]) {
+            const msgId = db.pendingMsgs[targetId];
+            try {
+                await bot.telegram.editMessageText(targetId, msgId, null, grantedText, { parse_mode: 'Markdown', ...grantedKeyboard });
+            } catch (e) {
+                await bot.telegram.sendMessage(targetId, grantedText, { parse_mode: 'Markdown', ...grantedKeyboard });
+            }
+            delete db.pendingMsgs[targetId];
+            saveDatabase(db);
+        } else {
+            await bot.telegram.sendMessage(targetId, grantedText, { parse_mode: 'Markdown', ...grantedKeyboard }).catch(()=>{});
+        }
+
+        return ctx.reply('✅ পারমিশন সফলভাবে দেওয়া হয়েছে এবং ইউজারের আগের মেসেজটি এডিট হয়ে ১০০% এক্সেস নোটিফিকেশন চলে গেছে।', { parse_mode: 'Markdown' });
     }
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_bot_prompt') {
