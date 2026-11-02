@@ -302,17 +302,16 @@ bot.on('message', async (ctx) => {
             if (session) {
                 const userBal = db.balances[targetUserId] || 0;
                 const lines = text.split('\n');
-                const prevLikes = lines[0] || '---';
-                const currLikes = lines[1] || '---';
-                const addedLikes = lines[2] || '---';
+                const prevStatus = lines[0] || '---';
+                const currStatus = lines[1] || '---';
+                const addedStatus = lines[2] || '---';
 
                 checkAndCleanMonthlyHistory(targetUserId, db);
 
                 if (!db.orderHistories[targetUserId]) db.orderHistories[targetUserId] = [];
                 
-                // Real local Bangladesh time & date (Asia/Dhaka)
                 const now = new Date();
-                const dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }); // DD/MM/YYYY
+                const dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' });
                 const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
 
                 db.orderHistories[targetUserId].push({
@@ -330,7 +329,7 @@ bot.on('message', async (ctx) => {
                 }
                 saveDatabase(db);
 
-                const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name: `" + session.nickname + "`\n│ 🛡 UID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ ❤️ Previous Likes: " + prevLikes + "\n│ 💖 Current Likes: " + currLikes + "\n│ 🚀 Added Likes: " + addedLikes + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার ডেইলি লাইক নিতে পারবেন।\n🙏 ধন্যবাদ!";
+                const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name/ID: `" + session.nickname + "`\n│ 🛡 UID/Guild ID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ 📌 Previous: " + prevStatus + "\n│ 💖 Current: " + currStatus + "\n│ 🚀 Added/Note: " + addedStatus + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n🙏 ধন্যবাদ!";
 
                 try {
                     await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
@@ -410,7 +409,7 @@ bot.on('message', async (ctx) => {
             if (currentSub) {
                 db.sessions[userId] = { step: 'admin_add_sub_product', category: currentSub };
                 saveDatabase(db);
-                return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD PACKAGE (" + currentSub + ") ║\n╚═════════════════════════════════╝\n✍️ নাম ও দাম পাঠান:\n*(উদাহরণ: `15 Days Likes - ৳150`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD PACKAGE (" + currentSub + ") ║\n╚═════════════════════════════════╝\n✍️ নাম ও দাম পাঠান:\n*(উদাহরণ: `3 SQUAD BOT - ৳140`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
             } else {
                 db.sessions[userId] = { step: 'admin_add_category' };
                 saveDatabase(db);
@@ -717,21 +716,20 @@ bot.on('message', async (ctx) => {
         const isOnlyCheck = session.step === 'awaiting_uid_only';
         const uid = text;
         
-        const waitMsg = await ctx.reply('⏳ Verifying player info...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 10% ]');
+        if (isOnlyCheck) {
+            const waitMsg = await ctx.reply('⏳ Verifying player info...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 20% ]');
+            try {
+                setTimeout(async () => {
+                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '🔄 Connecting with game server...\n\n▪️▪️▪️▪️▫️▫️▫️▫️▫️▫️ [ 55% ]', { parse_mode: 'Markdown' }).catch(() => {});
+                }, 1000);
 
-        try {
-            setTimeout(async () => {
-                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '🔄 Connecting with game server...\n\n▪️▪️▪️▪️▫️▫️▫️▫️▫️▫️ [ 40% ]', { parse_mode: 'Markdown' }).catch(() => {});
-            }, 1000);
+                setTimeout(async () => {
+                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚡ Fetching player profile data...\n\n▪️▪️▪️▪️▪️▪️▪️▫️▫️ [ 85% ]', { parse_mode: 'Markdown' }).catch(() => {});
+                }, 2000);
 
-            setTimeout(async () => {
-                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚡ Fetching player profile data...\n\n▪️▪️▪️▪️▪️▪️▪️▪️▫️▫️ [ 85% ]', { parse_mode: 'Markdown' }).catch(() => {});
-            }, 2000);
+                const nickname = await checkFreeFireUID(uid);
 
-            const nickname = await checkFreeFireUID(uid);
-
-            setTimeout(async () => {
-                if (isOnlyCheck) {
+                setTimeout(async () => {
                     delete db.sessions[userId];
                     saveDatabase(db);
                     
@@ -741,53 +739,58 @@ bot.on('message', async (ctx) => {
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]])
                     }).catch(() => {});
-                } else {
-                    session.step = 'review_order';
-                    session.uid = uid;
-                    session.nickname = nickname;
-                    saveDatabase(db);
-
-                    const userBal = db.balances[userId] || 0;
-                    const slipText = "╔═════════════════════════════════╗\n║         📦 ORDER REVIEW         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'User') + "\n│ 🎮 Game Name: `" + nickname + "`\n│ 🛡 UID: `" + uid + "`\n│ 💳 Price: ৳" + session.price + "\n│ 💰 Balance: ৳" + userBal + "\n└─────────────────────────────────┘";
-
-                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, slipText, {
-                        parse_mode: 'Markdown',
-                        ...Markup.inlineKeyboard([
-                            [Markup.button.callback('✅ Confirm Order 🚀', 'confirm_order'), Markup.button.callback('🔙 Back ↩️', 'shop_now_back')]
-                        ])
-                    }).catch(() => {});
-                }
-            }, 3000);
-
-        } catch (error) {
-            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚠️ API connection error. সঠিক UID দিয়ে আবার চেষ্টা করুন।').catch(() => {});
-        }
-        return;
-    }
-
-    // MAIN MENU BUTTONS
-    if (text === '🛍️ Shop Now') {
-        if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
-            db.sessions[userId].activeCategory = null;
+                }, 3000);
+            } catch (error) {
+                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚠️ API connection error. সঠিক UID দিয়ে আবার চেষ্টা করুন।').catch(() => {});
+            }
+            return;
+        } else {
+            // General or Guild Order Review Flow
+            session.step = 'review_order';
+            session.uid = uid;
+            session.nickname = session.isGuild ? 'Guild Order' : 'Player Account';
             saveDatabase(db);
-        }
-        let inlineButtons = [
-            [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
-        ];
 
-        const catKeys = Object.keys(db.categories || {});
-        if (catKeys.length > 0) {
-            catKeys.forEach((c) => {
-                inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
+            const userBal = db.balances[userId] || 0;
+            const slipText = "╔═════════════════════════════════╗\n║         📦 ORDER REVIEW         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'User') + "\n│ 📦 Product: `" + session.product + "`\n│ 🛡 UID/Guild ID: `" + uid + "`\n│ 🌍 Server: `" + session.region + "`\n│ 💳 Price: ৳" + session.price + "\n│ 💰 Balance: ৳" + userBal + "\n└─────────────────────────────────┘";
+
+            return ctx.reply(slipText, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('✅ Confirm Order 🚀', 'confirm_order'), Markup.button.callback('🔙 Back ↩️', 'shop_now_back')]
+                ])
             });
         }
+    }
 
-        inlineButtons.push([Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]);
+    // MAIN MENU BUTTONS WITH SMOOTH SHOP LOADER
+    if (text === '🛍️ Shop Now') {
+        const loadingMsg = await ctx.reply('⏳ Loading Shop Menu...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 50% ]');
+        
+        setTimeout(async () => {
+            if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
+                db.sessions[userId].activeCategory = null;
+                saveDatabase(db);
+            }
+            let inlineButtons = [
+                [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
+            ];
 
-        return ctx.reply("╔═════════════════════════════════╗\n║      🛍️ ALL AVAILABLE SHOP      ║\n╚═════════════════════════════════╝\n\n👇 আপনার পছন্দের সার্ভিসটি নিতে নিচের বাটনগুলোতে ক্লিক করুন:", {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard(inlineButtons)
-        });
+            const catKeys = Object.keys(db.categories || {});
+            if (catKeys.length > 0) {
+                catKeys.forEach((c) => {
+                    inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
+                });
+            }
+
+            inlineButtons.push([Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]);
+
+            await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, "╔═════════════════════════════════╗\n║      🛍️ ALL AVAILABLE SHOP      ║\n╚═════════════════════════════════╝\n\n👇 আপনার পছন্দের সার্ভিসটি নিতে নিচের বাটনগুলোতে ক্লিক করুন:", {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard(inlineButtons)
+            }).catch(() => {});
+        }, 800);
+        return;
     }
 
     if (text === '🔍 Check FF UID') {
@@ -833,8 +836,8 @@ bot.on('message', async (ctx) => {
         } else {
             userHistories.forEach((h, index) => {
                 historyBoxText += (index + 1) + ". 📦 **" + h.product + "**\n" +
-                                  "   🎮 গেমের নাম: `" + h.nickname + "`\n" +
-                                  "   🛡 UID: `" + h.uid + "`\n" +
+                                  "   🎮 নাম/আইডি: `" + h.nickname + "`\n" +
+                                  "   🛡 UID/Guild: `" + h.uid + "`\n" +
                                   "   🌍 সার্ভার: `" + h.region + "`\n" +
                                   "   💵 মূল্য: `" + h.price + " BDT`\n" +
                                   "   🕒 সময়: `" + h.time + "` | 📅 তারিখ: `" + h.date + "`\n";
@@ -1078,17 +1081,37 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
     });
 });
 
+// DYNAMICALLY HANDLE ALL CUSTOM PACKAGES (Guild Glory Bot, Squad Bot, etc.) WITH INSTANT SELECTION
 bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
     const catName = ctx.match[1];
     const index = parseInt(ctx.match[2]);
+    const userId = ctx.from.id.toString();
     const db = loadDatabase();
+
     const prod = db.customProducts[catName] && db.customProducts[catName][index] ? db.customProducts[catName][index] : { name: 'Custom Package' };
     
+    // Auto extract price from package title
+    let extractedPrice = 0;
+    const allNumbers = prod.name.match(/\d+/g);
+    if (allNumbers && allNumbers.length > 0) {
+        extractedPrice = parseInt(allNumbers[allNumbers.length - 1]);
+    }
+
+    if (!db.sessions) db.sessions = {};
+    db.sessions[userId] = { 
+        product: prod.name, 
+        price: extractedPrice, 
+        isGuild: catName.toLowerCase().includes('guild') || prod.name.toLowerCase().includes('squad') || prod.name.toLowerCase().includes('bot')
+    };
+    saveDatabase(db);
+
     await ctx.answerCbQuery('⭐ ' + prod.name + ' selected!');
-    await ctx.editMessageText("╔═════════════════════════════════╗\n║       📦 PRODUCT SELECTED       ║\n╚═════════════════════════════════╝\n📦 **Product:** `" + prod.name + "`\n\n💬 অর্ডারের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।", {
+    
+    await ctx.editMessageText("╔═════════════════════════════════╗\n║      🌍 SERVER SELECTION        ║\n╚═════════════════════════════════╝\nPackage: `" + prod.name + "` (" + extractedPrice + " BDT)\n\n👇 রিজিওন সিলেক্ট করুন:", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔙 Back to Shop 🛍️', 'shop_now_back')]
+            [Markup.button.callback('🇧🇩 BD (Bangladesh)', 'region_bd'), Markup.button.callback('🇮🇩 Indonesia', 'region_id')],
+            [Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]
         ])
     });
 });
@@ -1099,7 +1122,7 @@ bot.action(/pkg_like_(220|6000)/, async (ctx) => {
     const price = amount === '220' ? 8 : 300;
     const db = loadDatabase();
     if (!db.sessions) db.sessions = {};
-    db.sessions[userId] = { product: amount + ' Free Fire Likes', price: price };
+    db.sessions[userId] = { product: amount + ' Free Fire Likes', price: price, isGuild: false };
     saveDatabase(db);
 
     await ctx.editMessageText("╔═════════════════════════════════╗\n║      🌍 SERVER SELECTION        ║\n╚═════════════════════════════════╝\nPackage: `" + amount + " Likes` (" + price + " BDT)\n\n👇 রিজিওন সিলেক্ট করুন:", {
@@ -1121,9 +1144,11 @@ bot.action(/region_(bd|id)/, async (ctx) => {
         saveDatabase(db);
     }
 
-    await ctx.editMessageText("╔═════════════════════════════════╗\n║      🎮 ENTER GAME UID          ║\n╚═════════════════════════════════╝\nServer: `" + region + "`\n\n✍️ UID পাঠান:", {
+    const inputPrompt = db.sessions[userId] && db.sessions[userId].isGuild ? '✍️ Guild ID পাঠান:' : '✍️ Player UID পাঠান:';
+
+    await ctx.editMessageText("╔═════════════════════════════════╗\n║      🎮 ENTER ID DETAILS        ║\n╚═════════════════════════════════╝\nServer: `" + region + "`\n\n" + inputPrompt, {
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Back ↩️', 'cat_ff_likes')]])
+        ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Back ↩️', 'shop_now_back')]])
     });
 });
 
@@ -1135,14 +1160,15 @@ bot.action('confirm_order', async (ctx) => {
 
     const userBal = db.balances[userId] || 0;
     if (userBal < session.price) {
-        return ctx.answerCbQuery('❌ পর্যাপ্ত ব্যালেন্স নেই!', { show_alert: true });
+        return ctx.answerCbQuery('❌ পর্যাপ্ত ব্যালেন্স নেই! দয়া করে ডিপোজিট করুন।', { show_alert: true });
     }
 
     if (!db.balances) db.balances = {};
     db.balances[userId] -= session.price;
     if (!db.adminSessions) db.adminSessions = {};
 
-    const adminNotifyText = "╔═════════════════════════════════╗\n║   🔔 NEW ORDER PENDING APPROVAL ║\n╚═════════════════════════════════╝\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Customer: " + ctx.from.first_name + "\n🆔 Customer ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Name: `" + session.nickname + "`\n🎮 UID: `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👇 Click below to enter likes details:";
+    const idLabel = session.isGuild ? '🛡 Guild ID' : '🎮 UID';
+    const adminNotifyText = "╔═════════════════════════════════╗\n║   🔔 NEW ORDER PENDING APPROVAL ║\n╚═════════════════════════════════╝\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Customer: " + ctx.from.first_name + "\n🆔 Customer ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n" + idLabel + ": `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👇 Click below to enter order details:";
 
     const sentAdminMsg = await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
         parse_mode: 'Markdown',
@@ -1156,7 +1182,7 @@ bot.action('confirm_order', async (ctx) => {
         loadingMessageId: ctx.callbackQuery.message.message_id,
         adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
         product: session.product,
-        nickname: session.nickname,
+        nickname: session.nickname || 'N/A',
         uid: session.uid,
         region: session.region,
         price: session.price
@@ -1164,15 +1190,24 @@ bot.action('confirm_order', async (ctx) => {
     delete db.sessions[userId];
     saveDatabase(db);
 
-    await ctx.editMessageText('⏳ Order request is processing...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 10% ]', { parse_mode: 'Markdown' });
+    // PROGRESSIVE LOADING ANIMATION FOR ORDER PROCESSING
+    await ctx.editMessageText('⏳ Order request is processing...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 20% ]', { parse_mode: 'Markdown' });
     
     setTimeout(async () => {
         await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🔄 Connecting with server...\n\n▪️▪️▪️▪️▫️▫️▫️▫️▫️▫️ [ 40% ]', { parse_mode: 'Markdown' }).catch(() => {});
-    }, 1500);
+    }, 1200);
 
     setTimeout(async () => {
-        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ Synchronizing likes with game...\n\n▪️▪️▪️▪️▪️▪️▪️▪️▫️▫️ [ 85% ] (Hold)', { parse_mode: 'Markdown' }).catch(() => {});
-    }, 3000);
+        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ Processing transaction...\n\n▪️▪️▪️▪️▪️▪️▫️▫️▫️▫️ [ 55% ]', { parse_mode: 'Markdown' }).catch(() => {});
+    }, 2400);
+
+    setTimeout(async () => {
+        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🚀 Synchronizing order data...\n\n▪️▪️▪️▪️▪️▪️▪️▪️▫️▫️ [ 80% ]', { parse_mode: 'Markdown' }).catch(() => {});
+    }, 3600);
+
+    setTimeout(async () => {
+        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🔒 Finalizing security checks...\n\n▪️▪️▪️▪️▪️▪️▪️▪️▪️▫️ [ 85% ] (Hold)', { parse_mode: 'Markdown' }).catch(() => {});
+    }, 4800);
 });
 
 bot.action(/admin_input_(.+)/, async (ctx) => {
@@ -1183,8 +1218,8 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
     db.adminInputSession[userId] = { step: 'awaiting_order_details', targetUserId: targetUserId };
     saveDatabase(db);
 
-    await ctx.answerCbQuery('✍️ Chat-e 3 line-e like details pathan!');
-    await ctx.reply("╔═════════════════════════════════╗\n║        📝 ORDER DETAILS         ║\n╚═════════════════════════════════╝\nChat-e nicher moto 3 ti line pathan:\n1. Previous Likes\n2. Current Likes\n3. Added Likes", { parse_mode: 'Markdown' });
+    await ctx.answerCbQuery('✍️ Chat-e 3 line-e order details pathan!');
+    await ctx.reply("╔═════════════════════════════════╗\n║        📝 ORDER DETAILS         ║\n╚═════════════════════════════════╝\nChat-e nicher moto 3 ti line pathan:\n1. Previous Status / Info\n2. Current Status / Info\n3. Added Status / Note", { parse_mode: 'Markdown' });
 });
 
 bot.action(/admin_can_(.+)/, async (ctx) => {
