@@ -62,7 +62,7 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     let keyboard;
 
     if (isPendingAdminAccess) {
-        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন।\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
+        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন።\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
         keyboard = Markup.inlineKeyboard([
             [Markup.button.url('💬 Message Admin 🚀', 'https://t.me/sonu1813')],
             [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')]
@@ -87,12 +87,11 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     }
 }
 
-// প্রতিটি বাটনে ইউনিক ও আলাদা কালার থিম (কোনো কালার রিপিট করা হয়নি)
 function getMainKeyboard(userId) {
     let keyboard = [
-        [Markup.button.text('🛍️ Buy FF Likes')],[span_1](start_span)[span_1](end_span)
-        [Markup.button.text('👤 My Profile'), Markup.button.text('💳 Deposit')],[span_2](start_span)[span_2](end_span)
-        [Markup.button.text('🎁 Refer'), Markup.button.text('🆘 Support')][span_3](start_span)[span_3](end_span)
+        [Markup.button.text('🛍️ Buy FF Likes')],
+        [Markup.button.text('👤 My Profile'), Markup.button.text('💳 Deposit')],
+        [Markup.button.text('🎁 Refer'), Markup.button.text('🆘 Support')]
     ];
 
     if (userId.toString() === ADMIN_ID.toString()) {
@@ -389,9 +388,13 @@ bot.on('message', async (ctx) => {
         const cat = db.sessions[userId].category;
         if (!db.customProducts[cat]) db.customProducts[cat] = [];
         db.customProducts[cat].push({ name: text });
+        
+        // সিরিয়াল যেন সবসময় ঠিক থাকে (অটো সর্টিং লজিক)
+        db.customProducts[cat].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
         delete db.sessions[userId];
         saveDatabase(db);
-        return ctx.reply('✅ সফলভাবে `' + cat + '`-এর ভেতরে নতুন প্যাকেজ অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        return ctx.reply('✅ সফলভাবে `' + cat + '`-এর ভেতরে নতুন প্যাকেজ সিরিয়াল অনুযায়ী অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     }
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_sub_product') {
@@ -606,8 +609,11 @@ bot.on('message', async (ctx) => {
 
         const catKeys = Object.keys(db.categories || {});
         if (catKeys.length > 0) {
-            catKeys.forEach((c) => {
-                inlineButtons.push([Markup.button.callback('🔵 ' + c, 'custom_cat_' + c)]);
+            const colorEmojis = ['🔵', '🟣', '🟠', '🟡', '🟤', '🟢', '🔴', '✨', '💎', '🚀'];
+            // ক্যাটাগরিগুলোর সিরিয়াল যাতে সবসময় ঠিক থাকে (অটো সর্টেড)
+            catKeys.sort().forEach((c, idx) => {
+                const randomColor = colorEmojis[idx % colorEmojis.length];
+                inlineButtons.push([Markup.button.callback(randomColor + ' ' + c, 'custom_cat_' + c)]);
             });
         }
 
@@ -807,8 +813,10 @@ bot.action('shop_now_back', async (ctx) => {
 
     const catKeys = Object.keys(db.categories || {});
     if (catKeys.length > 0) {
-        catKeys.forEach((c) => {
-            inlineButtons.push([Markup.button.callback('🔵 ' + c, 'custom_cat_' + c)]);
+        const colorEmojis = ['🔵', '🟣', '🟠', '🟡', '🟤', '🟢', '🔴', '✨', '💎', '🚀'];
+        catKeys.sort().forEach((c, idx) => {
+            const randomColor = colorEmojis[idx % colorEmojis.length];
+            inlineButtons.push([Markup.button.callback(randomColor + ' ' + c, 'custom_cat_' + c)]);
         });
     }
 
@@ -835,8 +843,12 @@ bot.action('cat_ff_likes', async (ctx) => {
     ];
 
     if (db.customProducts && db.customProducts['Free Fire Likes']) {
+        const subColorEmojis = ['✨', '💎', '🔥', '⭐', '🌟', '⚡'];
+        // প্যাকেজগুলো সিরিয়াল অনুযায়ী সর্ট করা থাকবে যাতে ২২, ২২০ বা ৬০০০ এর সিরিয়াল উল্টাপাল্টা না হয়
+        db.customProducts['Free Fire Likes'].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts['Free Fire Likes'].forEach((p, idx) => {
-            inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
+            const subColor = subColorEmojis[idx % subColorEmojis.length];
+            inlineButtons.push([Markup.button.callback(subColor + ' ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
         });
     }
 
@@ -860,8 +872,11 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
 
     let inlineButtons = [];
     if (db.customProducts && db.customProducts[catName]) {
+        const subColorEmojis = ['✨', '💎', '🔥', '⭐', '🌟', '⚡'];
+        db.customProducts[catName].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts[catName].forEach((p, idx) => {
-            inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
+            const subColor = subColorEmojis[idx % subColorEmojis.length];
+            inlineButtons.push([Markup.button.callback(subColor + ' ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
         });
     }
 
@@ -1044,5 +1059,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => { console.log('HTTP Server listening on port ' + PORT); });
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGINT', `SIGINT`);
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
