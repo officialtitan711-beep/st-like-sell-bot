@@ -328,13 +328,11 @@ bot.on('message', async (ctx) => {
             if (currentSub) {
                 let listText = '🗑️ **(' + currentSub + ') থেকে যে বাটন বা প্যাকেজটি রিমুভ করতে চান, সেটির সঠিক নাম লিখে পাঠান:**\n\n';
                 
-                // ডিফল্ট অথবা কাস্টম সব প্রোডাক্ট সিরিয়াল অনুযায়ী লিস্ট করা হচ্ছে
-                let allItems = [];
                 if (currentSub === 'Free Fire Likes') {
                     if (!db.customProducts) db.customProducts = {};
                     if (!db.customProducts['Free Fire Likes']) db.customProducts['Free Fire Likes'] = [
-                        { name: '220 Likes - ৳8', default: true },
-                        { name: '6000 Likes - ৳300', default: true }
+                        { name: '220 Likes - ৳8' },
+                        { name: '6000 Likes - ৳300' }
                     ];
                 }
 
@@ -408,20 +406,28 @@ bot.on('message', async (ctx) => {
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_add_sub_product') {
         const cat = db.sessions[userId].category;
-        if (!db.customProducts[cat]) db.customProducts[cat] = [];
-        db.customProducts[cat].push({ name: text });
         
-        db.customProducts[cat].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        // ফ্রি ফায়ার লাইকস ক্যাটাগরির ডিফল্ট লিস্ট যদি আগে না থাকে
+        if (cat === 'Free Fire Likes' && (!db.customProducts['Free Fire Likes'] || db.customProducts['Free Fire Likes'].length === 0)) {
+            db.customProducts['Free Fire Likes'] = [
+                { name: '220 Likes - ৳8' },
+                { name: '6000 Likes - ৳300' }
+            ];
+        }
+
+        if (!db.customProducts[cat]) db.customProducts[cat] = [];
+        
+        // নতুন প্রোডাক্ট একদম শেষে (নিচে) যোগ হবে, কোনো স্বয়ংক্রিয় সর্টিং হবে না
+        db.customProducts[cat].push({ name: text });
 
         delete db.sessions[userId];
         saveDatabase(db);
-        return ctx.reply('✅ সফলভাবে `' + cat + '`-এর ভেতরে নতুন প্যাকেজ বা বাটন সিরিয়াল অনুযায়ী অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        return ctx.reply('✅ সফলভাবে `' + cat + '`-এর ভেতরে নতুন প্যাকেজ বা বাটন একদম নিচে অ্যাড করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     }
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_sub_product') {
         const cat = db.sessions[userId].category;
         
-        // ফ্রি ফায়ার লাইকস ক্যাটাগরির ডিফল্ট লিস্ট ইনিশিয়ালাইজ যদি না থাকে
         if (cat === 'Free Fire Likes' && (!db.customProducts['Free Fire Likes'] || db.customProducts['Free Fire Likes'].length === 0)) {
             db.customProducts['Free Fire Likes'] = [
                 { name: '220 Likes - ৳8' },
@@ -640,7 +646,8 @@ bot.on('message', async (ctx) => {
 
         const catKeys = Object.keys(db.categories || {});
         if (catKeys.length > 0) {
-            catKeys.sort().forEach((c) => {
+            // ক্যাটাগরির ক্ষেত্রেও কোনো সর্টিং ছাড়া যেভাবে অ্যাড করা হয়েছে সেই অর্ডারে থাকবে
+            catKeys.forEach((c) => {
                 inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
             });
         }
@@ -811,7 +818,7 @@ bot.action('shop_now_back', async (ctx) => {
 
     const catKeys = Object.keys(db.categories || {});
     if (catKeys.length > 0) {
-        catKeys.sort().forEach((c) => {
+        catKeys.forEach((c) => {
             inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
         });
     }
@@ -843,8 +850,8 @@ bot.action('cat_ff_likes', async (ctx) => {
     }
 
     let inlineButtons = [];
-    db.customProducts['Free Fire Likes'].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
     
+    // কোনো sort() বা সাজানোর লজিক ছাড়া যেভাবে আছে ঠিক সেই অর্ডারে রেন্ডার হবে
     db.customProducts['Free Fire Likes'].forEach((p, idx) => {
         let callbackData = '';
         if (p.name.includes('220 Likes')) callbackData = 'pkg_like_220';
@@ -874,7 +881,6 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
 
     let inlineButtons = [];
     if (db.customProducts && db.customProducts[catName]) {
-        db.customProducts[catName].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts[catName].forEach((p, idx) => {
             inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
         });
