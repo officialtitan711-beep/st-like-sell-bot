@@ -19,7 +19,7 @@ function loadDatabase() {
     try {
         if (fs.existsSync(DB_FILE)) {
             const data = fs.readFileSync(DB_FILE, 'utf8');
-            if (data.trim() === '') return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {} };
+            if (data.trim() === '') return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {} };
             const parsed = JSON.parse(data);
             if (!parsed.users) parsed.users = {};
             if (!parsed.balances) parsed.balances = {};
@@ -29,12 +29,14 @@ function loadDatabase() {
             if (!parsed.customProducts) parsed.customProducts = {};
             if (!parsed.allowedUsers) parsed.allowedUsers = {};
             if (!parsed.pendingMsgs) parsed.pendingMsgs = {};
+            if (!parsed.orderHistories) parsed.orderHistories = {};
+            if (!parsed.historyTimestamps) parsed.historyTimestamps = {};
             return parsed;
         }
     } catch (e) { 
         console.error('DB Load Error:', e); 
     }
-    return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {} };
+    return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {} };
 }
 
 function saveDatabase(data) {
@@ -42,6 +44,26 @@ function saveDatabase(data) {
         fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); 
     } catch (e) { 
         console.error('DB Save Error:', e); 
+    }
+}
+
+// Check and Auto-clear 30 days (1 Month) order history
+function checkAndCleanMonthlyHistory(userId, db) {
+    if (!db.historyTimestamps) db.historyTimestamps = {};
+    const now = Date.now();
+    const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000; // 30 Days
+
+    if (!db.historyTimestamps[userId]) {
+        db.historyTimestamps[userId] = now;
+        saveDatabase(db);
+    } else {
+        if (now - db.historyTimestamps[userId] >= thirtyDaysInMs) {
+            if (db.orderHistories && db.orderHistories[userId]) {
+                delete db.orderHistories[userId];
+            }
+            db.historyTimestamps[userId] = now;
+            saveDatabase(db);
+        }
     }
 }
 
@@ -233,12 +255,13 @@ bot.on('message', async (ctx) => {
     if (!db.allowedUsers) db.allowedUsers = {};
     if (!db.pendingMsgs) db.pendingMsgs = {};
     if (!db.adminReplySessions) db.adminReplySessions = {};
+    if (!db.orderHistories) db.orderHistories = {};
+    if (!db.historyTimestamps) db.historyTimestamps = {};
 
     const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
     // ADMIN REPLY & ORDER COMPLETION HANDLING
     if (userId === ADMIN_ID.toString()) {
-        // Checking if admin is replying via custom reply session (triggered by Reply button)
         const replySession = db.adminReplySessions[userId];
         if (replySession) {
             const targetUserId = replySession.targetUserId;
@@ -283,6 +306,29 @@ bot.on('message', async (ctx) => {
                 const currLikes = lines[1] || '---';
                 const addedLikes = lines[2] || '---';
 
+                checkAndCleanMonthlyHistory(targetUserId, db);
+
+                if (!db.orderHistories[targetUserId]) db.orderHistories[targetUserId] = [];
+                
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('en-GB'); // DD/MM/YYYY
+                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                db.orderHistories[targetUserId].push({
+                    date: dateStr,
+                    time: timeStr,
+                    product: session.product,
+                    uid: session.uid,
+                    nickname: session.nickname,
+                    region: session.region,
+                    price: session.price
+                });
+                
+                if (!db.historyTimestamps[targetUserId]) {
+                    db.historyTimestamps[targetUserId] = Date.now();
+                }
+                saveDatabase(db);
+
                 const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name: `" + session.nickname + "`\n│ 🛡 UID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ ❤️ Previous Likes: " + prevLikes + "\n│ 💖 Current Likes: " + currLikes + "\n│ 🚀 Added Likes: " + addedLikes + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার ডেইলি লাইক নিতে পারবেন।\n🙏 ধন্যবাদ!";
 
                 try {
@@ -304,7 +350,6 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // Admin replying to customer support via Telegram reply feature fallback
         if (ctx.message.reply_to_message) {
             const repliedText = ctx.message.reply_to_message.text || ctx.message.reply_to_message.caption || '';
             const match = repliedText.match(/ID[^`]*`(\d+)`/) || repliedText.match(/আইডি[^`]*`(\d+)`/);
@@ -502,10 +547,13 @@ bot.on('message', async (ctx) => {
         }
         if (!db.allowedUsers) db.allowedUsers = {};
         db.allowedUsers[targetId] = true;
+        
+        if (!db.historyTimestamps) db.historyTimestamps = {};
+        db.historyTimestamps[targetId] = Date.now();
+
         delete db.sessions[userId];
         saveDatabase(db);
 
-        // Edit the existing 50% pending message to 100% granted message
         const grantedText = "╔═════════════════════════════════╗\n║      🌟 100% ACCESS GRANTED     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 🎉 **Congratulations!**          │\n│ আপনি **ST Like Bot**-এর ১০০% এক্সেস   │\n│ সফলভাবে পেয়েছেন। ✨               │\n├─────────────────────────────────┤\n│ 👇 বট ব্যবহার করতে অবশ্যই নিচের   │\n│ **Verify Access Now** বাটনটিতে   │\n│ ক্লিক করুন:                      │\n└─────────────────────────────────┘";
         const grantedKeyboard = Markup.inlineKeyboard([
             [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')]
@@ -535,10 +583,13 @@ bot.on('message', async (ctx) => {
             if (foundUid) targetId = foundUid;
         }
         if (db.allowedUsers) delete db.allowedUsers[targetId];
+        if (db.orderHistories && db.orderHistories[targetId]) delete db.orderHistories[targetId];
+        if (db.historyTimestamps && db.historyTimestamps[targetId]) delete db.historyTimestamps[targetId];
+
         delete db.sessions[userId];
         saveDatabase(db);
         bot.telegram.sendMessage(targetId, '╔═════════════════════════════════╗\n║      ❌ ACCESS REVOKED ❌       ║\n╚═════════════════════════════════╝\n⚠️ আপনার বট অ্যাক্সেস রিমুভ করা হয়েছে।', { parse_mode: 'Markdown' }).catch(()=>{});
-        return ctx.reply('🗑️ ইউজারের অ্যাক্সেস রিমুভ করা হয়েছে।', { parse_mode: 'Markdown' });
+        return ctx.reply('🗑️ ইউজারের অ্যাক্সেস এবং তার অর্ডার হিস্ট্রি সফলভাবে রিমুভ করা হয়েছে।', { parse_mode: 'Markdown' });
     }
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_send_msg_prompt') {
@@ -665,7 +716,6 @@ bot.on('message', async (ctx) => {
         const isOnlyCheck = session.step === 'awaiting_uid_only';
         const uid = text;
         
-        // Professional Thin Loading Animation (Progress bar style)
         const waitMsg = await ctx.reply('⏳ Verifying player info...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 10% ]');
 
         try {
@@ -773,7 +823,29 @@ bot.on('message', async (ctx) => {
     }
 
     if (text === '📜 Order History') {
-        const historyBoxText = "╔═════════════════════════════════╗\n║    📜 PURCHASE & ORDER HISTORY  ║\n╚═════════════════════════════════╝\n❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!";
+        checkAndCleanMonthlyHistory(userId, db);
+        const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId] : [];
+        let historyBoxText = "📜 **PURCHASE & ORDER HISTORY**\n\n";
+
+        if (userHistories.length === 0) {
+            historyBoxText += "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n";
+        } else {
+            userHistories.forEach((h, index) => {
+                historyBoxText += (index + 1) + ". 📦 **" + h.product + "**\n" +
+                                  "   🎮 গেমের নাম: `" + h.nickname + "`\n" +
+                                  "   🛡 UID: `" + h.uid + "`\n" +
+                                  "   🌍 সার্ভার: `" + h.region + "`\n" +
+                                  "   💵 মূল্য: `" + h.price + " BDT`\n" +
+                                  "   🕒 সময়: `" + h.time + "` | 📅 তারিখ: `" + h.date + "`\n";
+                
+                if (index < userHistories.length - 1) {
+                    historyBoxText += "───────────────────────────────────\n";
+                }
+            });
+        }
+
+        historyBoxText += "⚠️ *নোট: প্রতি ৩০ দিন (১ মাস) পর পর পূর্ববর্তী অর্ডার হিস্ট্রি স্বয়ংক্রিয়ভাবে মুছে যায় এবং নতুন মাসের অর্ডারগুলো আবার কাউন্ট হওয়া শুরু হয়।*";
+
         return ctx.reply(historyBoxText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
