@@ -407,7 +407,6 @@ bot.on('message', async (ctx) => {
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_add_sub_product') {
         const cat = db.sessions[userId].category;
         
-        // ফ্রি ফায়ার লাইকস ক্যাটাগরির ডিফল্ট লিস্ট যদি আগে না থাকে
         if (cat === 'Free Fire Likes' && (!db.customProducts['Free Fire Likes'] || db.customProducts['Free Fire Likes'].length === 0)) {
             db.customProducts['Free Fire Likes'] = [
                 { name: '220 Likes - ৳8' },
@@ -416,8 +415,6 @@ bot.on('message', async (ctx) => {
         }
 
         if (!db.customProducts[cat]) db.customProducts[cat] = [];
-        
-        // নতুন প্রোডাক্ট একদম শেষে (নিচে) যোগ হবে, কোনো স্বয়ংক্রিয় সর্টিং হবে না
         db.customProducts[cat].push({ name: text });
 
         delete db.sessions[userId];
@@ -596,7 +593,107 @@ bot.on('message', async (ctx) => {
         });
     }
 
-    // SUPPORT DESK & UNIQUE DESIGN FOR CUSTOMER MESSAGES
+    // MAIN MENU BUTTON CLICKS (Live tracking to admin + flawless normal customer flow)
+    if (text === '🛍️ Shop Now') {
+        await bot.telegram.sendMessage(ADMIN_ID, "🔔 **LIVE ACTIVITY TRACKER:**\n👤 Customer: " + (ctx.from.first_name || 'N/A') + " (`" + userId + "`)\n📌 Clicked: `🛍️ Shop Now`", { parse_mode: 'Markdown' }).catch(()=>{});
+        
+        if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
+            db.sessions[userId].activeCategory = null;
+            saveDatabase(db);
+        }
+        let inlineButtons = [
+            [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
+        ];
+
+        const catKeys = Object.keys(db.categories || {});
+        if (catKeys.length > 0) {
+            catKeys.forEach((c) => {
+                inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
+            });
+        }
+
+        inlineButtons.push([Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]);
+
+        return ctx.reply("🛍️ **All Available Products & Services**\n\n👇 আপনার পছন্দের সার্ভিসটি নিতে নিচের বাটনগুলোতে ক্লিক করুন:", {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard(inlineButtons)
+        });
+    }
+
+    if (text === '🔍 Check FF UID') {
+        await bot.telegram.sendMessage(ADMIN_ID, "🔔 **LIVE ACTIVITY TRACKER:**\n👤 Customer: " + (ctx.from.first_name || 'N/A') + " (`" + userId + "`)\n📌 Clicked: `🔍 Check FF UID`", { parse_mode: 'Markdown' }).catch(()=>{});
+
+        db.sessions[userId] = { step: 'awaiting_uid_only' };
+        saveDatabase(db);
+        return ctx.reply('🎮 **Free Fire UID Checker**\n\n✍️ UID লিখে পাঠান:', {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
+            ])
+        });
+    }
+
+    if (text === '💰 Add Balance') {
+        await bot.telegram.sendMessage(ADMIN_ID, "🔔 **LIVE ACTIVITY TRACKER:**\n👤 Customer: " + (ctx.from.first_name || 'N/A') + " (`" + userId + "`)\n📌 Clicked: `💰 Add Balance`", { parse_mode: 'Markdown' }).catch(()=>{});
+
+        const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n└─────────────────────────────────┘";
+        return ctx.reply(depositMenuText, { 
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('bKash 🌸', 'dep_bkash'), Markup.button.callback('Nagad 🧨', 'dep_nagad')],
+                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
+            ])
+        });
+    }
+
+    if (text === '👤 My Profile') {
+        await bot.telegram.sendMessage(ADMIN_ID, "🔔 **LIVE ACTIVITY TRACKER:**\n👤 Customer: " + (ctx.from.first_name || 'N/A') + " (`" + userId + "`)\n📌 Clicked: `👤 My Profile`", { parse_mode: 'Markdown' }).catch(()=>{});
+
+        const balance = db.balances[userId] || 0;
+        const profileBoxText = "⚡═════════════════════════════════⚡\n👤          **USER PROFILE**         👤\n⚡═════════════════════════════════⚡\n🆔 Telegram ID: `" + userId + "`\n💰 Account Balance: `৳" + balance + "` 💳\n⚡═════════════════════════════════⚡";
+        return ctx.reply(profileBoxText, { 
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
+            ])
+        });
+    }
+
+    if (text === '📜 Order History') {
+        await bot.telegram.sendMessage(ADMIN_ID, "🔔 **LIVE ACTIVITY TRACKER:**\n👤 Customer: " + (ctx.from.first_name || 'N/A') + " (`" + userId + "`)\n📌 Clicked: `📜 Order History`", { parse_mode: 'Markdown' }).catch(()=>{});
+
+        const historyBoxText = "🎯-----------------------------------🎯\n📜 **PURCHASE & ORDER HISTORY** 📜\n🎯-----------------------------------🎯\n❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!";
+        return ctx.reply(historyBoxText, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
+            ])
+        });
+    }
+
+    if (text === '📞 Support Desk') {
+        await bot.telegram.sendMessage(ADMIN_ID, "🔔 **LIVE ACTIVITY TRACKER:**\n👤 Customer: " + (ctx.from.first_name || 'N/A') + " (`" + userId + "`)\n📌 Clicked: `📞 Support Desk`", { parse_mode: 'Markdown' }).catch(()=>{});
+
+        const supportInstructionBox = "╔═════════════════════════════════╗\n" +
+                                       "║       📞 SUPPORT DESK 📞        ║\n" +
+                                       "╚═════════════════════════════════╝\n" +
+                                       "┌─────────────────────────────────┐\n" +
+                                       "│ 💡 আপনার যেকোনো সমস্যা, TrxID বা  │\n" +
+                                       "│ স্ক্রিনশট সরাসরি এই বটের চ্যাটেই   │\n" +
+                                       "│ লিখে বা পাঠিয়ে দিন!             │\n" +
+                                       "├─────────────────────────────────┤\n" +
+                                       "│ ⚡ অ্যাডমিন খুব দ্রুত আপনার সাথে   │\n" +
+                                       "│ যোগাযোগ করবেন। 👇              │\n" +
+                                       "└─────────────────────────────────┘";
+        return ctx.reply(supportInstructionBox, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
+            ])
+        });
+    }
+
+    // SUPPORT DESK & UNIQUE DESIGN FOR ACTUAL CUSTOMER MESSAGES (Forwarded to Admin instantly)
     if (userId !== ADMIN_ID.toString()) {
         const customerInfo = "📥 **NEW SUPPORT MESSAGE / FILE!** 📥\n━━━━━━━━━━━━━━━━━━━\n👤 Name: " + (ctx.from.first_name || 'N/A') + "\n🔗 Username: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n🆔 ID: `" + userId + "`\n━━━━━━━━━━━━━━━━━━━";
         
@@ -628,94 +725,6 @@ bot.on('message', async (ctx) => {
                                    "└─────────────────────────────────┘";
 
         return ctx.reply(customerUniqueBox, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-            ])
-        });
-    }
-
-    if (text === '🛍️ Shop Now') {
-        if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
-            db.sessions[userId].activeCategory = null;
-            saveDatabase(db);
-        }
-        let inlineButtons = [
-            [Markup.button.callback('🔥 Buy Free Fire Likes ⚡', 'cat_ff_likes')]
-        ];
-
-        const catKeys = Object.keys(db.categories || {});
-        if (catKeys.length > 0) {
-            // ক্যাটাগরির ক্ষেত্রেও কোনো সর্টিং ছাড়া যেভাবে অ্যাড করা হয়েছে সেই অর্ডারে থাকবে
-            catKeys.forEach((c) => {
-                inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
-            });
-        }
-
-        inlineButtons.push([Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]);
-
-        return ctx.reply("🛍️ **All Available Products & Services**\n\n👇 আপনার পছন্দের সার্ভিসটি নিতে নিচের বাটনগুলোতে ক্লিক করুন:", {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard(inlineButtons)
-        });
-    }
-
-    if (text === '🔍 Check FF UID') {
-        db.sessions[userId] = { step: 'awaiting_uid_only' };
-        saveDatabase(db);
-        return ctx.reply('🎮 **Free Fire UID Checker**\n\n✍️ UID লিখে পাঠান:', {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-            ])
-        });
-    }
-
-    if (text === '💰 Add Balance') {
-        const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n└─────────────────────────────────┘";
-        return ctx.reply(depositMenuText, { 
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('bKash 🌸', 'dep_bkash'), Markup.button.callback('Nagad 🧨', 'dep_nagad')],
-                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-            ])
-        });
-    }
-
-    if (text === '👤 My Profile') {
-        const balance = db.balances[userId] || 0;
-        const profileBoxText = "⚡═════════════════════════════════⚡\n👤          **USER PROFILE**         👤\n⚡═════════════════════════════════⚡\n🆔 Telegram ID: `" + userId + "`\n💰 Account Balance: `৳" + balance + "` 💳\n⚡═════════════════════════════════⚡";
-        return ctx.reply(profileBoxText, { 
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-            ])
-        });
-    }
-
-    if (text === '📜 Order History') {
-        const historyBoxText = "🎯-----------------------------------🎯\n📜 **PURCHASE & ORDER HISTORY** 📜\n🎯-----------------------------------🎯\n❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!";
-        return ctx.reply(historyBoxText, {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-            ])
-        });
-    }
-
-    if (text === '📞 Support Desk') {
-        const supportInstructionBox = "╔═════════════════════════════════╗\n" +
-                                       "║       📞 SUPPORT DESK 📞        ║\n" +
-                                       "╚═════════════════════════════════╝\n" +
-                                       "┌─────────────────────────────────┐\n" +
-                                       "│ 💡 আপনার যেকোনো সমস্যা, TrxID বা  │\n" +
-                                       "│ স্ক্রিনশট সরাসরি এই বটের চ্যাটেই   │\n" +
-                                       "│ লিখে বা পাঠিয়ে দিন!             │\n" +
-                                       "├─────────────────────────────────┤\n" +
-                                       "│ ⚡ অ্যাডমিন খুব দ্রুত আপনার সাথে   │\n" +
-                                       "│ যোগাযোগ করবেন। 👇              │\n" +
-                                       "└─────────────────────────────────┘";
-        return ctx.reply(supportInstructionBox, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
@@ -850,8 +859,6 @@ bot.action('cat_ff_likes', async (ctx) => {
     }
 
     let inlineButtons = [];
-    
-    // কোনো sort() বা সাজানোর লজিক ছাড়া যেভাবে আছে ঠিক সেই অর্ডারে রেন্ডার হবে
     db.customProducts['Free Fire Likes'].forEach((p, idx) => {
         let callbackData = '';
         if (p.name.includes('220 Likes')) callbackData = 'pkg_like_220';
