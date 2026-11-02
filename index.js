@@ -236,7 +236,7 @@ bot.on('message', async (ctx) => {
                 const currLikes = lines[1] || '---';
                 const addedLikes = lines[2] || '---';
 
-                const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name: `" + session.nickname + "`\n│ 🛡 UID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ ❤️ Previous Likes: " + prevLikes + "\n│ 💖 Current Likes: " + currLikes + "\n│ 🚀 Added Likes: " + addedLikes + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।\n🙏 ধন্যবাদ!";
+                const finalSuccessBox = "╔═════════════════════════════════╗\n║       ✅ ORDER COMPLETE         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n│ 👤 Name: `" + session.nickname + "`\n│ 🛡 UID: `" + session.uid + "`\n│ 🌍 Server: `" + session.region + "`\n├─────────────────────────────────┤\n│ ❤️ Previous Likes: " + prevLikes + "\n│ 💖 Current Likes: " + currLikes + "\n│ 🚀 Added Likes: " + addedLikes + "\n├─────────────────────────────────┤\n│ 💸 Deducted: `" + session.price + " BDT`\n│ 💰 Current Balance: `" + userBal + " BDT`\n└─────────────────────────────────┘\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার ডেইলি লাইক নিতে পারবেন।\n🙏 ধন্যবাদ!";
 
                 try {
                     await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
@@ -598,39 +598,52 @@ bot.on('message', async (ctx) => {
     if (session && (session.step === 'awaiting_uid' || session.step === 'awaiting_uid_only')) {
         const isOnlyCheck = session.step === 'awaiting_uid_only';
         const uid = text;
-        const waitMsg = await ctx.reply('⏳ Verifying player info...');
+        
+        // Professional Thin Loading Animation (Progress bar style)
+        const waitMsg = await ctx.reply('⏳ Verifying player info...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 10% ]');
 
         try {
+            setTimeout(async () => {
+                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '🔄 Connecting with game server...\n\n▪️▪️▪️▪️▫️▫️▫️▫️▫️▫️ [ 40% ]', { parse_mode: 'Markdown' }).catch(() => {});
+            }, 1000);
+
+            setTimeout(async () => {
+                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚡ Fetching player profile data...\n\n▪️▪️▪️▪️▪️▪️▪️▪️▫️▫️ [ 85% ]', { parse_mode: 'Markdown' }).catch(() => {});
+            }, 2000);
+
             const nickname = await checkFreeFireUID(uid);
-            await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
 
-            if (isOnlyCheck) {
-                delete db.sessions[userId];
-                saveDatabase(db);
-                return ctx.reply("╔═════════════════════════════════╗\n║       🎉 ACCOUNT FOUND          ║\n╚═════════════════════════════════╝\n🆔 UID: `" + uid + "`\n👤 Name: `" + nickname + "`", {
-                    parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]])
-                });
-            }
+            setTimeout(async () => {
+                if (isOnlyCheck) {
+                    delete db.sessions[userId];
+                    saveDatabase(db);
+                    
+                    const foundBox = "╔═════════════════════════════════╗\n║       🎉 ACCOUNT FOUND          ║\n╚═════════════════════════════════╝\n\n👤 Name: `" + nickname + "`\n\n🆔 UID: `" + uid + "`";
 
-            session.step = 'review_order';
-            session.uid = uid;
-            session.nickname = nickname;
-            saveDatabase(db);
+                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, foundBox, {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]])
+                    }).catch(() => {});
+                } else {
+                    session.step = 'review_order';
+                    session.uid = uid;
+                    session.nickname = nickname;
+                    saveDatabase(db);
 
-            const userBal = db.balances[userId] || 0;
-            const slipText = "╔═════════════════════════════════╗\n║         📦 ORDER REVIEW         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'User') + "\n│ 🎮 Game Name: `" + nickname + "`\n│ 🛡 UID: `" + uid + "`\n│ 💳 Price: ৳" + session.price + "\n│ 💰 Balance: ৳" + userBal + "\n└─────────────────────────────────┘";
+                    const userBal = db.balances[userId] || 0;
+                    const slipText = "╔═════════════════════════════════╗\n║         📦 ORDER REVIEW         ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'User') + "\n│ 🎮 Game Name: `" + nickname + "`\n│ 🛡 UID: `" + uid + "`\n│ 💳 Price: ৳" + session.price + "\n│ 💰 Balance: ৳" + userBal + "\n└─────────────────────────────────┘";
 
-            await ctx.reply(slipText, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('✅ Confirm Order 🚀', 'confirm_order'), Markup.button.callback('🔙 Back ↩️', 'shop_now_back')]
-                ])
-            });
+                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, slipText, {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.callback('✅ Confirm Order 🚀', 'confirm_order'), Markup.button.callback('🔙 Back ↩️', 'shop_now_back')]
+                        ])
+                    }).catch(() => {});
+                }
+            }, 3000);
 
         } catch (error) {
-            await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id).catch(() => {});
-            await ctx.reply('⚠️ API connection error. সঠিক UID দিয়ে আবার চেষ্টা করুন।');
+            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, '⚠️ API connection error. সঠিক UID দিয়ে আবার চেষ্টা করুন।').catch(() => {});
         }
         return;
     }
@@ -725,7 +738,7 @@ bot.on('message', async (ctx) => {
 
     // GENERAL FREE TEXT OR SUPPORT MESSAGE
     if (userId !== ADMIN_ID.toString()) {
-        const customerInfo = "╔═════════════════════════════════╗\n║    📥 NEW CUSTOMER MESSAGE      ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'N/A') + "\n│ 🔗 Username: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n│ 🆔 ID: `" + userId + "`\n└─────────────────────────────────➗";
+        const customerInfo = "╔═════════════════════════════════╗\n║    📥 NEW CUSTOMER MESSAGE      ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 👤 Name: " + (ctx.from.first_name || 'N/A') + "\n│ 🔗 Username: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n│ 🆔 ID: `" + userId + "`\n└─────────────────────────────────┘";
         
         try {
             await bot.telegram.sendMessage(ADMIN_ID, customerInfo, { parse_mode: 'Markdown' });
