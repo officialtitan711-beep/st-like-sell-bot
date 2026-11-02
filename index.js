@@ -62,7 +62,7 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     let keyboard;
 
     if (isPendingAdminAccess) {
-        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন።\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
+        text = "✦────────── ⚠️ ACCESS PENDING ──────────✦\nআপনার টেলিগ্রাম চ্যানেল ভেরিফিকেশন সফল হয়েছে! ✅ \nতবে প্রিমিয়াম বটের ফুল অ্যাক্সেস পেতে নিচের অ্যাডমিনকে মেসেজ করে পারমিশন নিয়ে নিন।\n\n👑 **অ্যাডমিন আইডি:** `@sonu1813`\n✦─────────────────────────────────✦";
         keyboard = Markup.inlineKeyboard([
             [Markup.button.url('💬 Message Admin 🚀', 'https://t.me/sonu1813')],
             [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')]
@@ -389,7 +389,6 @@ bot.on('message', async (ctx) => {
         if (!db.customProducts[cat]) db.customProducts[cat] = [];
         db.customProducts[cat].push({ name: text });
         
-        // সিরিয়াল যেন সবসময় ঠিক থাকে (অটো সর্টিং লজিক)
         db.customProducts[cat].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
         delete db.sessions[userId];
@@ -610,7 +609,6 @@ bot.on('message', async (ctx) => {
         const catKeys = Object.keys(db.categories || {});
         if (catKeys.length > 0) {
             const colorEmojis = ['🔵', '🟣', '🟠', '🟡', '🟤', '🟢', '🔴', '✨', '💎', '🚀'];
-            // ক্যাটাগরিগুলোর সিরিয়াল যাতে সবসময় ঠিক থাকে (অটো সর্টেড)
             catKeys.sort().forEach((c, idx) => {
                 const randomColor = colorEmojis[idx % colorEmojis.length];
                 inlineButtons.push([Markup.button.callback(randomColor + ' ' + c, 'custom_cat_' + c)]);
@@ -844,7 +842,6 @@ bot.action('cat_ff_likes', async (ctx) => {
 
     if (db.customProducts && db.customProducts['Free Fire Likes']) {
         const subColorEmojis = ['✨', '💎', '🔥', '⭐', '🌟', '⚡'];
-        // প্যাকেজগুলো সিরিয়াল অনুযায়ী সর্ট করা থাকবে যাতে ২২, ২২০ বা ৬০০০ এর সিরিয়াল উল্টাপাল্টা না হয়
         db.customProducts['Free Fire Likes'].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
         db.customProducts['Free Fire Likes'].forEach((p, idx) => {
             const subColor = subColorEmojis[idx % subColorEmojis.length];
@@ -1000,7 +997,7 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
 bot.action(/admin_can_(.+)/, async (ctx) => {
     const targetUserId = ctx.match[1];
     await ctx.answerCbQuery('❌ Order cancelled!');
-    await ctx.editMessageText(ctx.callbackQuery.message.text + "\n\n**[STATUS: CANCELLED ❌]**", { parse_mode: 'Markdown' });
+    await ctx.editMessageText(ctx.callbackQuery.message.text + "\n\n**[STATUS: COMPLETED ✅]**", { parse_mode: 'Markdown' });
     
     const dbObj = loadDatabase();
     if (dbObj.adminSessions && dbObj.adminSessions[targetUserId]) {
@@ -1059,5 +1056,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => { console.log('HTTP Server listening on port ' + PORT); });
 
-process.once('SIGINT', `SIGINT`);
+process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
