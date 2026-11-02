@@ -47,11 +47,10 @@ function saveDatabase(data) {
     }
 }
 
-// Check and Auto-clear 30 days (1 Month) order history
 function checkAndCleanMonthlyHistory(userId, db) {
     if (!db.historyTimestamps) db.historyTimestamps = {};
     const now = Date.now();
-    const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000; // 30 Days
+    const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
 
     if (!db.historyTimestamps[userId]) {
         db.historyTimestamps[userId] = now;
@@ -136,9 +135,9 @@ function getMainKeyboard(userId) {
             ['-----------------------------------'],
             ['➕ Add Bot', '❌ Remove Bot'],
             ['➕ Add Product', '❌ Remove Product'],
-            ['💳 Add/Minus Balance', '📱 Set Payment Numbers'],
-            ['📊 Total Users', '📩 Send Message'],
-            ['📢 All Users Msg']
+            ['✏️ Change Product Price', '💳 Add/Minus Balance'],
+            ['📱 Set Payment Numbers', '📊 Total Users'],
+            ['📩 Send Message', '📢 All Users Msg']
         );
     }
     return Markup.keyboard(keyboard).resize();
@@ -447,6 +446,26 @@ bot.on('message', async (ctx) => {
                 return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
             }
         }
+        if (text === '✏️ Change Product Price') {
+            const currentSub = db.sessions[userId] && db.sessions[userId].activeCategory ? db.sessions[userId].activeCategory : null;
+            if (!currentSub) {
+                return ctx.reply('⚠️ প্রথমে "🛍️ Shop Now" এ গিয়ে যে ক্যাটাগরির (যেমন: Free Fire Likes বা অন্য কোনো ক্যাটাগরি) প্রোডাক্ট এডিট করতে চান সেটিতে প্রবেশ করুন, তারপর এই বাটনে ক্লিক করুন।', { parse_mode: 'Markdown' });
+            }
+
+            let listText = '╔═════════════════════════════════╗\n║   ✏️ UPDATE PACKAGE (' + currentSub + ') ║\n╚═════════════════════════════════╝\n\n✍️ ফরম্যাট: `[পুরাতন নাম/সিরিয়াল] | [নতুন নাম ও দাম]`\n*(উদাহরণ: `1 | 220 Likes - ৳5` অথবা `220 Likes - ৳7 | 220 Likes - ৳5`)*\n\n👇 বর্তমান প্যাকেজগুলোর তালিকা:\n\n';
+            const list = db.customProducts[currentSub] || [];
+            if (list.length > 0) {
+                list.forEach((p, index) => {
+                    listText += (index + 1) + '. `' + p.name + '`\n';
+                });
+            } else {
+                listText += '⚠️ এই ক্যাটাগরিতে কোনো প্যাকেজ নেই।';
+            }
+
+            db.sessions[userId] = { step: 'admin_update_sub_product', category: currentSub };
+            saveDatabase(db);
+            return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+        }
         if (text === '📊 Total Users') {
             const allowedIds = Object.keys(db.allowedUsers || {});
             if (allowedIds.length === 0) return ctx.reply('⚠️ কোনো ইউজার নেই।');
@@ -510,7 +529,9 @@ bot.on('message', async (ctx) => {
         const cat = db.sessions[userId].category;
         
         const list = db.customProducts[cat] || [];
-        const index = list.findIndex(p => p.name.toLowerCase() === text.toLowerCase());
+        const cleanInput = text.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+        const index = list.findIndex(p => p.name.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '') === cleanInput);
+        
         if (index > -1) {
             list.splice(index, 1);
             db.customProducts[cat] = list;
@@ -519,6 +540,40 @@ bot.on('message', async (ctx) => {
             return ctx.reply('╔═════════════════════════════════╗\n║    🗑️ PACKAGE REMOVED SUCCESS   ║\n╚═════════════════════════════════╝\n\n📦 `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
         } else {
             return ctx.reply('❌ এই নামের কোনো প্যাকেজ বা বাটন পাওয়া যায়নি। সঠিক নামটি লিখে পাঠান।');
+        }
+    }
+
+    if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_update_sub_product') {
+        const cat = db.sessions[userId].category;
+        const parts = text.split('|').map(s => s.trim());
+        
+        if (parts.length < 2) {
+            return ctx.reply('❌ সঠিক ফরম্যাটে দিন! উদাহরণ: `1 | 220 Likes - ৳5` অথবা পুরনো নাম লিখে পাইপ (`|`) দিয়ে নতুন নাম ও দাম দিন।');
+        }
+
+        const identifier = parts[0];
+        const newName = parts[1];
+        const list = db.customProducts[cat] || [];
+        let targetIndex = -1;
+
+        if (!isNaN(identifier)) {
+            const idx = parseInt(identifier) - 1;
+            if (idx >= 0 && idx < list.length) {
+                targetIndex = idx;
+            }
+        } else {
+            const cleanId = identifier.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+            targetIndex = list.findIndex(p => p.name.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '') === cleanId);
+        }
+
+        if (targetIndex > -1) {
+            list[targetIndex].name = newName;
+            db.customProducts[cat] = list;
+            delete db.sessions[userId];
+            saveDatabase(db);
+            return ctx.reply('╔═════════════════════════════════╗\n║    ✨ PACKAGE UPDATED SUCCESS   ║\n╚═════════════════════════════════╝\n\n📦 নতুন নাম ও দাম: `' + newName + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        } else {
+            return ctx.reply('❌ কাঙ্ক্ষিত প্যাকেজ বা সিরিয়ালটি খুঁজে পাওয়া যায়নি। আবার সঠিক ফরম্যাটে চেষ্টা করুন।');
         }
     }
 
@@ -648,7 +703,7 @@ bot.on('message', async (ctx) => {
             return ctx.reply('❌ সঠিক অ্যামাউন্ট পাঠান (যেমন: `100`)।', { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
         }
         if (amount < 100) {
-            const alertText = "⚠️═════════════════════════════════⚠️\n🛑 **MINIMUM DEPOSIT WARNING** 🛑\n⚠️═════════════════════════════════⚠️\n\nসর্বনিম্ন **১০০ টাকা** (100 BDT) ডিপোজিট করতে হবে।\n\n❌ আপনার পরিমাণ: `" + amount + " BDT`";
+            const alertText = "⚠️═════════════════════════════════⚠️\n🛑 **MINIMUM DEPOSIT WARNING** 🛑\n⚠️═════════════════════════════════⚠️\n\nসর্বনিম্ন **১০০ টাকা** (100 BDT) ডিপোজিট করতে হবে。\n\n❌ আপনার পরিমাণ: `" + amount + " BDT`";
             return ctx.reply(alertText, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
@@ -729,7 +784,6 @@ bot.on('message', async (ctx) => {
             }
             return;
         } else {
-            // STRICT SEPARATION FOR GUILD VS LIKES ORDERS
             if (session.isGuild) {
                 session.step = 'review_order';
                 session.uid = uid;
@@ -746,7 +800,6 @@ bot.on('message', async (ctx) => {
                     ])
                 });
             } else {
-                // FREE FIRE LIKES ORDER FLOW (Dynamic price extracted from custom product name)
                 const waitMsg = await ctx.reply('⏳ Verifying player info...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 20% ]');
 
                 try {
@@ -1058,14 +1111,6 @@ bot.action('cat_ff_likes', async (ctx) => {
     }
 
     let inlineButtons = [];
-    if (db.customProducts['Free Fire Likes'].length === 0) {
-        // Fallback if empty
-        db.customProducts['Free Fire Likes'] = [
-            { name: '220 Likes - ৳7' }
-        ];
-        saveDatabase(db);
-    }
-
     db.customProducts['Free Fire Likes'].forEach((p, idx) => {
         inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
     });
@@ -1111,7 +1156,6 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
 
     const prod = db.customProducts[catName] && db.customProducts[catName][index] ? db.customProducts[catName][index] : { name: 'Custom Package' };
     
-    // Robust Price Extractor: Finds numbers after '৳' or takes the last number in string
     let extractedPrice = 0;
     const tkMatch = prod.name.match(/[৳টka]\s*(\d+)/i) || prod.name.match(/(\d+)\s*[৳টka]/i);
     if (tkMatch && tkMatch[1]) {
@@ -1212,7 +1256,7 @@ bot.action('confirm_order', async (ctx) => {
     }, 2400);
 
     setTimeout(async () => {
-        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🚀 Synchronizing order data...\n\n▪️▪️▪️▪️▪️▪️▫️▫️▫️▫️ [ 80% ]', { parse_mode: 'Markdown' }).catch(() => {});
+        await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🚀 Synchronizing order data...\n\n▪️▪️▪️▪️▫️▫️▫️▫️▫️▫️ [ 80% ]', { parse_mode: 'Markdown' }).catch(() => {});
     }, 3600);
 
     setTimeout(async () => {
