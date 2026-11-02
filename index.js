@@ -424,10 +424,7 @@ bot.on('message', async (ctx) => {
                 
                 if (currentSub === 'Free Fire Likes') {
                     if (!db.customProducts) db.customProducts = {};
-                    if (!db.customProducts['Free Fire Likes']) db.customProducts['Free Fire Likes'] = [
-                        { name: '220 Likes - ৳8' },
-                        { name: '6000 Likes - ৳300' }
-                    ];
+                    if (!db.customProducts['Free Fire Likes']) db.customProducts['Free Fire Likes'] = [];
                 }
 
                 if (db.customProducts[currentSub] && db.customProducts[currentSub].length > 0) {
@@ -501,13 +498,6 @@ bot.on('message', async (ctx) => {
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_add_sub_product') {
         const cat = db.sessions[userId].category;
         
-        if (cat === 'Free Fire Likes' && (!db.customProducts['Free Fire Likes'] || db.customProducts['Free Fire Likes'].length === 0)) {
-            db.customProducts['Free Fire Likes'] = [
-                { name: '220 Likes - ৳8' },
-                { name: '6000 Likes - ৳300' }
-            ];
-        }
-
         if (!db.customProducts[cat]) db.customProducts[cat] = [];
         db.customProducts[cat].push({ name: text });
 
@@ -519,13 +509,6 @@ bot.on('message', async (ctx) => {
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_sub_product') {
         const cat = db.sessions[userId].category;
         
-        if (cat === 'Free Fire Likes' && (!db.customProducts['Free Fire Likes'] || db.customProducts['Free Fire Likes'].length === 0)) {
-            db.customProducts['Free Fire Likes'] = [
-                { name: '220 Likes - ৳8' },
-                { name: '6000 Likes - ৳300' }
-            ];
-        }
-
         const list = db.customProducts[cat] || [];
         const index = list.findIndex(p => p.name.toLowerCase() === text.toLowerCase());
         if (index > -1) {
@@ -754,7 +737,6 @@ bot.on('message', async (ctx) => {
                 saveDatabase(db);
 
                 const userBal = db.balances[userId] || 0;
-                // GUILD ORDER REVIEW (Product Name first, then Guild ID, Server, Price, Balance with proper gaps)
                 const slipText = "╔═════════════════════════════════╗\n║         📦 ORDER REVIEW         ║\n╚═════════════════════════════════╝\n\n┌─────────────────────────────────┐\n│ 📦 Product: `" + session.product + "`\n\n│ 🛡 Guild ID: `" + uid + "`\n\n│ 🌍 Server: `" + session.region + "`\n\n│ 💳 Price: ৳" + session.price + "\n\n│ 💰 Balance: ৳" + userBal + "\n└─────────────────────────────────┘";
 
                 return ctx.reply(slipText, {
@@ -764,7 +746,7 @@ bot.on('message', async (ctx) => {
                     ])
                 });
             } else {
-                // FREE FIRE LIKES ORDER FLOW (Product Name first, then Nickname, UID, Server, Price, Balance with proper gaps)
+                // FREE FIRE LIKES ORDER FLOW (Dynamic price extracted from custom product name)
                 const waitMsg = await ctx.reply('⏳ Verifying player info...\n\n▪️▫️▫️▫️▫️▫️▫️▫️▫️▫️ [ 20% ]');
 
                 try {
@@ -1071,21 +1053,21 @@ bot.action('cat_ff_likes', async (ctx) => {
 
     if (!db.customProducts) db.customProducts = {};
     if (!db.customProducts['Free Fire Likes']) {
-        db.customProducts['Free Fire Likes'] = [
-            { name: '220 Likes - ৳8' },
-            { name: '6000 Likes - ৳300' }
-        ];
+        db.customProducts['Free Fire Likes'] = [];
         saveDatabase(db);
     }
 
     let inlineButtons = [];
-    db.customProducts['Free Fire Likes'].forEach((p, idx) => {
-        let callbackData = '';
-        if (p.name.includes('220 Likes')) callbackData = 'pkg_like_220';
-        else if (p.name.includes('6000 Likes')) callbackData = 'pkg_like_6000';
-        else callbackData = 'sub_prod_Free Fire Likes_' + idx;
+    if (db.customProducts['Free Fire Likes'].length === 0) {
+        // Fallback if empty
+        db.customProducts['Free Fire Likes'] = [
+            { name: '220 Likes - ৳7' }
+        ];
+        saveDatabase(db);
+    }
 
-        inlineButtons.push([Markup.button.callback('⭐ ' + p.name, callbackData)]);
+    db.customProducts['Free Fire Likes'].forEach((p, idx) => {
+        inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
     });
 
     inlineButtons.push([Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]);
@@ -1129,10 +1111,16 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
 
     const prod = db.customProducts[catName] && db.customProducts[catName][index] ? db.customProducts[catName][index] : { name: 'Custom Package' };
     
+    // Robust Price Extractor: Finds numbers after '৳' or takes the last number in string
     let extractedPrice = 0;
-    const allNumbers = prod.name.match(/\d+/g);
-    if (allNumbers && allNumbers.length > 0) {
-        extractedPrice = parseInt(allNumbers[allNumbers.length - 1]);
+    const tkMatch = prod.name.match(/[৳টka]\s*(\d+)/i) || prod.name.match(/(\d+)\s*[৳টka]/i);
+    if (tkMatch && tkMatch[1]) {
+        extractedPrice = parseInt(tkMatch[1]);
+    } else {
+        const allNumbers = prod.name.match(/\d+/g);
+        if (allNumbers && allNumbers.length > 0) {
+            extractedPrice = parseInt(allNumbers[allNumbers.length - 1]);
+        }
     }
 
     if (!db.sessions) db.sessions = {};
@@ -1145,29 +1133,13 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
 
     await ctx.answerCbQuery('⭐ ' + prod.name + ' selected!');
     
+    const backCallback = catName === 'Free Fire Likes' ? 'cat_ff_likes' : 'shop_now_back';
+
     await ctx.editMessageText("╔═════════════════════════════════╗\n║      🌍 SERVER SELECTION        ║\n╚═════════════════════════════════╝\n\nPackage: `" + prod.name + "` (" + extractedPrice + " BDT)\n\n👇 রিজিওন সিলেক্ট করুন:", {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
             [Markup.button.callback('🇧🇩 BD (Bangladesh)', 'region_bd'), Markup.button.callback('🇮🇩 Indonesia', 'region_id')],
-            [Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]
-        ])
-    });
-});
-
-bot.action(/pkg_like_(220|6000)/, async (ctx) => {
-    const userId = ctx.from.id.toString();
-    const amount = ctx.match[1];
-    const price = amount === '220' ? 8 : 300;
-    const db = loadDatabase();
-    if (!db.sessions) db.sessions = {};
-    db.sessions[userId] = { product: amount + ' Free Fire Likes', price: price, isGuild: false };
-    saveDatabase(db);
-
-    await ctx.editMessageText("╔═════════════════════════════════╗\n║      🌍 SERVER SELECTION        ║\n╚═════════════════════════════════╝\n\nPackage: `" + amount + " Likes` (" + price + " BDT)\n\n👇 রিজিওন সিলেক্ট করুন:", {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🇧🇩 BD (Bangladesh)', 'region_bd'), Markup.button.callback('🇮🇩 Indonesia', 'region_id')],
-            [Markup.button.callback('🔙 Back ↩️', 'cat_ff_likes')]
+            [Markup.button.callback('🔙 Back 🛍️', backCallback)]
         ])
     });
 });
@@ -1206,7 +1178,6 @@ bot.action('confirm_order', async (ctx) => {
     if (!db.adminSessions) db.adminSessions = {};
 
     const idLabel = session.isGuild ? '🛡 Guild ID' : '🎮 UID';
-    // ADMIN NOTIFICATION FORMAT (Customer Name, Username, ID first, then product, name, UID with proper gaps)
     const adminNotifyText = "╔═════════════════════════════════╗\n║   🔔 NEW ORDER PENDING APPROVAL ║\n╚═════════════════════════════════╝\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 Customer: " + ctx.from.first_name + "\n🔗 Username: " + (ctx.from.username ? '@' + ctx.from.username : 'N/A') + "\n🆔 Customer ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n\n👤 Name: `" + session.nickname + "`\n\n" + idLabel + ": `" + session.uid + "`\n\n💵 Price: `৳" + session.price + "`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n👇 Click below to enter order details:";
 
     const sentAdminMsg = await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
