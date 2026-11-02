@@ -310,9 +310,10 @@ bot.on('message', async (ctx) => {
 
                 if (!db.orderHistories[targetUserId]) db.orderHistories[targetUserId] = [];
                 
+                // Real local Bangladesh time & date (Asia/Dhaka)
                 const now = new Date();
-                const dateStr = now.toLocaleDateString('en-GB'); // DD/MM/YYYY
-                const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }); // DD/MM/YYYY
+                const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
 
                 db.orderHistories[targetUserId].push({
                     date: dateStr,
