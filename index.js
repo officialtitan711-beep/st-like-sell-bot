@@ -62,9 +62,8 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     let keyboard;
 
     if (isPendingAdminAccess) {
-        text = "╔═════════════════════════════════╗\n║      🌟 ACCESS GRANTED 🌟       ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 🎉 **অভিনন্দন, ভর্টেক্স ভাইয়ের বট!**   │\n│ আপনি বটের এক্সেসটি সফলভাবে       │\n│ পেয়েছেন। ✨                      │\n├─────────────────────────────────┤\n│ 👇 অনুগ্রহ করে নিচের বাটনে ক্লিক   │\n│ করুন:                           │\n│ 👑 **Admin:** `@sonu1813`         │\n└─────────────────────────────────┘";
+        text = "╔═════════════════════════════════╗\n║      ⏳ 50% ACCESS PENDING      ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 🎉 **Congratulations!**          │\n│ আপনি **ST Like Bot**-এর ৫০% এক্সেস   │\n│ সফলভাবে পেয়েছেন। ✨               │\n├─────────────────────────────────┤\n│ ⚠️ বাকী ৫০% এক্সেস পেতে নিচের     │\n│ বাটনে ক্লিক করে অ্যাডমিনকে মেসেজ   │\n│ করে পারমিশন নিয়ে নিন।           │\n│ 👑 **Admin:** `@sonu1813`         │\n└─────────────────────────────────┘";
         keyboard = Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')],
             [Markup.button.url('💬 Message Admin 🚀', 'https://t.me/sonu1813')]
         ]);
     } else {
@@ -457,8 +456,15 @@ bot.on('message', async (ctx) => {
         db.allowedUsers[targetId] = true;
         delete db.sessions[userId];
         saveDatabase(db);
-        bot.telegram.sendMessage(targetId, '╔═════════════════════════════════╗\n║      🌟 ACCESS APPROVED 🌟      ║\n╚═════════════════════════════════╝\n🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। ✨', { parse_mode: 'Markdown' }).catch(()=>{});
-        return ctx.reply('✅ পারমিশন সফলভাবে দেওয়া হয়েছে।', { parse_mode: 'Markdown' });
+
+        // Auto-update message when admin grants 100% access
+        const grantedText = "╔═════════════════════════════════╗\n║      🌟 100% ACCESS GRANTED     ║\n╚═════════════════════════════════╝\n┌─────────────────────────────────┐\n│ 🎉 **Congratulations!**          │\n│ আপনি **ST Like Bot**-এর ১০০% এক্সেস   │\n│ সফলভাবে পেয়েছেন। ✨               │\n├─────────────────────────────────┤\n│ 👇 বট ব্যবহার করতে অবশ্যই নিচের   │\n│ **Verify Access Now** বাটনটিতে   │\n│ ক্লিক করুন:                      │\n└─────────────────────────────────┘";
+        const grantedKeyboard = Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Verify Access Now ✨', 'verify_sub')]
+        ]);
+
+        bot.telegram.sendMessage(targetId, grantedText, { parse_mode: 'Markdown', ...grantedKeyboard }).catch(()=>{});
+        return ctx.reply('✅ পারমিশন সফলভাবে দেওয়া হয়েছে এবং ইউজারের কাছে ১০০% এক্সেস নোটিফিকেশন চলে গেছে।', { parse_mode: 'Markdown' });
     }
 
     if (userId === ADMIN_ID.toString() && db.sessions[userId] && db.sessions[userId].step === 'admin_remove_bot_prompt') {
