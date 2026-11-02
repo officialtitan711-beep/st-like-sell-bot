@@ -205,6 +205,7 @@ bot.action('verify_sub', async (ctx) => {
 });
 
 bot.on('message', async (ctx) => {
+    if (!ctx.message) return;
     const userId = ctx.from.id.toString();
     const db = loadDatabase();
     if (!db.balances) db.balances = {};
@@ -217,7 +218,7 @@ bot.on('message', async (ctx) => {
 
     const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
-    // ADMIN REPLY & FORWARD HANDLING
+    // ADMIN REPLY & ORDER COMPLETION HANDLING
     if (userId === ADMIN_ID.toString()) {
         const adminSession = db.adminInputSession && db.adminInputSession[userId] ? db.adminInputSession[userId] : null;
         if (adminSession && adminSession.step === 'awaiting_order_details') {
@@ -255,7 +256,7 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // Admin replying to any forwarded/sent message via reply feature with UNIQUE DESIGN
+        // Admin replying to customer support via reply feature with UNIQUE DESIGN
         if (ctx.message.reply_to_message) {
             const repliedText = ctx.message.reply_to_message.text || ctx.message.reply_to_message.caption || '';
             const match = repliedText.match(/ID[^`]*`(\d+)`/) || repliedText.match(/আইডি[^`]*`(\d+)`/);
