@@ -11,41 +11,71 @@ const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir
 
 const RENDER_URL = 'https://st-like-sell-bot.onrender.com';
 const PORT = process.env.PORT || 3000;
-const DB_FILE = 'database.json';
+const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL; // রেন্ডারের এনভায়রনমেন্ট থেকে ফায়ারবেস লিংক নেবে
 
 const bot = new Telegraf(BOT_TOKEN);
 
+// মেমোরি ক্যাশ ডাটা অবজেক্ট
+let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {} };
+
+// ফায়ারবেস থেকে ডাটা সিঙ্ক করার ফাংশন
 function loadDatabase() {
-    try {
-        if (fs.existsSync(DB_FILE)) {
-            const data = fs.readFileSync(DB_FILE, 'utf8');
-            if (data.trim() === '') return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {} };
-            const parsed = JSON.parse(data);
-            if (!parsed.users) parsed.users = {};
-            if (!parsed.balances) parsed.balances = {};
-            if (!parsed.sessions) parsed.sessions = {};
-            if (!parsed.numbers) parsed.numbers = {};
-            if (!parsed.categories) parsed.categories = {};
-            if (!parsed.customProducts) parsed.customProducts = {};
-            if (!parsed.allowedUsers) parsed.allowedUsers = {};
-            if (!parsed.pendingMsgs) parsed.pendingMsgs = {};
-            if (!parsed.orderHistories) parsed.orderHistories = {};
-            if (!parsed.historyTimestamps) parsed.historyTimestamps = {};
-            return parsed;
-        }
-    } catch (e) { 
-        console.error('DB Load Error:', e); 
-    }
-    return { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {} };
+    return cachedDb;
 }
 
-function saveDatabase(data) {
-    try { 
-        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2)); 
-    } catch (e) { 
-        console.error('DB Save Error:', e); 
-    }
+function syncDataFromFirebase() {
+    if (!FIREBASE_DB_URL) return;
+    const url = FIREBASE_DB_URL.endsWith('/') ? `${FIREBASE_DB_URL}database.json` : `${FIREBASE_DB_URL}/database.json`;
+    https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+            try {
+                if (data && data !== 'null') {
+                    const parsed = JSON.parse(data);
+                    if (parsed) cachedDb = parsed;
+                }
+            } catch (e) {
+                console.error('Firebase Load Error:', e);
+            }
+        });
+    }).on('error', (e) => {
+        console.error('Firebase Fetch Error:', e);
+    });
 }
+
+// ফায়ারবেসে ডাটা সেভ করার ফাংশন
+function saveDatabase(data) {
+    cachedDb = data;
+    if (!FIREBASE_DB_URL) return;
+    
+    const dataString = JSON.stringify(data);
+    const dbUrl = new URL(FIREBASE_DB_URL.endsWith('/') ? `${FIREBASE_DB_URL}database.json` : `${FIREBASE_DB_URL}/database.json`);
+    
+    const reqOptions = {
+        hostname: dbUrl.hostname,
+        path: dbUrl.pathname + dbUrl.search,
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(dataString)
+        }
+    };
+
+    const req = https.request(reqOptions, (res) => {
+        // সেভ সফল হলে রেসপন্স হ্যান্ডেল
+    });
+    req.on('error', (e) => {
+        console.error('Firebase Save Error:', e);
+    });
+    req.write(dataString);
+    req.end();
+}
+
+// বট স্টার্ট হওয়ার সাথে সাথে ফায়ারবেস থেকে ডাটা ফেচ করে নেওয়া
+syncDataFromFirebase();
+// প্রতি ৫ মিনিট পর পর ফায়ারবেস সিঙ্ক রিফ্রেশ রাখার জন্য
+setInterval(syncDataFromFirebase, 5 * 60 * 1000);
 
 function checkAndCleanMonthlyHistory(userId, db) {
     if (!db.historyTimestamps) db.historyTimestamps = {};
