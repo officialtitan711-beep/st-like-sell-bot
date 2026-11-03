@@ -17,14 +17,14 @@ const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
 const PORT = process.env.PORT || 3000;
-const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL; // রেন্ডারের এনভায়রনমেন্ট থেকে ফায়ারবেস লিংক নেবে
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com';
+const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
 
 const bot = new Telegraf(BOT_TOKEN);
 
 // মেমোরি ক্যাশ ডাটা অবজেক্ট
 let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {} };
 
-// ফায়ারবেস থেকে ডাটা সিঙ্ক করার ফাংশন
 function loadDatabase() {
     return cachedDb;
 }
@@ -50,7 +50,6 @@ function syncDataFromFirebase() {
     });
 }
 
-// ফায়ারবেসে ডাটা সেভ করার ফাংশন
 function saveDatabase(data) {
     cachedDb = data;
     if (!FIREBASE_DB_URL) return;
@@ -68,9 +67,7 @@ function saveDatabase(data) {
         }
     };
 
-    const req = https.request(reqOptions, (res) => {
-        // সেভ সফল হলে রেসপন্স হ্যান্ডেল
-    });
+    const req = https.request(reqOptions, (res) => {});
     req.on('error', (e) => {
         console.error('Firebase Save Error:', e);
     });
@@ -78,9 +75,7 @@ function saveDatabase(data) {
     req.end();
 }
 
-// বট স্টার্ট হওয়ার সাথে সাথে ফায়ারবেস থেকে ডাটা ফেচ করে নেওয়া
 syncDataFromFirebase();
-// প্রতি ৫ মিনিট পর পর ফায়ারবেস সিঙ্ক রিফ্রেশ রাখার জন্য
 setInterval(syncDataFromFirebase, 5 * 60 * 1000);
 
 function checkAndCleanMonthlyHistory(userId, db) {
@@ -306,7 +301,6 @@ bot.on('message', async (ctx) => {
 
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
-        // ADMIN REPLY & ORDER COMPLETION HANDLING
         if (userId === ADMIN_ID.toString()) {
             const replySession = db.adminReplySessions[userId];
             if (replySession) {
@@ -428,7 +422,6 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // ADMIN PANEL COMMANDS & DYNAMIC CATEGORIES/PRODUCTS MANAGEMENT
         if (userId === ADMIN_ID.toString() && text) {
             if (text === '➕ Add Bot') {
                 db.sessions[userId] = { step: 'admin_add_bot_prompt' };
@@ -447,7 +440,7 @@ bot.on('message', async (ctx) => {
             }
             if (text === '📱 Set Payment Numbers') {
                 return ctx.reply("╔═════════════════════════════════╗\n║    📱 PAYMENT SETUP PANEL       ║\n╚═════════════════════════════════╝\n\n👇 মাধ্যম সিলেক্ট করুন:", Markup.inlineKeyboard([
-                    [Markup.button.callback('📱 Set bKash 🌸', 'set_bkash_prompt'), Markup.button.callback('📱 Set Nagad 🧨', 'set_nagad_prompt')],
+                    [Markup.button.callback('💳 বিকাশ [bKash]', 'set_bkash_prompt'), Markup.button.callback('💳 নগদ [Nagad]', 'set_nagad_prompt')],
                     [Markup.button.callback('🔙 Main Menu 🏠', 'back_start')]
                 ]));
             }
@@ -742,7 +735,6 @@ bot.on('message', async (ctx) => {
             return ctx.reply('╔═════════════════════════════════╗\n║     📱 NUMBER UPDATED SUCCESS   ║\n╚═════════════════════════════════╝\n\n💳 ' + method.toUpperCase() + ': `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
         }
 
-        // SESSION FLOW (UID & DEPOSIT)
         const session = db.sessions[userId];
         if (session && session.step === 'awaiting_deposit_amount') {
             const amount = parseFloat(text);
@@ -885,10 +877,14 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // MAIN MENU BUTTONS WITH SMOOTH SHOP LOADER
+        // Shop Now with smooth 50% -> 100% loader
         if (text === '🛍️ Shop Now') {
-            const loadingMsg = await ctx.reply('⏳ Loading Shop Menu...\n\n▰▰▰▰▰▱▱▱▱▱ [ 50% ]');
+            const loadingMsg = await ctx.reply('⏳ Loading Shop Menu...\n\n▰▰▰▰▰▱▱▱▱▱▱ [ 50% ]');
             
+            setTimeout(async () => {
+                await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, '⏳ Loading Shop Menu...\n\n▰▰▰▰▰▰▰▰▰▰ [ 100% ]\n\n✨ Successfully Loaded!').catch(() => {});
+            }, 600);
+
             setTimeout(async () => {
                 if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
                     db.sessions[userId].activeCategory = null;
@@ -911,7 +907,7 @@ bot.on('message', async (ctx) => {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard(inlineButtons)
                 }).catch(() => {});
-            }, 800);
+            }, 1200);
             return;
         }
 
@@ -926,12 +922,13 @@ bot.on('message', async (ctx) => {
             });
         }
 
+        // --- DEPOSIT MENU WITH BKASH & NAGAD BRAND STYLED BUTTONS ---
         if (text === '💰 Add Balance') {
-            const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n└─────────────────────────────────┘";
+            const depositMenuText = "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n└─────────────────────────────────┘\n\n👇 Choose any payment method below to transfer:";
             return ctx.reply(depositMenuText, { 
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
-                    [Markup.button.callback('bKash 🌸', 'dep_bkash'), Markup.button.callback('Nagad 🧨', 'dep_nagad')],
+                    [Markup.button.callback('💖 বিকাশ [bKash]', 'dep_bkash'), Markup.button.callback('🧡 নগদ [Nagad]', 'dep_nagad')],
                     [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
                 ])
             });
@@ -1000,7 +997,6 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        // GENERAL FREE TEXT OR SUPPORT MESSAGE WITH DESIGNED BOX & REPLY BUTTON
         if (userId !== ADMIN_ID.toString()) {
             const customerName = ctx.from.first_name || 'N/A';
             const customerUsername = ctx.from.username ? '@' + ctx.from.username : 'N/A';
@@ -1181,7 +1177,7 @@ bot.action('cat_ff_likes', async (ctx) => {
         inlineButtons.push([Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]);
 
         await ctx.editMessageText('╔═════════════════════════════════╗\n║     🔥 FREE FIRE LIKES PACKS    ║\n╚═════════════════════════════════╝\n\n👇 প্যাকেজ সিলেক্ট করুন:', {
-            parse_mode: 'Markdown',
+            parse_Mode: 'Markdown',
             ...Markup.inlineKeyboard(inlineButtons)
         });
     } catch (e) {}
@@ -1323,7 +1319,7 @@ bot.action('confirm_order', async (ctx) => {
         }, 1200);
 
         setTimeout(async () => {
-            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ Processing transaction...\n\n▰▰▰▰▰▰▰▰▱▱ [ 80% ]', { parse_mode: 'Markdown' }).catch(() => {});
+            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ Processing transaction...\n\n▰▰▰▰▰▱▱▱▱▱ [ 80% ]', { parse_mode: 'Markdown' }).catch(() => {});
         }, 2400);
 
         setTimeout(async () => {
@@ -1393,23 +1389,29 @@ bot.action('back_start', async (ctx) => {
     } catch (e) {}
 });
 
-// HTTP সার্ভার Render পোর্ট ও /ping চেক ঠিক রাখার জন্য রাখা হলো
+// Webhook & HTTP Server Configuration for 24/7 Render Stability
+const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
+const fullWebhookUrl = `${RENDER_URL}${webhookPath}`;
+
+bot.telegram.setWebhook(fullWebhookUrl, { drop_pending_updates: true })
+    .then(() => console.log(`Webhook set successfully to: ${fullWebhookUrl}`))
+    .catch((err) => console.error('Webhook set error:', err));
+
 const server = http.createServer((req, res) => {
-    if (req.url === '/ping') {
+    if (req.url === webhookPath && req.method === 'POST') {
+        bot.webhookCallback(webhookPath)(req, res);
+    } else if (req.url === '/ping') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK');
     } else {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Polling Bot is running live!');
+        res.end('Bot is running live via Webhook!');
     }
 });
 
-server.listen(PORT, () => { console.log('HTTP Server listening on port ' + PORT); });
-
-// পোলিং মোড স্টার্ট (ডায়মন্ড টপআপ বটের মতো ১০০% স্টেবল)
-bot.launch({ drop_pending_updates: true })
-    .then(() => console.log('Bot started successfully in Polling Mode!'))
-    .catch((err) => console.error('Bot launch error:', err));
+server.listen(PORT, () => {
+    console.log(`HTTP Server listening on port ${PORT}`);
+});
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
