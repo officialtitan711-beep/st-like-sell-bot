@@ -901,7 +901,7 @@ bot.on('message', async (ctx) => {
                 const catKeys = Object.keys(db.categories || {});
                 if (catKeys.length > 0) {
                     catKeys.forEach((c) => {
-                        inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
+                        inlineButtons.push([Markup.button.callback(c, 'custom_cat_' + c)]);
                     });
                 }
 
@@ -1144,7 +1144,7 @@ bot.action('shop_now_back', async (ctx) => {
         const catKeys = Object.keys(db.categories || {});
         if (catKeys.length > 0) {
             catKeys.forEach((c) => {
-                inlineButtons.push([Markup.button.callback('⭐ ' + c, 'custom_cat_' + c)]);
+                inlineButtons.push([Markup.button.callback(c, 'custom_cat_' + c)]);
             });
         }
 
@@ -1175,7 +1175,7 @@ bot.action('cat_ff_likes', async (ctx) => {
 
         let inlineButtons = [];
         db.customProducts['Free Fire Likes'].forEach((p, idx) => {
-            inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_Free Fire Likes_' + idx)]);
+            inlineButtons.push([Markup.button.callback(p.name, 'sub_prod_Free Fire Likes_' + idx)]);
         });
 
         inlineButtons.push([Markup.button.callback('🔙 Back 🛍️', 'shop_now_back')]);
@@ -1201,7 +1201,7 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
         let inlineButtons = [];
         if (db.customProducts && db.customProducts[catName]) {
             db.customProducts[catName].forEach((p, idx) => {
-                inlineButtons.push([Markup.button.callback('⭐ ' + p.name, 'sub_prod_' + catName + '_' + idx)]);
+                inlineButtons.push([Markup.button.callback(p.name, 'sub_prod_' + catName + '_' + idx)]);
             });
         }
 
@@ -1242,7 +1242,7 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
         };
         saveDatabase(db);
 
-        await ctx.answerCbQuery('⭐ ' + prod.name + ' selected!');
+        await ctx.answerCbQuery(prod.name + ' selected!');
         
         const backCallback = catName === 'Free Fire Likes' ? 'cat_ff_likes' : 'shop_now_back';
 
@@ -1319,20 +1319,16 @@ bot.action('confirm_order', async (ctx) => {
         await ctx.editMessageText('⏳ Order request is processing...\n\n▰▰▱▱▱▱▱▱▱▱ [ 20% ]', { parse_mode: 'Markdown' });
         
         setTimeout(async () => {
-            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🔄 Connecting with server...\n\n▰▰▰▰▰▱▱▱▱▱ [ 40% ]', { parse_mode: 'Markdown' }).catch(() => {});
+            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🔄 Connecting with server...\n\n▰▰▰▰▰▱▱▱▱▱ [ 50% ]', { parse_mode: 'Markdown' }).catch(() => {});
         }, 1200);
 
         setTimeout(async () => {
-            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ Processing transaction...\n\n▰▰▰▰▰▰▱▱▱▱ [ 55% ]', { parse_mode: 'Markdown' }).catch(() => {});
+            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '⚡ Processing transaction...\n\n▰▰▰▰▰▰▰▰▱▱ [ 80% ]', { parse_mode: 'Markdown' }).catch(() => {});
         }, 2400);
 
         setTimeout(async () => {
-            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🚀 Synchronizing order data...\n\n▰▰▰▰▰▰▰▰▱▱ [ 80% ]', { parse_mode: 'Markdown' }).catch(() => {});
+            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🚀 Synchronizing order data...\n\n▰▰▰▰▰▰▰▰▰▱ [ 85% ] (Hold)', { parse_mode: 'Markdown' }).catch(() => {});
         }, 3600);
-
-        setTimeout(async () => {
-            await ctx.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, '🔒 Finalizing security checks...\n\n▰▰▰▰▰▰▰▰▰▱ [ 85% ] (Hold)', { parse_mode: 'Markdown' }).catch(() => {});
-        }, 4800);
     } catch (e) {}
 });
 
