@@ -1,5 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
-const http = require('http');
+const http = http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -116,7 +116,7 @@ function t(userId, key) {
             balanceRechargedBox: "✦ ─────────────── ✦ ─────────────── ✦\n       💎 ব্যালেন্স রিচার্জ সফল 💎\n✦ ─────────────── ✦ ─────────────── ✦\n\nআপনার অ্যাকাউন্ট ব্যালেন্স সফলভাবে আপডেট করা হয়েছে! ✨\n\n-----------------------------------------\n📌 পূর্বের ব্যালেন্স: `",
             minDepositWarning: "⚠️═════════════════════════════════⚠️\n🛑 **সর্বনিম্ন ডিপোজিট সতর্কতা** 🛑\n⚠️═════════════════════════════════⚠️\n\nবট নিয়ম অনুযায়ী সর্বনিম্ন **১০০ টাকা** ডিপোজিট করতে হবে।\n\n❌ আপনার প্রদত্ত পরিমাণ: `",
             verifyingPlayer: "⏳ প্লেয়ার ইনফো যাচাই করা হচ্ছে...\n\n▰▰▱▱▱▱▱▱▱▱ [ ২০% ]",
-            connectingServer: "🔄 গেম সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n▰▰▱▱▱▱▱▱▱ [ ৫০% ]",
+            connectingServer: "🔄 গেম সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n▰▰▱▱▱▱▱▱▱▱ [ ৫০% ]",
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 অ্যাকাউন্ট পাওয়া গেছে     ║\n╚═════════════════════════════════╝\n\n👤 নাম: `",
             supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **অর্ডার ও ক্রয়ের ইতিহাস**\n\n",
@@ -955,17 +955,26 @@ bot.on('message', async (ctx) => {
             const loading100Text = lang === 'en' ? '⏳ Loading Shop Menu...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ 100% ]' : '⏳ শপ মেনু লোড হচ্ছে...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ ১০০% ]';
             const successAlert = lang === 'en' ? '✅ Shop Loaded Successfully! 🎉' : '✅ শপ সফলভাবে লোড হয়েছে! 🎉';
 
-            // প্রথমে ৫০% লোডিং মেসেজ পাঠানো হলো
-            const loadingMsg = await ctx.reply(loading50Text);
+            // ১. প্রথমে ৫০% লোডিং মেসেজ পাঠানো হলো
+            let loadingMsg;
+            try {
+                loadingMsg = await ctx.reply(loading50Text);
+            } catch (err) {
+                return;
+            }
             
-            // ফাস্ট কিন্তু স্লো গতির লজিক (প্রথমে ৫০%, তারপর ১০০% এবং পপআপ)
+            // ২. একটু পরে ১০০% এবং পপআপ শো করার টাইমআউট
             setTimeout(async () => {
                 try {
                     await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, loading100Text).catch(() => {});
                     await ctx.answerCbQuery(successAlert, { show_alert: false }).catch(() => {});
 
-                    // ন্যানো সেকেন্ডের মতো অল্প সময় অপেক্ষা করে শপ মেনু ওপেন হবে
+                    // ৩. একদম নিশ্চিতভাবে ক্যাটাগরিগুলো ওপেন করার জন্য আগের লোডিং মেসেজ ডিলিট করে নতুন শপ মেনু পাঠানো হচ্ছে
                     setTimeout(async () => {
+                        try {
+                            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+                        } catch (err) {}
+
                         if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
                             db.sessions[userId].activeCategory = null;
                             saveDatabase(db);
@@ -980,12 +989,14 @@ bot.on('message', async (ctx) => {
                         }
                         inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
 
-                        await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, t(userId, 'shopMenuTitle'), {
+                        await ctx.reply(t(userId, 'shopMenuTitle'), {
                             parse_mode: 'Markdown',
                             ...Markup.inlineKeyboard(inlineButtons)
                         }).catch(() => {});
-                    }, 350); 
-                } catch (e) {}
+                    }, 400); 
+                } catch (e) {
+                    console.error('Shop Menu Error:', e);
+                }
             }, 600);
             return;
         }
