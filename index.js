@@ -449,10 +449,14 @@ bot.on('message', async (ctx) => {
 
                 if (session) {
                     const userBal = db.balances[targetUserId] || 0;
-                    const lines = text.split('\n');
-                    const prevStatus = lines[0] || '---';
-                    const currStatus = lines[1] || '---';
-                    const addedStatus = lines[2] || '---';
+                    
+                    // এখানে অতিরিক্ত স্পেস, ডট বা নাম্বারিং (1. 2. 3.) স্বয়ংক্রিয়ভাবে ফিল্টার করে পরিষ্কার করে নেওয়া হচ্ছে
+                    const rawLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                    const cleanLines = rawLines.map(l => l.replace(/^[1-3][\.\)]\s*/, ''));
+
+                    const prevStatus = cleanLines[0] || '---';
+                    const currStatus = cleanLines[1] || '---';
+                    const addedStatus = cleanLines[2] || '---';
 
                     if (!db.orderHistories[targetUserId]) db.orderHistories[targetUserId] = [];
                     
