@@ -98,7 +98,6 @@ function t(userId, key) {
             orderHistory: "📜 অর্ডার হিস্ট্রি",
             supportDesk: "📞 সাপোর্ট ডেস্ক",
             shopMenuTitle: "╔═════════════════════════════════╗\n║      🛍️ সকল উপলব্ধ সার্ভিস       ║\n╚═════════════════════════════════╝\n\n👇 আপনার পছন্দের সার্ভিসটি নিতে নিচের বাটনগুলোতে ক্লিক করুন:",
-            loadingShop: "⏳ শপ মেনু লোড হচ্ছে...\n\n▰▰▰▰▰▱▱▱▱▱▱ [ ৫০% ]",
             checkUidPrompt: "╔═════════════════════════════════╗\n║    🎮 ফ্রি ফায়ার ইউআইডি চেকার     ║\n╚═════════════════════════════════╝\n\n✍️ ইউআইডি লিখে পাঠান:",
             depositPortal: "╔═════════════════════════════════╗\n║   💰 ব্যালেন্স ও ডিপোজিট পোর্টাল  ║\n╚═════════════════════════════════╝\n\n┌─────────────────────────────────┐\n│ 💎 সর্বনিম্ন ডিপোজিট: `১০০.০ টাকা`  │\n└─────────────────────────────────┘\n\n👇 টাকা পাঠানোর জন্য যেকোনো মাধ্যম সিলেক্ট করুন:",
             supportText: "╔═════════════════════════════════╗\n║       📞 সাপোর্ট ডেস্ক 📞        ║\n╚═════════════════════════════════╝\n\n┌─────────────────────────────────┐\n│ 💡 আপনার যেকোনো সমস্যা, TrxID বা  │\n│ স্ক্রিনশট সরাসরি এই বটের চ্যাটেই   │\n│ লিখে বা পাঠিয়ে দিন!             │\n├─────────────────────────────────┤\n│ ⚡ অ্যাডমিন খুব দ্রুত আপনার সাথে   │\n│ যোগাযোগ করবেন। 👇              │\n└─────────────────────────────────┘",
@@ -115,8 +114,6 @@ function t(userId, key) {
             depositCancelledBox: "✦ ─────────────── ✦ ─────────────── ✦\n      ❌ ডিপোজিট বাতিল করা হয়েছে ❌\n✦ ─────────────── ✦ ─────────────── ✦\n\n⚠️ আপনার ডিপোজিট রিকোয়েস্টটি অ্যাডমিন কর্তৃক বাতিল করা হয়েছে।\n\n✦ ─────────────── ✦ ─────────────── ✦",
             balanceRechargedBox: "✦ ─────────────── ✦ ─────────────── ✦\n       💎 ব্যালেন্স রিচার্জ সফল 💎\n✦ ─────────────── ✦ ─────────────── ✦\n\nআপনার অ্যাকাউন্ট ব্যালেন্স সফলভাবে আপডেট করা হয়েছে! ✨\n\n-----------------------------------------\n📌 পূর্বের ব্যালেন্স: `",
             minDepositWarning: "⚠️═════════════════════════════════⚠️\n🛑 **সর্বনিম্ন ডিপোজিট সতর্কতা** 🛑\n⚠️═════════════════════════════════⚠️\n\nবট নিয়ম অনুযায়ী সর্বনিম্ন **১০০ টাকা** ডিপোজিট করতে হবে।\n\n❌ আপনার প্রদত্ত পরিমাণ: `",
-            verifyingPlayer: "⏳ প্লেয়ার ইনফো যাচাই করা হচ্ছে...\n\n▰▰▱▱▱▱▱▱▱▱ [ ২০% ]",
-            connectingServer: "🔄 গেম সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n▰▰▰▰▰▱▱▱▱▱ [ ৫০% ]",
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 অ্যাকাউন্ট পাওয়া গেছে     ║\n╚═════════════════════════════════╝\n\n👤 নাম: `",
             supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **অর্ডার ও ক্রয়ের ইতিহাস**\n\n",
@@ -135,7 +132,6 @@ function t(userId, key) {
             orderHistory: "📜 Order History",
             supportDesk: "📞 Support Desk",
             shopMenuTitle: "╔═════════════════════════════════╗\n║      🛍️ ALL AVAILABLE SHOP      ║\n╚═════════════════════════════════╝\n\n👇 Please select the buttons below to choose your preferred service:",
-            loadingShop: "⏳ Loading Shop Menu...\n\n▰▰▰▰▰▱▱▱▱▱▱ [ 50% ]",
             checkUidPrompt: "╔═════════════════════════════════╗\n║    🎮 FREE FIRE UID CHECKER     ║\n╚═════════════════════════════════╝\n\n✍️ Send UID:",
             depositPortal: "╔═════════════════════════════════╗\n║   💰 ADD BALANCE & DEPOSIT 💰   ║\n╚═════════════════════════════════╝\n\n┌─────────────────────────────────┐\n│ 💎 Min Deposit: `100.0 BDT`       │\n└─────────────────────────────────┘\n\n👇 Choose any payment method below to transfer:",
             supportText: "╔═════════════════════════════════╗\n║       📞 SUPPORT DESK 📞        ║\n╚═════════════════════════════════╝\n\n┌─────────────────────────────────┐\n│ 💡 Send any issue, TrxID or     │\n│ screenshot directly in this     │\n│ bot chat!                       │\n├─────────────────────────────────┤\n│ ⚡ Admin will contact you       │\n│ very soon. 👇                   │\n└─────────────────────────────────┘",
@@ -152,8 +148,6 @@ function t(userId, key) {
             depositCancelledBox: "✦ ─────────────── ✦ ─────────────── ✦\n      ❌ DEPOSIT CANCELLED ❌\n✦ ─────────────── ✦ ─────────────── ✦\n\n⚠️ Your deposit request has been cancelled by the admin.\n\n✦ ─────────────── ✦ ─────────────── ✦",
             balanceRechargedBox: "✦ ─────────────── ✦ ─────────────── ✦\n       💎 BALANCE RECHARGED 💎\n✦ ─────────────── ✦ ─────────────── ✦\n\nAccount balance updated successfully! ✨\n\n-----------------------------------------\n📌 Prev: `",
             minDepositWarning: "⚠️═════════════════════════════════⚠️\n🛑 **MINIMUM DEPOSIT WARNING** 🛑\n⚠️═════════════════════════════════⚠️\n\nMinimum deposit must be **100 BDT**.\n\n❌ Your amount: `",
-            verifyingPlayer: "⏳ Verifying player info...\n\n▰▰▱▱▱▱▱▱▱▱ [ 20% ]",
-            connectingServer: "🔄 Connecting with game server...\n\n▰▰▱▱▱▱▱▱▱▱ [ 50% ]",
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 ACCOUNT FOUND          ║\n╚═════════════════════════════════╝\n\n👤 Name: `",
             supportSentSuccess: "✨ Your message or screenshot has been sent directly to the admin! Please wait.",
             historyTitle: "📜 **PURCHASE & ORDER HISTORY**\n\n",
@@ -842,46 +836,15 @@ bot.on('message', async (ctx) => {
             const lang = getUserLang(userId);
             
             if (isOnlyCheck) {
-                const checkTitle = lang === 'en' ? '⏳ Checking UID...\n\n' : '⏳ ইউআইডি চেক করা হচ্ছে...\n\n';
-                const checkSteps = [20, 45, 65, 85];
-                let cIdx = 0;
-
-                let initPer = checkSteps[0];
-                let initBar = '▰'.repeat(Math.floor(initPer / 10)) + '▱'.repeat(10 - Math.floor(initPer / 10));
-                const waitMsg = await ctx.reply(checkTitle + `${initBar} [ ${initPer}% ]`, { parse_mode: 'Markdown' });
-
-                const checkInterval = setInterval(async () => {
-                    cIdx++;
-                    if (cIdx < checkSteps.length) {
-                        let per = checkSteps[cIdx];
-                        let bar = '▰'.repeat(Math.floor(per / 10)) + '▱'.repeat(10 - Math.floor(per / 10));
-                        try {
-                            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${bar} [ ${per}% ]`, { parse_mode: 'Markdown' });
-                        } catch (e) {}
-                    } else {
-                        clearInterval(checkInterval);
-                        try {
-                            const nickname = await checkFreeFireUID(uid);
-                            delete db.sessions[userId];
-                            saveDatabase(db);
-                            
-                            let finalBar = '▰'.repeat(10) + '▱'.repeat(0);
-                            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${finalBar} [ 100% ]`, { parse_mode: 'Markdown' });
-
-                            setTimeout(async () => {
-                                const foundBox = t(userId, 'accountFoundTitle') + nickname + "`\n\n🆔 UID: `" + uid + "`";
-                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, foundBox, {
-                                    parse_mode: 'Markdown',
-                                    ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
-                                }).catch(() => {});
-                            }, 500);
-                        } catch (error) {
-                            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, lang === 'en' ? '⚠️ API connection error.' : '⚠️ এপিআই কানেকশন এরর।').catch(() => {});
-                        }
-                    }
-                }, 500);
-
-                return;
+                const nickname = await checkFreeFireUID(uid);
+                delete db.sessions[userId];
+                saveDatabase(db);
+                
+                const foundBox = t(userId, 'accountFoundTitle') + nickname + "`\n\n🆔 UID: `" + uid + "`";
+                return ctx.reply(foundBox, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+                });
             } else {
                 if (session.isGuild) {
                     session.step = 'review_order';
@@ -899,52 +862,21 @@ bot.on('message', async (ctx) => {
                         ])
                     });
                 } else {
-                    const checkTitle = lang === 'en' ? '⏳ Verifying player info...\n\n' : '⏳ প্লেয়ার ইনফো যাচাই করা হচ্ছে...\n\n';
-                    const checkSteps = [20, 45, 70, 90];
-                    let cIdx = 0;
+                    const nickname = await checkFreeFireUID(uid);
+                    session.step = 'review_order';
+                    session.uid = uid;
+                    session.nickname = nickname;
+                    saveDatabase(db);
 
-                    let initPer = checkSteps[0];
-                    let initBar = '▰'.repeat(Math.floor(initPer / 10)) + '▱'.repeat(10 - Math.floor(initPer / 10));
-                    const waitMsg = await ctx.reply(checkTitle + `${initBar} [ ${initPer}% ]`, { parse_mode: 'Markdown' });
+                    const userBal = db.balances[userId] || 0;
+                    const slipText = t(userId, 'orderReviewTitle') + "\n\n┌─────────────────────────────────┐\n│ 📦 " + (lang === 'en' ? 'Product' : 'প্যাকেজ') + ": `" + session.product + "`\n\n│ 👤 " + (lang === 'en' ? 'Name' : 'নাম') + ": `" + nickname + "`\n\n│ 🛡 " + (lang === 'en' ? 'UID' : 'ইউআইডি') + ": `" + uid + "`\n\n│ 🌍 " + (lang === 'en' ? 'Server' : 'সার্ভার') + ": `" + session.region + "`\n\n│ 💳 " + (lang === 'en' ? 'Price' : 'মূল্য') + ": ৳" + session.price + "\n\n│ 💰 " + (lang === 'en' ? 'Balance' : 'ব্যালেন্স') + ": ৳" + userBal + "\n└─────────────────────────────────┘";
 
-                    const orderCheckInterval = setInterval(async () => {
-                        cIdx++;
-                        if (cIdx < checkSteps.length) {
-                            let per = checkSteps[cIdx];
-                            let bar = '▰'.repeat(Math.floor(per / 10)) + '▱'.repeat(10 - Math.floor(per / 10));
-                            try {
-                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${bar} [ ${per}% ]`, { parse_mode: 'Markdown' });
-                            } catch (e) {}
-                        } else {
-                            clearInterval(orderCheckInterval);
-                            try {
-                                const nickname = await checkFreeFireUID(uid);
-                                session.step = 'review_order';
-                                session.uid = uid;
-                                session.nickname = nickname;
-                                saveDatabase(db);
-
-                                let finalBar = '▰'.repeat(10) + '▱'.repeat(0);
-                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${finalBar} [ 100% ]`, { parse_mode: 'Markdown' });
-
-                                setTimeout(async () => {
-                                    const userBal = db.balances[userId] || 0;
-                                    const slipText = t(userId, 'orderReviewTitle') + "\n\n┌─────────────────────────────────┐\n│ 📦 " + (lang === 'en' ? 'Product' : 'প্যাকেজ') + ": `" + session.product + "`\n\n│ 👤 " + (lang === 'en' ? 'Name' : 'নাম') + ": `" + nickname + "`\n\n│ 🛡 " + (lang === 'en' ? 'UID' : 'ইউআইডি') + ": `" + uid + "`\n\n│ 🌍 " + (lang === 'en' ? 'Server' : 'সার্ভার') + ": `" + session.region + "`\n\n│ 💳 " + (lang === 'en' ? 'Price' : 'মূল্য') + ": ৳" + session.price + "\n\n│ 💰 " + (lang === 'en' ? 'Balance' : 'ব্যালেন্স') + ": ৳" + userBal + "\n└─────────────────────────────────┘";
-
-                                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, slipText, {
-                                        parse_mode: 'Markdown',
-                                        ...Markup.inlineKeyboard([
-                                            [Markup.button.callback(t(userId, 'confirmOrderBtn'), 'confirm_order'), Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back')]
-                                        ])
-                                    }).catch(() => {});
-                                }, 500);
-                            } catch (error) {
-                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, lang === 'en' ? '⚠️ API connection error.' : '⚠️ এপিআই কানেকশন এরর।').catch(() => {});
-                            }
-                        }
-                    }, 500);
-
-                    return;
+                    return ctx.reply(slipText, {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.callback(t(userId, 'confirmOrderBtn'), 'confirm_order'), Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back')]
+                        ])
+                    });
                 }
             }
         }
@@ -968,10 +900,6 @@ bot.on('message', async (ctx) => {
                     await ctx.answerCbQuery(successAlert, { show_alert: false }).catch(() => {});
 
                     setTimeout(async () => {
-                        try {
-                            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-                        } catch (err) {}
-
                         if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
                             db.sessions[userId].activeCategory = null;
                             saveDatabase(db);
@@ -986,15 +914,20 @@ bot.on('message', async (ctx) => {
                         }
                         inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
 
-                        await ctx.reply(t(userId, 'shopMenuTitle'), {
+                        await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, t(userId, 'shopMenuTitle'), {
                             parse_mode: 'Markdown',
                             ...Markup.inlineKeyboard(inlineButtons)
-                        }).catch(() => {});
-                    }, 400); 
+                        }).catch(async () => {
+                            await ctx.reply(t(userId, 'shopMenuTitle'), {
+                                parse_mode: 'Markdown',
+                                ...Markup.inlineKeyboard(inlineButtons)
+                            }).catch(() => {});
+                        });
+                    }, 300); 
                 } catch (e) {
                     console.error('Shop Menu Error:', e);
                 }
-            }, 600);
+            }, 400);
             return;
         }
 
@@ -1467,41 +1400,7 @@ bot.action('confirm_order', async (ctx) => {
         const lang = getUserLang(userId);
         const processingTitle = lang === 'en' ? '⏳ Order is processing...\n\n' : '⏳ অর্ডার প্রসেসিং হচ্ছে...\n\n';
 
-        function getRandomSteps() {
-            let steps = [];
-            let current = 20; 
-            while (current < 80) {
-                steps.push(current);
-                let jump = [15, 25, 30][Math.floor(Math.random() * 3)];
-                current += jump;
-                if (current > 85) current = 85;
-            }
-            steps.push(85);
-            return steps;
-        }
-
-        const steps = getRandomSteps();
-        let stepIdx = 0;
-
-        let initPercent = steps[0];
-        let initFilled = Math.floor(initPercent / 10);
-        let initBar = '▰'.repeat(initFilled) + '▱'.repeat(10 - initFilled);
-        
-        const procMsg = await ctx.editMessageText(processingTitle + `${initBar} [ ${initPercent}% ]`, { parse_mode: 'Markdown' });
-
-        const loadingInterval = setInterval(async () => {
-            stepIdx++;
-            if (stepIdx < steps.length) {
-                let percent = steps[stepIdx];
-                let filled = Math.floor(percent / 10);
-                let bar = '▰'.repeat(filled) + '▱'.repeat(10 - filled);
-                try {
-                    await ctx.telegram.editMessageText(userId, procMsg.message_id, null, processingTitle + `${bar} [ ${percent}% ]`, { parse_mode: 'Markdown' });
-                } catch (e) {}
-            } else {
-                clearInterval(loadingInterval);
-            }
-        }, 600);
+        const procMsg = await ctx.editMessageText(processingTitle + `▰▰▰▰▱▱▱▱▱▱ [ 50% ]`, { parse_mode: 'Markdown' });
 
         const adminNotifyText = "✦ ─────────────── ✦ ─────────────── ✦\n          🔔 NEW ORDER PENDING\n✦ ─────────────── ✦ ─────────────── ✦\n\n👤 Customer: " + ctx.from.first_name + "\n🆔 ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Name: `" + session.nickname + "`\n" + idLabel + ": `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n\n👇 Click below to enter order details:";
 
@@ -1521,8 +1420,7 @@ bot.action('confirm_order', async (ctx) => {
             uid: session.uid,
             region: session.region,
             price: session.price,
-            isGuild: session.isGuild,
-            intervalObj: loadingInterval
+            isGuild: session.isGuild
         };
         delete db.sessions[userId];
         saveDatabase(db);
@@ -1538,10 +1436,6 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         const db = loadDatabase();
         if (!db.adminInputSession) db.adminInputSession = {};
         db.adminInputSession[userId] = { step: 'awaiting_order_details', targetUserId: targetUserId };
-        
-        if (db.adminSessions && db.adminSessions[targetUserId] && db.adminSessions[targetUserId].intervalObj) {
-            clearInterval(db.adminSessions[targetUserId].intervalObj);
-        }
         saveDatabase(db);
 
         await ctx.answerCbQuery('✍️ 3 line order details pathan!');
@@ -1558,9 +1452,6 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
         
         const dbObj = loadDatabase();
         if (dbObj.adminSessions && dbObj.adminSessions[targetUserId]) {
-            if (dbObj.adminSessions[targetUserId].intervalObj) {
-                clearInterval(dbObj.adminSessions[targetUserId].intervalObj);
-            }
             const loadingMsgId = dbObj.adminSessions[targetUserId].loadingMessageId;
             const price = dbObj.adminSessions[targetUserId].price;
             
