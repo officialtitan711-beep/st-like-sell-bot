@@ -21,7 +21,7 @@ const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
 
 const bot = new Telegraf(BOT_TOKEN);
 
-let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {}, userLang: {}, depositRequests: {}, adminReplySessions: {}, adminInputSession: {}, adminSessions: {} };
+let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: {}, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {}, lastCleanMonth: '', userLang: {}, depositRequests: {}, adminReplySessions: {}, adminInputSession: {}, adminSessions: {} };
 
 function loadDatabase() {
     return cachedDb;
@@ -37,7 +37,10 @@ function syncDataFromFirebase() {
             try {
                 if (data && data !== 'null') {
                     const parsed = JSON.parse(data);
-                    if (parsed) cachedDb = parsed;
+                    if (parsed) {
+                        cachedDb = parsed;
+                        checkAndCleanFirstDayOfMonth();
+                    }
                 }
             } catch (e) {
                 console.error('Firebase Load Error:', e);
@@ -73,8 +76,37 @@ function saveDatabase(data) {
     req.end();
 }
 
+// প্রতি মাসের ১ তারিখে সব ইউজারের গত মাসের অর্ডার হিস্ট্রি স্বয়ংক্রিয়ভাবে রিমুভ করার ফিক্সড লজিক
+function checkAndCleanFirstDayOfMonth() {
+    const db = loadDatabase();
+    if (!db.orderHistories) return;
+
+    const now = new Date();
+    const currentDay = now.getDate(); // আজকের তারিখ (১ থেকে ৩১)
+    const currentMonthYear = now.getFullYear() + '-' + (now.getMonth() + 1); // বর্তমান বছর ও মাস (যেমন: 2026-6)
+
+    // যদি আজকের তারিখ ১ হয় এবং এই মাসের জন্য ক্লিনিং অলরেডি রান না করে থাকে
+    if (currentDay === 1 && db.lastCleanMonth !== currentMonthYear) {
+        let modified = false;
+        Object.keys(db.orderHistories).forEach(userId => {
+            const histories = db.orderHistories[userId];
+            if (Array.isArray(histories) && histories.length > 0) {
+                // ১ তারিখ হওয়ায় গত মাসের সমস্ত হিস্ট্রি ক্লিয়ার করে দেওয়া হচ্ছে
+                db.orderHistories[userId] = [];
+                modified = true;
+            }
+        });
+
+        db.lastCleanMonth = currentMonthYear; // সেভ করে রাখা যাতে ১ তারিখে একবারে বেশি রান না করে
+        if (modified) {
+            saveDatabase(db);
+        }
+    }
+}
+
 syncDataFromFirebase();
 setInterval(syncDataFromFirebase, 5 * 60 * 1000);
+setInterval(checkAndCleanFirstDayOfMonth, 60 * 60 * 1000); // প্রতি ১ ঘণ্টা পর পর চেক করবে আজ ১ তারিখ কিনা
 
 function getUserLang(userId) {
     const db = loadDatabase();
@@ -117,6 +149,7 @@ function t(userId, key) {
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 অ্যাকাউন্ট পাওয়া গেছে     ║\n╚═════════════════════════════════╝\n\n👤 নাম: `",
             supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **অর্ডার ও ক্রয়ের ইতিহাস**\n\n",
+            historyDisclaimer: "\n\n⚠️ **[ WARNING ]** 🚨\n⚡ *সতর্কবাণী: প্রতি মাসের ১ তারিখে গত মাসের সমস্ত অর্ডার হিস্ট্রি স্বয়ংক্রিয়ভাবে মুছে ফেলা হয়!*\n",
             noHistory: "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n"
         },
         en: {
@@ -151,6 +184,7 @@ function t(userId, key) {
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 ACCOUNT FOUND          ║\n╚═════════════════════════════════╝\n\n👤 Name: `",
             supportSentSuccess: "✨ Your message or screenshot has been sent directly to the admin! Please wait.",
             historyTitle: "📜 **PURCHASE & ORDER HISTORY**\n\n",
+            historyDisclaimer: "\n\n⚠️ **[ WARNING ]** 🚨\n⚡ *Warning: All order history is automatically cleared on the 1st of every month!*\n",
             noHistory: "❌ No orders completed yet!\n\n"
         }
     };
@@ -450,7 +484,6 @@ bot.on('message', async (ctx) => {
                 if (session) {
                     const userBal = db.balances[targetUserId] || 0;
                     
-                    // এখানে অতিরিক্ত স্পেস, ডট বা নাম্বারিং (1. 2. 3.) স্বয়ংক্রিয়ভাবে ফিল্টার করে পরিষ্কার করে নেওয়া হচ্ছে
                     const rawLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
                     const cleanLines = rawLines.map(l => l.replace(/^[1-3][\.\)]\s*/, ''));
 
@@ -464,7 +497,9 @@ bot.on('message', async (ctx) => {
                     const dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' });
                     const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
 
+                    // অর্ডার হিস্ট্রি সংরক্ষণ
                     db.orderHistories[targetUserId].push({
+                        timestamp: now.getTime(),
                         date: dateStr,
                         time: timeStr,
                         product: session.product,
@@ -1019,6 +1054,7 @@ bot.on('message', async (ctx) => {
         }
 
         if (text === '📜 Order History' || text === '📜 অর্ডার হিস্ট্রি') {
+            checkAndCleanFirstDayOfMonth(); // হিস্ট্রি ওপেন করার সময়ও চেক করবে আজ ১ তারিখ কিনা
             const lang = getUserLang(userId);
             const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId] : [];
             let historyBoxText = t(userId, 'historyTitle');
@@ -1026,9 +1062,15 @@ bot.on('message', async (ctx) => {
                 historyBoxText += t(userId, 'noHistory');
             } else {
                 userHistories.forEach((h, index) => {
-                    historyBoxText += (index + 1) + ". 📦 **" + translateProductName(h.product, userId) + "**\n   🎮: `" + h.nickname + "`\n   🛡 UID: `" + h.uid + "`\n   💵: `" + h.price + " BDT`\n   🕒: `" + h.time + "` | 📅: `" + h.date + "`\n───────────────────\n";
+                    const prodName = translateProductName(h.product, userId);
+                    if (lang === 'bn') {
+                        historyBoxText += (index + 1) + ". 📦 **" + prodName + "**\n   🎮 নাম: `" + h.nickname + "`\n   🛡 ইউআইডি: `" + h.uid + "`\n   💵 মূল্য: `" + h.price + " টাকা`\n   🕒 সময়: `" + h.time + "` | 📅 তারিখ: `" + h.date + "`\n───────────────────\n";
+                    } else {
+                        historyBoxText += (index + 1) + ". 📦 **" + prodName + "**\n   🎮 Name: `" + h.nickname + "`\n   🛡 UID: `" + h.uid + "`\n   💵 Price: `" + h.price + " BDT`\n   🕒 Time: `" + h.time + "` | 📅 Date: `" + h.date + "`\n───────────────────\n";
+                    }
                 });
             }
+            historyBoxText += t(userId, 'historyDisclaimer'); // ডিসক্লেমার যুক্ত করা হলো
             return ctx.reply(historyBoxText, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
