@@ -119,7 +119,7 @@ function t(userId, key) {
             verifyingPlayer: "⏳ প্লেয়ার ইনফো যাচাই করা হচ্ছে...\n\n▰▰▱▱▱▱▱▱▱▱ [ ২০% ]",
             connectingServer: "🔄 গেম সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n▰▰▰▰▰▱▱▱▱▱ [ ৫০% ]",
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 অ্যাকাউন্ট পাওয়া গেছে     ║\n╚═════════════════════════════════╝\n\n👤 নাম: `",
-            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন。",
+            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **অর্ডার ও ক্রয়ের ইতিহাস**\n\n",
             noHistory: "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n"
         },
@@ -401,6 +401,14 @@ bot.on('message', async (ctx) => {
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
         if (userId === ADMIN_ID.toString()) {
+            // অ্যাডমিন যখনই নিচের মূল মেনুর যেকোনো অপশন বা বাটন চাপবে, তখন যেকোনো চলমান প্রম্পট বা সেশন রিসেট হয়ে যাবে
+            if (text.startsWith('➕') || text.startsWith('❌') || text.startsWith('💳') || text.startsWith('📱') || text.startsWith('✏️') || text.startsWith('📊') || text.startsWith('📩') || text.startsWith('📢') || text.includes('Shop Now') || text.includes('শপ নাও') || text.includes('UID') || text.includes('ইউআইডি') || text.includes('ব্যালেন্স') || text.includes('প্রোফাইল') || text.includes('অর্ডার') || text.includes('সাপোর্ট')) {
+                if (db.adminReplySessions && db.adminReplySessions[userId]) delete db.adminReplySessions[userId];
+                if (db.adminInputSession && db.adminInputSession[userId]) delete db.adminInputSession[userId];
+                if (db.sessions && db.sessions[userId]) delete db.sessions[userId];
+                saveDatabase(db);
+            }
+
             const replySession = db.adminReplySessions[userId];
             if (replySession) {
                 const targetUserId = replySession.targetUserId;
@@ -521,22 +529,22 @@ bot.on('message', async (ctx) => {
             if (text === '➕ Add Bot') {
                 db.sessions[userId] = { step: 'admin_add_bot_prompt' };
                 saveDatabase(db);
-                return ctx.reply("╔═════════════════════════════════╗\n║     ➕ ADD BOT / PERMISSION     ║\n╚═════════════════════════════════╝\n\n✍️ যে ইউজারের আইডি বা ইউজারনেম পারমিশন দিতে চান তা লিখে পাঠান:\n*(উদাহরণ: `123456789`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply("╔═════════════════════════════════╗\n║     ➕ ADD BOT / PERMISSION     ║\n╚═════════════════════════════════╝\n\n✍️ যে ইউজারের আইডি বা ইউজারনেম পারমিশন দিতে চান তা লিখে পাঠান:\n*(উদাহরণ: `123456789`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
             }
             if (text === '❌ Remove Bot') {
                 db.sessions[userId] = { step: 'admin_remove_bot_prompt' };
                 saveDatabase(db);
-                return ctx.reply("╔═════════════════════════════════╗\n║     ❌ REMOVE BOT ACCESS        ║\n╚═════════════════════════════════╝\n\n✍️ যে ইউজারের আইডি রিমুভ করতে চান তা পাঠান:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply("╔═════════════════════════════════╗\n║     ❌ REMOVE BOT ACCESS        ║\n╚═════════════════════════════════╝\n\n✍️ যে ইউজারের আইডি রিমুভ করতে চান তা পাঠান:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
             }
             if (text === '💳 Add/Minus Balance') {
                 db.sessions[userId] = { step: 'admin_balance_prompt' };
                 saveDatabase(db);
-                return ctx.reply("╔═════════════════════════════════╗\n║    🛠️ BALANCE MANAGEMENT        ║\n╚═════════════════════════════════╝\n\n✍️ ফরম্যাট: `[User_ID] [টাকার পরিমাণ]`\n*(উদাহরণ: `123456789 100`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply("╔═════════════════════════════════╗\n║    🛠️ BALANCE MANAGEMENT        ║\n╚═════════════════════════════════╝\n\n✍️ ফরম্যাট: `[User_ID] [টাকার পরিমাণ]`\n*(উদাহরণ: `123456789 100`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
             }
             if (text === '📱 Set Payment Numbers') {
                 return ctx.reply("╔═════════════════════════════════╗\n║    📱 PAYMENT SETUP PANEL       ║\n╚═════════════════════════════════╝\n\n👇 মাধ্যম সিলেক্ট করুন:", Markup.inlineKeyboard([
                     [Markup.button.callback('💳 বিকাশ [bKash]', 'set_bkash_prompt'), Markup.button.callback('💳 নগদ [Nagad]', 'set_nagad_prompt')],
-                    [Markup.button.callback('🔙 Main Menu 🏠', 'back_start')]
+                    [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
                 ]));
             }
             if (text === '➕ Add Product') {
@@ -544,11 +552,11 @@ bot.on('message', async (ctx) => {
                 if (currentSub) {
                     db.sessions[userId] = { step: 'admin_add_sub_product', category: currentSub };
                     saveDatabase(db);
-                    return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD PACKAGE (" + currentSub + ") ║\n╚═════════════════════════════════╝\n\n✍️ নাম ও দাম পাঠান:\n*(উদাহরণ: `3 SQUAD BOT - ৳140`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                    return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD PACKAGE (" + currentSub + ") ║\n╚═════════════════════════════════╝\n\n✍️ নাম ও দাম পাঠান:\n*(উদাহরণ: `3 SQUAD BOT - ৳140`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
                 } else {
                     db.sessions[userId] = { step: 'admin_add_category' };
                     saveDatabase(db);
-                    return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD MAIN CATEGORY        ║\n╚═════════════════════════════════╝\n\n✍️ নতুন ক্যাটাগরির নাম লিখে পাঠান:\n*(উদাহরণ: `Guild Glory Bot`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                    return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD MAIN CATEGORY        ║\n╚═════════════════════════════════╝\n\n✍️ নতুন ক্যাটাগরির নাম লিখে পাঠান:\n*(উদাহরণ: `Guild Glory Bot`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
                 }
             }
             if (text === '❌ Remove Product') {
@@ -563,14 +571,14 @@ bot.on('message', async (ctx) => {
                     }
                     db.sessions[userId] = { step: 'admin_remove_sub_product', category: currentSub };
                     saveDatabase(db);
-                    return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                    return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
                 } else {
                     const catKeys = Object.keys(db.categories || {});
                     let listText = '╔═════════════════════════════════╗\n║      🗑️ REMOVE CATEGORY         ║\n╚═════════════════════════════════╝\n\n✍️ সম্পূর্ণ ক্যাটাগরি রিমুভ করতে সঠিক নামটি লিখে পাঠান:\n\n1. `Free Fire Likes`\n';
                     catKeys.forEach((c, index) => { listText += (index + 2) + '. `' + c + '`\n'; });
                     db.sessions[userId] = { step: 'admin_remove_category' };
                     saveDatabase(db);
-                    return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                    return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
                 }
             }
             if (text === '✏️ Change Product Price') {
@@ -587,7 +595,7 @@ bot.on('message', async (ctx) => {
                 }
                 db.sessions[userId] = { step: 'admin_update_sub_product', category: currentSub };
                 saveDatabase(db);
-                return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
             }
             if (text === '📊 Total Users') {
                 const allowedIds = Object.keys(db.allowedUsers || {});
@@ -603,12 +611,12 @@ bot.on('message', async (ctx) => {
             if (text === '📩 Send Message') {
                 db.sessions[userId] = { step: 'admin_send_msg_prompt' };
                 saveDatabase(db);
-                return ctx.reply("╔═════════════════════════════════╗\n║     📩 DIRECT MESSAGE PANEL     ║\n╚═════════════════════════════════╝\n\n✍️ ফরম্যাট: `[User_ID] [মেসেজ]`", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply("╔═════════════════════════════════╗\n║     📩 DIRECT MESSAGE PANEL     ║\n╚═════════════════════════════════╝\n\n✍️ ফরম্যাট: `[User_ID] [মেসেজ]`", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
             }
             if (text === '📢 All Users Msg') {
                 db.sessions[userId] = { step: 'admin_broadcast_prompt' };
                 saveDatabase(db);
-                return ctx.reply("╔═════════════════════════════════╗\n║      📢 BROADCAST MESSAGE       ║\n╚═════════════════════════════════╝\n\n✍️ মেসেজটি লিখে পাঠান:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start')]]) });
+                return ctx.reply("╔═════════════════════════════════╗\n║      📢 BROADCAST MESSAGE       ║\n╚═════════════════════════════════╝\n\n✍️ মেসেজটি লিখে পাঠান:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
             }
 
             if (db.sessions[userId] && db.sessions[userId].step === 'admin_add_category') {
@@ -1167,7 +1175,7 @@ bot.action(/admin_reply_(.+)/, async (ctx) => {
         saveDatabase(db);
 
         await ctx.answerCbQuery('✍️ এখন চ্যাটে আপনার রিপ্লাই মেসেজটি লিখে পাঠান!');
-        await ctx.reply("╔═════════════════════════════════╗\n║       💬 ADMIN REPLY            ║\n╚═════════════════════════════════╝\n\n✍️ ইউ আইডি: `" + targetUserId + "`\n\n👇 কাস্টমারের কাছে পাঠানোর জন্য আপনার উত্তরটি লিখে পাঠান:", { parse_mode: 'Markdown' });
+        await ctx.reply("╔═════════════════════════════════╗\n║       💬 ADMIN REPLY            ║\n╚═════════════════════════════════╝\n\n✍️ ইউ আইডি: `" + targetUserId + "`\n\n👇 কাস্টমারের কাছে পাঠানোর জন্য আপনার উত্তরটি লিখে পাঠান:", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
     } catch (e) {}
 });
 
@@ -1199,7 +1207,7 @@ bot.action('set_bkash_prompt', async (ctx) => {
         const db = loadDatabase();
         db.sessions[userId] = { step: 'waiting_set_bkash' };
         saveDatabase(db);
-        await ctx.editMessageText('📱 বিকাশ নম্বর পাঠান:', { parse_mode: 'Markdown' });
+        await ctx.editMessageText('📱 বিকাশ নম্বর পাঠান:', { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
     } catch (e) {}
 });
 
@@ -1210,7 +1218,7 @@ bot.action('set_nagad_prompt', async (ctx) => {
         const db = loadDatabase();
         db.sessions[userId] = { step: 'waiting_set_nagad' };
         saveDatabase(db);
-        await ctx.editMessageText('📱 নগদ নম্বর পাঠান:', { parse_mode: 'Markdown' });
+        await ctx.editMessageText('📱 নগদ নম্বর পাঠান:', { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
     } catch (e) {}
 });
 
@@ -1420,7 +1428,7 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         saveDatabase(db);
 
         await ctx.answerCbQuery('✍️ 3 line order details pathan!');
-        await ctx.reply("📝 অর্ডার ডিটেইলস চ্যাটে ৩ লাইনে পাঠান:\n1. Previous Status\n2. Current Status\n3. Added Status / Note", { parse_mode: 'Markdown' });
+        await ctx.reply("📝 অর্ডার ডিটেইলস চ্যাটে ৩ লাইনে পাঠান:\n1. Previous Status\n2. Current Status\n3. Added Status / Note", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
     } catch (e) {}
 });
 
@@ -1464,6 +1472,9 @@ bot.action('back_start_inline', async (ctx) => {
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         if (db.sessions && db.sessions[userId]) { delete db.sessions[userId]; saveDatabase(db); }
+        if (db.adminInputSession && db.adminInputSession[userId]) { delete db.adminInputSession[userId]; saveDatabase(db); }
+        if (db.adminReplySessions && db.adminReplySessions[userId]) { delete db.adminReplySessions[userId]; saveDatabase(db); }
+        
         const lang = getUserLang(userId);
         const backText = lang === 'en' ? '✨ Returned to main menu:' : '✨ মূল মেনুতে ফিরে এসেছেন:';
         await ctx.editMessageText(backText, { parse_mode: 'Markdown' }).catch(() => {});
