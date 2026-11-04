@@ -3,7 +3,6 @@ const http = require('http');
 const https = require('https');
 require('dotenv').config();
 
-// গ্লোবাল এরর হ্যান্ডলার
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
 });
@@ -154,7 +153,7 @@ function t(userId, key) {
             balanceRechargedBox: "✦ ─────────────── ✦ ─────────────── ✦\n       💎 BALANCE RECHARGED 💎\n✦ ─────────────── ✦ ─────────────── ✦\n\nAccount balance updated successfully! ✨\n\n-----------------------------------------\n📌 Prev: `",
             minDepositWarning: "⚠️═════════════════════════════════⚠️\n🛑 **MINIMUM DEPOSIT WARNING** 🛑\n⚠️═════════════════════════════════⚠️\n\nMinimum deposit must be **100 BDT**.\n\n❌ Your amount: `",
             verifyingPlayer: "⏳ Verifying player info...\n\n▰▰▱▱▱▱▱▱▱▱ [ 20% ]",
-            connectingServer: "🔄 Connecting with game server...\n\n▰▰▰▰▰▱▱▱▱▱ [ 50% ]",
+            connectingServer: "🔄 Connecting with game server...\n\n▰▰▱▱▱▱▱▱▱▱ [ 50% ]",
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 ACCOUNT FOUND          ║\n╚═════════════════════════════════╝\n\n👤 Name: `",
             supportSentSuccess: "✨ Your message or screenshot has been sent directly to the admin! Please wait.",
             historyTitle: "📜 **PURCHASE & ORDER HISTORY**\n\n",
@@ -401,12 +400,16 @@ bot.on('message', async (ctx) => {
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
         if (userId === ADMIN_ID.toString()) {
-            // অ্যাডমিন যখনই নিচের মূল মেনুর যেকোনো অপশন বা বাটন চাপবে, তখন যেকোনো চলমান প্রম্পট বা সেশন রিসেট হয়ে যাবে
             if (text.startsWith('➕') || text.startsWith('❌') || text.startsWith('💳') || text.startsWith('📱') || text.startsWith('✏️') || text.startsWith('📊') || text.startsWith('📩') || text.startsWith('📢') || text.includes('Shop Now') || text.includes('শপ নাও') || text.includes('UID') || text.includes('ইউআইডি') || text.includes('ব্যালেন্স') || text.includes('প্রোফাইল') || text.includes('অর্ডার') || text.includes('সাপোর্ট')) {
-                if (db.adminReplySessions && db.adminReplySessions[userId]) delete db.adminReplySessions[userId];
-                if (db.adminInputSession && db.adminInputSession[userId]) delete db.adminInputSession[userId];
-                if (db.sessions && db.sessions[userId]) delete db.sessions[userId];
-                saveDatabase(db);
+                if (text !== '➕ Add Product' && text !== '❌ Remove Product' && text !== '✏️ Change Product Price') {
+                    if (db.adminReplySessions && db.adminReplySessions[userId]) delete db.adminReplySessions[userId];
+                    if (db.adminInputSession && db.adminInputSession[userId]) delete db.adminInputSession[userId];
+                    if (db.sessions && db.sessions[userId]) {
+                        const activeCat = db.sessions[userId].activeCategory;
+                        db.sessions[userId] = { activeCategory: activeCat };
+                    }
+                    saveDatabase(db);
+                }
             }
 
             const replySession = db.adminReplySessions[userId];
@@ -550,9 +553,9 @@ bot.on('message', async (ctx) => {
             if (text === '➕ Add Product') {
                 const currentSub = db.sessions[userId] && db.sessions[userId].activeCategory ? db.sessions[userId].activeCategory : null;
                 if (currentSub) {
-                    db.sessions[userId] = { step: 'admin_add_sub_product', category: currentSub };
+                    db.sessions[userId] = { step: 'admin_add_sub_product', category: currentSub, activeCategory: currentSub };
                     saveDatabase(db);
-                    return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD PACKAGE (" + currentSub + ") ║\n╚═════════════════════════════════╝\n\n✍️ নাম ও দাম পাঠান:\n*(উদাহরণ: `3 SQUAD BOT - ৳140`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
+                    return ctx.reply("╔═════════════════════════════════╗\n║     📦 ADD PACKAGE (" + currentSub + ") ║\n╚═════════════════════════════════╝\n\n✍️ নতুন প্যাকেজের নাম ও দাম পাঠান:\n*(উদাহরণ: `3 SQUAD BOT - ৳140`)*", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
                 } else {
                     db.sessions[userId] = { step: 'admin_add_category' };
                     saveDatabase(db);
@@ -562,14 +565,14 @@ bot.on('message', async (ctx) => {
             if (text === '❌ Remove Product') {
                 const currentSub = db.sessions[userId] && db.sessions[userId].activeCategory ? db.sessions[userId].activeCategory : null;
                 if (currentSub) {
-                    let listText = '╔═════════════════════════════════╗\n║     🗑️ REMOVE PACKAGE (' + currentSub + ') ║\n╚═════════════════════════════════╝\n\n✍️ যে বাটন বা প্যাকেজটি রিমুভ করতে চান, সেটির সঠিক নাম লিখে পাঠান:\n\n';
+                    let listText = '╔═════════════════════════════════╗\n║     🗑️ REMOVE PACKAGE (' + currentSub + ') ║\n╚═════════════════════════════════╝\n\n✍️ যে প্যাকেজটি রিমুভ করতে চান, সেটির সঠিক নাম লিখে পাঠান:\n\n';
                     if (currentSub === 'Free Fire Likes' && (!db.customProducts['Free Fire Likes'])) db.customProducts['Free Fire Likes'] = [];
                     if (db.customProducts[currentSub] && db.customProducts[currentSub].length > 0) {
                         db.customProducts[currentSub].forEach((p, index) => { listText += (index + 1) + '. `' + p.name + '`\n'; });
                     } else {
                         listText += '⚠️ এই ক্যাটাগরিতে কোনো প্যাকেজ নেই।';
                     }
-                    db.sessions[userId] = { step: 'admin_remove_sub_product', category: currentSub };
+                    db.sessions[userId] = { step: 'admin_remove_sub_product', category: currentSub, activeCategory: currentSub };
                     saveDatabase(db);
                     return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
                 } else {
@@ -593,7 +596,7 @@ bot.on('message', async (ctx) => {
                 } else {
                     listText += '⚠️ এই ক্যাটাগরিতে কোনো প্যাকেজ নেই।';
                 }
-                db.sessions[userId] = { step: 'admin_update_sub_product', category: currentSub };
+                db.sessions[userId] = { step: 'admin_update_sub_product', category: currentSub, activeCategory: currentSub };
                 saveDatabase(db);
                 return ctx.reply(listText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancel ❌', 'back_start_inline')]]) });
             }
@@ -624,7 +627,7 @@ bot.on('message', async (ctx) => {
                 if (!db.customProducts[text]) db.customProducts[text] = [];
                 delete db.sessions[userId];
                 saveDatabase(db);
-                return ctx.reply('✅ ক্যাটাগরি সফলভাবে যোগ করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+                return ctx.reply('✅ নতুন ক্যাটাগরি সফলভাবে তৈরি করা হয়েছে: `' + text + '`', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
             }
             if (db.sessions[userId] && db.sessions[userId].step === 'admin_remove_category') {
                 if (db.categories[text]) {
@@ -641,9 +644,9 @@ bot.on('message', async (ctx) => {
                 const cat = db.sessions[userId].category;
                 if (!db.customProducts[cat]) db.customProducts[cat] = [];
                 db.customProducts[cat].push({ name: text });
-                delete db.sessions[userId];
+                db.sessions[userId] = { activeCategory: cat };
                 saveDatabase(db);
-                return ctx.reply('✅ প্যাকেজ যোগ করা হয়েছে!', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+                return ctx.reply('✅ ক্যাটাগরির ভেতরে নতুন প্যাকেজ সফলভাবে যোগ করা হয়েছে!', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
             }
             if (db.sessions[userId] && db.sessions[userId].step === 'admin_remove_sub_product') {
                 const cat = db.sessions[userId].category;
@@ -652,7 +655,7 @@ bot.on('message', async (ctx) => {
                 if (idx > -1) {
                     list.splice(idx, 1);
                     db.customProducts[cat] = list;
-                    delete db.sessions[userId];
+                    db.sessions[userId] = { activeCategory: cat };
                     saveDatabase(db);
                     return ctx.reply('🗑️ প্যাকেজ রিমুভ সফল!', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
                 } else {
@@ -668,9 +671,9 @@ bot.on('message', async (ctx) => {
                 if (targetIdx >= 0 && targetIdx < list.length) {
                     list[targetIdx].name = parts[1];
                     db.customProducts[cat] = list;
-                    delete db.sessions[userId];
+                    db.sessions[userId] = { activeCategory: cat };
                     saveDatabase(db);
-                    return ctx.reply('✨ প্যাকেজ আপডেট সফল!', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+                    return ctx.reply('✨ প্যাকেজের নাম ও দাম সফলভাবে আপডেট করা হয়েছে!', { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
                 } else {
                     return ctx.reply('❌ প্যাকেজ খুঁজে পাওয়া যায়নি।');
                 }
@@ -1333,7 +1336,8 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
         db.sessions[userId] = { 
             product: translatedProdName, 
             price: extractedPrice, 
-            isGuild: catName.toLowerCase().includes('guild') || prod.name.toLowerCase().includes('squad') || prod.name.toLowerCase().includes('bot')
+            isGuild: catName.toLowerCase().includes('guild') || prod.name.toLowerCase().includes('squad') || prod.name.toLowerCase().includes('bot'),
+            activeCategory: catName
         };
         saveDatabase(db);
 
@@ -1481,7 +1485,6 @@ bot.action('back_start_inline', async (ctx) => {
     } catch (e) {}
 });
 
-// Webhook & Server Setup
 const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
 const fullWebhookUrl = `${RENDER_URL}${webhookPath}`;
 
