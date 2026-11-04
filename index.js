@@ -440,6 +440,10 @@ bot.on('message', async (ctx) => {
                 const targetUserId = adminSession.targetUserId;
                 const session = db.adminSessions[targetUserId];
 
+                if (session && session.holdIntervalRef) {
+                    clearInterval(session.holdIntervalRef);
+                }
+
                 delete db.adminInputSession[userId];
                 saveDatabase(db);
 
@@ -475,10 +479,14 @@ bot.on('message', async (ctx) => {
                         `✦ ─────────────── ✦ ─────────────── ✦\n           ✅ অর্ডার সম্পন্ন\n✦ ─────────────── ✦ ─────────────── ✦\n\n📦 প্যাকেজ: \`${session.product}\`\n\n👤 নাম: \`${session.nickname}\`\n\n${idLabelText}: \`${session.uid}\`\n\n🌐 সার্ভার: \`${session.region}\`\n\n✦ ─────────────── ✦ ─────────────── ✦\n\n📌 পূর্বের লাইক: ${prevStatus}\n\n💖 বর্তমান লাইক: ${currStatus}\n\n🚀 অ্যাড/নোট: ${addedStatus}\n\n✦ ─────────────── ✦ ─────────────── ✦\n\n🪶 কাটা হয়েছে: \`${session.price} টাকা\`\n\n💰 বর্তমান ব্যালেন্স: \`${userBal} টাকা\`\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন |\n\nSIR TOPUP এর পাশেই থাকুন 💙\n✦ ─────────────── ✦ ─────────────── ✦`;
 
                     try {
-                        await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
-                            parse_mode: 'Markdown',
-                            ...Markup.inlineKeyboard([[Markup.button.callback(lang === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
-                        });
+                        await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, (lang === 'en' ? '⏳ Order is processing...\n\n' : '⏳ অর্ডার প্রসেসিং হচ্ছে...\n\n') + '▰▰▰▰▰▰▰▰▰▰ [ 100% ]', { parse_mode: 'Markdown' });
+
+                        setTimeout(async () => {
+                            await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
+                                parse_mode: 'Markdown',
+                                ...Markup.inlineKeyboard([[Markup.button.callback(lang === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
+                            });
+                        }, 500);
 
                         try {
                             await ctx.telegram.editMessageText(ADMIN_ID, session.adminMsgId, null, "╔═════════════════════════════════╗\n║    🔔 ORDER COMPLETED ✅        ║\n╚═════════════════════════════════╝\n\n🆔 Customer ID: `" + targetUserId + "`\n\n📦 Product: `" + session.product + "`\n\n**[STATUS: COMPLETED ✅]**", { parse_mode: 'Markdown' });
@@ -836,7 +844,6 @@ bot.on('message', async (ctx) => {
             const lang = getUserLang(userId);
             
             if (isOnlyCheck) {
-                // UID চেক করার সময় আগের সেই সুন্দর অ্যানিমেশন লজিক
                 const checkTitle = lang === 'en' ? '⏳ Checking UID...\n\n' : '⏳ ইউআইডি চেক করা হচ্ছে...\n\n';
                 const checkSteps = [20, 45, 65, 85];
                 let cIdx = 0;
@@ -894,7 +901,6 @@ bot.on('message', async (ctx) => {
                         ])
                     });
                 } else {
-                    // অর্ডার প্লেস করার সময় UID ভেরিফাই করার অ্যানিমেশন লজিক
                     const checkTitle = lang === 'en' ? '⏳ Verifying player info...\n\n' : '⏳ প্লেয়ার ইনফো যাচাই করা হচ্ছে...\n\n';
                     const checkSteps = [20, 45, 70, 90];
                     let cIdx = 0;
@@ -965,7 +971,6 @@ bot.on('message', async (ctx) => {
                 }
                 inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
 
-                // শপ মেনু থেকে লোডিং সরিয়ে সরাসরি ইনস্ট্যান্ট ওপেন করা হলো
                 await ctx.reply(t(userId, 'shopMenuTitle'), {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard(inlineButtons)
@@ -1445,7 +1450,27 @@ bot.action('confirm_order', async (ctx) => {
         const lang = getUserLang(userId);
         const processingTitle = lang === 'en' ? '⏳ Order is processing...\n\n' : '⏳ অর্ডার প্রসেসিং হচ্ছে...\n\n';
 
-        const procMsg = await ctx.editMessageText(processingTitle + `▰▰▰▰▱▱▱▱▱▱ [ 50% ]`, { parse_mode: 'Markdown' });
+        const procMsg = await ctx.editMessageText(processingTitle + `▰▱▱▱▱▱▱▱▱▱ [ 20% ]`, { parse_mode: 'Markdown' });
+
+        const steps = [
+            { per: 35, bar: '▰▰▱▱▱▱▱▱▱▱' },
+            { per: 50, bar: '▰▰▰▰▱▱▱▱▱▱' },
+            { per: 80, bar: '▰▰▰▰▰▰▰▱▱▱' },
+            { per: 92, bar: '▰▰▰▰▰▰▰▰▰▱' }
+        ];
+
+        let sIdx = 0;
+        const holdInterval = setInterval(async () => {
+            if (sIdx < steps.length) {
+                const currentStep = steps[sIdx];
+                try {
+                    await ctx.telegram.editMessageText(userId, procMsg.message_id, null, processingTitle + `${currentStep.bar} [ ${currentStep.per}% ]`, { parse_mode: 'Markdown' });
+                } catch (err) {}
+                sIdx++;
+            } else {
+                clearInterval(holdInterval);
+            }
+        }, 600);
 
         const adminNotifyText = "✦ ─────────────── ✦ ─────────────── ✦\n          🔔 NEW ORDER PENDING\n✦ ─────────────── ✦ ─────────────── ✦\n\n👤 Customer: " + ctx.from.first_name + "\n🆔 ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Name: `" + session.nickname + "`\n" + idLabel + ": `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n\n👇 Click below to enter order details:";
 
@@ -1465,7 +1490,8 @@ bot.action('confirm_order', async (ctx) => {
             uid: session.uid,
             region: session.region,
             price: session.price,
-            isGuild: session.isGuild
+            isGuild: session.isGuild,
+            holdIntervalRef: holdInterval
         };
         delete db.sessions[userId];
         saveDatabase(db);
@@ -1499,6 +1525,9 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
         if (dbObj.adminSessions && dbObj.adminSessions[targetUserId]) {
             const loadingMsgId = dbObj.adminSessions[targetUserId].loadingMessageId;
             const price = dbObj.adminSessions[targetUserId].price;
+            const holdRef = dbObj.adminSessions[targetUserId].holdIntervalRef;
+
+            if (holdRef) clearInterval(holdRef);
             
             if (!dbObj.balances[targetUserId]) dbObj.balances[targetUserId] = 0;
             dbObj.balances[targetUserId] += price;
