@@ -842,24 +842,45 @@ bot.on('message', async (ctx) => {
             const lang = getUserLang(userId);
             
             if (isOnlyCheck) {
-                const waitMsg = await ctx.reply(t(userId, 'verifyingPlayer'));
-                try {
-                    setTimeout(async () => {
-                        await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, t(userId, 'connectingServer'), { parse_mode: 'Markdown' }).catch(() => {});
-                    }, 1000);
-                    const nickname = await checkFreeFireUID(uid);
-                    setTimeout(async () => {
-                        delete db.sessions[userId];
-                        saveDatabase(db);
-                        const foundBox = t(userId, 'accountFoundTitle') + nickname + "`\n\n🆔 UID: `" + uid + "`";
-                        await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, foundBox, {
-                            parse_mode: 'Markdown',
-                            ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
-                        }).catch(() => {});
-                    }, 2000);
-                } catch (error) {
-                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, lang === 'en' ? '⚠️ API connection error.' : '⚠️ এপিআই কানেকশন এরর।').catch(() => {});
-                }
+                const checkTitle = lang === 'en' ? '⏳ Checking UID...\n\n' : '⏳ ইউআইডি চেক করা হচ্ছে...\n\n';
+                const checkSteps = [20, 45, 65, 85];
+                let cIdx = 0;
+
+                let initPer = checkSteps[0];
+                let initBar = '▰'.repeat(Math.floor(initPer / 10)) + '▱'.repeat(10 - Math.floor(initPer / 10));
+                const waitMsg = await ctx.reply(checkTitle + `${initBar} [ ${initPer}% ]`, { parse_mode: 'Markdown' });
+
+                const checkInterval = setInterval(async () => {
+                    cIdx++;
+                    if (cIdx < checkSteps.length) {
+                        let per = checkSteps[cIdx];
+                        let bar = '▰'.repeat(Math.floor(per / 10)) + '▱'.repeat(10 - Math.floor(per / 10));
+                        try {
+                            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${bar} [ ${per}% ]`, { parse_mode: 'Markdown' });
+                        } catch (e) {}
+                    } else {
+                        clearInterval(checkInterval);
+                        try {
+                            const nickname = await checkFreeFireUID(uid);
+                            delete db.sessions[userId];
+                            saveDatabase(db);
+                            
+                            let finalBar = '▰'.repeat(10) + '▱'.repeat(0);
+                            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${finalBar} [ 100% ]`, { parse_mode: 'Markdown' });
+
+                            setTimeout(async () => {
+                                const foundBox = t(userId, 'accountFoundTitle') + nickname + "`\n\n🆔 UID: `" + uid + "`";
+                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, foundBox, {
+                                    parse_mode: 'Markdown',
+                                    ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+                                }).catch(() => {});
+                            }, 500);
+                        } catch (error) {
+                            await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, lang === 'en' ? '⚠️ API connection error.' : '⚠️ এপিআই কানেকশন এরর।').catch(() => {});
+                        }
+                    }
+                }, 500);
+
                 return;
             } else {
                 if (session.isGuild) {
@@ -878,26 +899,51 @@ bot.on('message', async (ctx) => {
                         ])
                     });
                 } else {
-                    const waitMsg = await ctx.reply(t(userId, 'verifyingPlayer'));
-                    try {
-                        const nickname = await checkFreeFireUID(uid);
-                        session.step = 'review_order';
-                        session.uid = uid;
-                        session.nickname = nickname;
-                        saveDatabase(db);
+                    const checkTitle = lang === 'en' ? '⏳ Verifying player info...\n\n' : '⏳ প্লেয়ার ইনফো যাচাই করা হচ্ছে...\n\n';
+                    const checkSteps = [20, 45, 70, 90];
+                    let cIdx = 0;
 
-                        const userBal = db.balances[userId] || 0;
-                        const slipText = t(userId, 'orderReviewTitle') + "\n\n┌─────────────────────────────────┐\n│ 📦 " + (lang === 'en' ? 'Product' : 'প্যাকেজ') + ": `" + session.product + "`\n\n│ 👤 " + (lang === 'en' ? 'Name' : 'নাম') + ": `" + nickname + "`\n\n│ 🛡 " + (lang === 'en' ? 'UID' : 'ইউআইডি') + ": `" + uid + "`\n\n│ 🌍 " + (lang === 'en' ? 'Server' : 'সার্ভার') + ": `" + session.region + "`\n\n│ 💳 " + (lang === 'en' ? 'Price' : 'মূল্য') + ": ৳" + session.price + "\n\n│ 💰 " + (lang === 'en' ? 'Balance' : 'ব্যালেন্স') + ": ৳" + userBal + "\n└─────────────────────────────────┘";
+                    let initPer = checkSteps[0];
+                    let initBar = '▰'.repeat(Math.floor(initPer / 10)) + '▱'.repeat(10 - Math.floor(initPer / 10));
+                    const waitMsg = await ctx.reply(checkTitle + `${initBar} [ ${initPer}% ]`, { parse_mode: 'Markdown' });
 
-                        await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, slipText, {
-                            parse_mode: 'Markdown',
-                            ...Markup.inlineKeyboard([
-                                [Markup.button.callback(t(userId, 'confirmOrderBtn'), 'confirm_order'), Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back')]
-                            ])
-                        }).catch(() => {});
-                    } catch (error) {
-                        await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, lang === 'en' ? '⚠️ API connection error.' : '⚠️ এপিআই কানেকশন এরর।').catch(() => {});
-                    }
+                    const orderCheckInterval = setInterval(async () => {
+                        cIdx++;
+                        if (cIdx < checkSteps.length) {
+                            let per = checkSteps[cIdx];
+                            let bar = '▰'.repeat(Math.floor(per / 10)) + '▱'.repeat(10 - Math.floor(per / 10));
+                            try {
+                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${bar} [ ${per}% ]`, { parse_mode: 'Markdown' });
+                            } catch (e) {}
+                        } else {
+                            clearInterval(orderCheckInterval);
+                            try {
+                                const nickname = await checkFreeFireUID(uid);
+                                session.step = 'review_order';
+                                session.uid = uid;
+                                session.nickname = nickname;
+                                saveDatabase(db);
+
+                                let finalBar = '▰'.repeat(10) + '▱'.repeat(0);
+                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, checkTitle + `${finalBar} [ 100% ]`, { parse_mode: 'Markdown' });
+
+                                setTimeout(async () => {
+                                    const userBal = db.balances[userId] || 0;
+                                    const slipText = t(userId, 'orderReviewTitle') + "\n\n┌─────────────────────────────────┐\n│ 📦 " + (lang === 'en' ? 'Product' : 'প্যাকেজ') + ": `" + session.product + "`\n\n│ 👤 " + (lang === 'en' ? 'Name' : 'নাম') + ": `" + nickname + "`\n\n│ 🛡 " + (lang === 'en' ? 'UID' : 'ইউআইডি') + ": `" + uid + "`\n\n│ 🌍 " + (lang === 'en' ? 'Server' : 'সার্ভার') + ": `" + session.region + "`\n\n│ 💳 " + (lang === 'en' ? 'Price' : 'মূল্য') + ": ৳" + session.price + "\n\n│ 💰 " + (lang === 'en' ? 'Balance' : 'ব্যালেন্স') + ": ৳" + userBal + "\n└─────────────────────────────────┘";
+
+                                    await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, slipText, {
+                                        parse_mode: 'Markdown',
+                                        ...Markup.inlineKeyboard([
+                                            [Markup.button.callback(t(userId, 'confirmOrderBtn'), 'confirm_order'), Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back')]
+                                        ])
+                                    }).catch(() => {});
+                                }, 500);
+                            } catch (error) {
+                                await ctx.telegram.editMessageText(ctx.chat.id, waitMsg.message_id, null, lang === 'en' ? '⚠️ API connection error.' : '⚠️ এপিআই কানেকশন এরর।').catch(() => {});
+                            }
+                        }
+                    }, 500);
+
                     return;
                 }
             }
@@ -909,13 +955,16 @@ bot.on('message', async (ctx) => {
             const loading100Text = lang === 'en' ? '⏳ Loading Shop Menu...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ 100% ]' : '⏳ শপ মেনু লোড হচ্ছে...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ ১০০% ]';
             const successAlert = lang === 'en' ? '✅ Shop Loaded Successfully! 🎉' : '✅ শপ সফলভাবে লোড হয়েছে! 🎉';
 
+            // প্রথমে ৫০% লোডিং মেসেজ পাঠানো হলো
             const loadingMsg = await ctx.reply(loading50Text);
             
+            // একটু ফাস্ট কিন্তু স্লো গতির লজিক (প্রথমে ৫০%, তারপর ১০০% এবং পপআপ)
             setTimeout(async () => {
                 try {
-                    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, loading100Text);
+                    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, loading100Text).catch(() => {});
                     await ctx.answerCbQuery(successAlert, { show_alert: false }).catch(() => {});
 
+                    // ন্যানো সেকেন্ডের মতো অল্প সময় অপেক্ষা করে শপ মেনু ওপেন হবে
                     setTimeout(async () => {
                         if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
                             db.sessions[userId].activeCategory = null;
@@ -935,9 +984,9 @@ bot.on('message', async (ctx) => {
                             parse_mode: 'Markdown',
                             ...Markup.inlineKeyboard(inlineButtons)
                         }).catch(() => {});
-                    }, 200); 
+                    }, 350); 
                 } catch (e) {}
-            }, 300);
+            }, 600);
             return;
         }
 
@@ -1410,19 +1459,16 @@ bot.action('confirm_order', async (ctx) => {
         const lang = getUserLang(userId);
         const processingTitle = lang === 'en' ? '⏳ Order is processing...\n\n' : '⏳ অর্ডার প্রসেসিং হচ্ছে...\n\n';
 
-        // রেন্ডম এলোমেলো স্টেপ জেনারেটর (প্রতিবার একেক রকম সংখ্যা দেখাবে এবং ৮০% এর উপরে গিয়ে হোল্ড করবে)
         function getRandomSteps() {
             let steps = [];
-            let current = Math.floor(Math.random() * 20) + 15; // প্রথম সংখ্যা ১৫% থেকে ৩৫% এর মধ্যে
+            let current = 20; 
             while (current < 80) {
                 steps.push(current);
-                let jump = Math.floor(Math.random() * 18) + 8; // এলোমেলো জাম্প
+                let jump = [15, 25, 30][Math.floor(Math.random() * 3)];
                 current += jump;
+                if (current > 85) current = 85;
             }
-            // ৮০% এর উপরে যেকোনো রেন্ডম সংখ্যায় হোল্ড করবে (যেমন: ৮২, ৮৭, ৯১, ৯৬, ৯৯ ইত্যাদি)
-            let finalHold = Math.floor(Math.random() * 18) + 82; 
-            if (finalHold > 99) finalHold = 99;
-            steps.push(finalHold);
+            steps.push(85);
             return steps;
         }
 
