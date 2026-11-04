@@ -116,7 +116,7 @@ function t(userId, key) {
             balanceRechargedBox: "✦ ─────────────── ✦ ─────────────── ✦\n       💎 ব্যালেন্স রিচার্জ সফল 💎\n✦ ─────────────── ✦ ─────────────── ✦\n\nআপনার অ্যাকাউন্ট ব্যালেন্স সফলভাবে আপডেট করা হয়েছে! ✨\n\n-----------------------------------------\n📌 পূর্বের ব্যালেন্স: `",
             minDepositWarning: "⚠️═════════════════════════════════⚠️\n🛑 **সর্বনিম্ন ডিপোজিট সতর্কতা** 🛑\n⚠️═════════════════════════════════⚠️\n\nবট নিয়ম অনুযায়ী সর্বনিম্ন **১০০ টাকা** ডিপোজিট করতে হবে।\n\n❌ আপনার প্রদত্ত পরিমাণ: `",
             verifyingPlayer: "⏳ প্লেয়ার ইনফো যাচাই করা হচ্ছে...\n\n▰▰▱▱▱▱▱▱▱▱ [ ২০% ]",
-            connectingServer: "🔄 গেম সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n▰▰▱▱▱▱▱▱▱▱ [ ৫০% ]",
+            connectingServer: "🔄 গেম সার্ভারের সাথে কানেক্ট করা হচ্ছে...\n\n▰▰▰▰▰▱▱▱▱▱ [ ৫০% ]",
             accountFoundTitle: "╔═════════════════════════════════╗\n║       🎉 অ্যাকাউন্ট পাওয়া গেছে     ║\n╚═════════════════════════════════╝\n\n👤 নাম: `",
             supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **অর্ডার ও ক্রয়ের ইতিহাস**\n\n",
@@ -905,13 +905,17 @@ bot.on('message', async (ctx) => {
 
         if (text === '🛍️ Shop Now' || text === '🛍️ শপ নাও') {
             const lang = getUserLang(userId);
-            const loadingText = lang === 'en' ? '⏳ Loading Shop Menu...\n\n▰▰▰▰▰▱▱▱▱▱▱ [ 50% ]' : '⏳ শপ মেনু লোড হচ্ছে...\n\n▰▰▰▰▰▱▱▱▱▱▱ [ ৫০% ]';
-            const loaded100Text = lang === 'en' ? '⏳ Loading Shop Menu...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ 100% ]' : '⏳ শপ মেনু লোড হচ্ছে...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ ১০০% ]';
+            const loading50Text = lang === 'en' ? '⏳ Loading Shop Menu...\n\n▰▰▰▰▰▱▱▱▱▱▱ [ 50% ]' : '⏳ শপ মেনু লোড হচ্ছে...\n\n▰▰▰▰▰▱▱▱▱▱▱ [ ৫০% ]';
+            const loading100Text = lang === 'en' ? '⏳ Loading Shop Menu...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ 100% ]' : '⏳ শপ মেনু লোড হচ্ছে...\n\n▰▰▰▰▰▰▰▰▰▰▰ [ ১০০% ]';
+            const successAlert = lang === 'en' ? '✅ Shop Loaded Successfully! 🎉' : '✅ শপ সফলভাবে লোড হয়েছে! 🎉';
 
-            const loadingMsg = await ctx.reply(loadingText);
+            const loadingMsg = await ctx.reply(loading50Text);
+            
             setTimeout(async () => {
                 try {
-                    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, loaded100Text);
+                    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, null, loading100Text);
+                    await ctx.answerCbQuery(successAlert, { show_alert: false }).catch(() => {});
+
                     setTimeout(async () => {
                         if (userId === ADMIN_ID.toString() && db.sessions[userId]) {
                             db.sessions[userId].activeCategory = null;
@@ -931,9 +935,9 @@ bot.on('message', async (ctx) => {
                             parse_mode: 'Markdown',
                             ...Markup.inlineKeyboard(inlineButtons)
                         }).catch(() => {});
-                    }, 400);
+                    }, 200); 
                 } catch (e) {}
-            }, 600);
+            }, 300);
             return;
         }
 
@@ -1481,7 +1485,6 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         if (!db.adminInputSession) db.adminInputSession = {};
         db.adminInputSession[userId] = { step: 'awaiting_order_details', targetUserId: targetUserId };
         
-        // অ্যাডমিন যখন ডিটেইলস দেওয়ার জন্য ক্লিক করবেন, তখন ব্যাকগ্রাউন্ডে চলতে থাকা রেন্ডম লোডিং ইন্টারভালটি পরিষ্কার (క్લিয়ার) হয়ে যাবে
         if (db.adminSessions && db.adminSessions[targetUserId] && db.adminSessions[targetUserId].intervalObj) {
             clearInterval(db.adminSessions[targetUserId].intervalObj);
         }
