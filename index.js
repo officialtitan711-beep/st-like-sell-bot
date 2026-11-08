@@ -76,28 +76,25 @@ function saveDatabase(data) {
     req.end();
 }
 
-// প্রতি মাসের ১ তারিখে সব ইউজারের গত মাসের অর্ডার হিস্ট্রি স্বয়ংক্রিয়ভাবে রিমুভ করার ফিক্সড লজিক
 function checkAndCleanFirstDayOfMonth() {
     const db = loadDatabase();
     if (!db.orderHistories) return;
 
     const now = new Date();
-    const currentDay = now.getDate(); // আজকের তারিখ (১ থেকে ৩১)
-    const currentMonthYear = now.getFullYear() + '-' + (now.getMonth() + 1); // বর্তমান বছর ও মাস (যেমন: 2026-6)
+    const currentDay = now.getDate();
+    const currentMonthYear = now.getFullYear() + '-' + (now.getMonth() + 1);
 
-    // যদি আজকের তারিখ ১ হয় এবং এই মাসের জন্য ক্লিনিং অলরেডি রান না করে থাকে
     if (currentDay === 1 && db.lastCleanMonth !== currentMonthYear) {
         let modified = false;
         Object.keys(db.orderHistories).forEach(userId => {
             const histories = db.orderHistories[userId];
             if (Array.isArray(histories) && histories.length > 0) {
-                // ১ তারিখ হওয়ায় গত মাসের সমস্ত হিস্ট্রি ক্লিয়ার করে দেওয়া হচ্ছে
                 db.orderHistories[userId] = [];
                 modified = true;
             }
         });
 
-        db.lastCleanMonth = currentMonthYear; // সেভ করে রাখা যাতে ১ তারিখে একবারে বেশি রান না করে
+        db.lastCleanMonth = currentMonthYear;
         if (modified) {
             saveDatabase(db);
         }
@@ -106,7 +103,7 @@ function checkAndCleanFirstDayOfMonth() {
 
 syncDataFromFirebase();
 setInterval(syncDataFromFirebase, 5 * 60 * 1000);
-setInterval(checkAndCleanFirstDayOfMonth, 60 * 60 * 1000); // প্রতি ১ ঘণ্টা পর পর চেক করবে আজ ১ তারিখ কিনা
+setInterval(checkAndCleanFirstDayOfMonth, 60 * 60 * 1000);
 
 function getUserLang(userId) {
     const db = loadDatabase();
@@ -472,16 +469,18 @@ bot.on('message', async (ctx) => {
             const adminSession = db.adminInputSession[userId];
             if (adminSession && adminSession.step === 'awaiting_order_details') {
                 const targetUserId = adminSession.targetUserId;
-                const session = db.adminSessions[targetUserId];
-
-                if (session && session.holdIntervalRef) {
-                    clearInterval(session.holdIntervalRef);
-                }
+                
+                // [FIXED] ডাটাবেজ বা মেমোরি থেকে পার্মানেন্ট সেশন উদ্ধার করার ফিক্সড লজিক
+                let session = db.adminSessions && db.adminSessions[targetUserId] ? db.adminSessions[targetUserId] : null;
 
                 delete db.adminInputSession[userId];
                 saveDatabase(db);
 
                 if (session) {
+                    if (session.holdIntervalRef) {
+                        clearInterval(session.holdIntervalRef);
+                    }
+
                     const userBal = db.balances[targetUserId] || 0;
                     
                     const rawLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -497,7 +496,6 @@ bot.on('message', async (ctx) => {
                     const dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' });
                     const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
 
-                    // অর্ডার হিস্ট্রি সংরক্ষণ
                     db.orderHistories[targetUserId].push({
                         timestamp: now.getTime(),
                         date: dateStr,
@@ -518,25 +516,33 @@ bot.on('message', async (ctx) => {
                         `✦ ─────────────── ✦ ─────────────── ✦\n           ✅ অর্ডার সম্পন্ন\n✦ ─────────────── ✦ ─────────────── ✦\n\n📦 প্যাকেজ: \`${session.product}\`\n\n👤 নাম: \`${session.nickname}\`\n\n${idLabelText}: \`${session.uid}\`\n\n🌐 সার্ভার: \`${session.region}\`\n\n✦ ─────────────── ✦ ─────────────── ✦\n\n📌 পূর্বের লাইক: ${prevStatus}\n\n💖 বর্তমান লাইক: ${currStatus}\n\n🚀 অ্যাড/নোট: ${addedStatus}\n\n✦ ─────────────── ✦ ─────────────── ✦\n\n🪶 কাটা হয়েছে: \`${session.price} টাকা\`\n\n💰 বর্তমান ব্যালেন্স: \`${userBal} টাকা\`\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⏳ এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন |\n\nSIR TOPUP এর পাশেই থাকুন 💙\n✦ ─────────────── ✦ ─────────────── ✦`;
 
                     try {
-                        await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, (lang === 'en' ? '⏳ Order is processing...\n\n' : '⏳ অর্ডার প্রসেসিং হচ্ছে...\n\n') + '▰▰▰▰▰▰▰▰▰▰ [ 100% ]', { parse_mode: 'Markdown' });
+                        if (session.loadingMessageId) {
+                            await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, (lang === 'en' ? '⏳ Order is processing...\n\n' : '⏳ অর্ডার প্রসেসিং হচ্ছে...\n\n') + '▰▰▰▰▰▰▰▰▰▰ [ 100% ]', { parse_mode: 'Markdown' });
 
-                        setTimeout(async () => {
-                            await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
-                                parse_mode: 'Markdown',
-                                ...Markup.inlineKeyboard([[Markup.button.callback(lang === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
-                            });
-                        }, 500);
+                            setTimeout(async () => {
+                                await bot.telegram.editMessageText(targetUserId, session.loadingMessageId, null, finalSuccessBox, { 
+                                    parse_mode: 'Markdown',
+                                    ...Markup.inlineKeyboard([[Markup.button.callback(lang === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
+                                });
+                            }, 500);
+                        }
 
-                        try {
-                            await ctx.telegram.editMessageText(ADMIN_ID, session.adminMsgId, null, "╔═════════════════════════════════╗\n║    🔔 ORDER COMPLETED ✅        ║\n╚═════════════════════════════════╝\n\n🆔 Customer ID: `" + targetUserId + "`\n\n📦 Product: `" + session.product + "`\n\n**[STATUS: COMPLETED ✅]**", { parse_mode: 'Markdown' });
-                        } catch (err) {}
+                        if (session.adminMsgId) {
+                            try {
+                                await ctx.telegram.editMessageText(ADMIN_ID, session.adminMsgId, null, "╔═════════════════════════════════╗\n║    🔔 ORDER COMPLETED ✅        ║\n╚═════════════════════════════════╝\n\n🆔 Customer ID: `" + targetUserId + "`\n\n📦 Product: `" + session.product + "`\n\n**[STATUS: COMPLETED ✅]**", { parse_mode: 'Markdown' });
+                            } catch (err) {}
+                        }
 
-                        delete db.adminSessions[targetUserId];
-                        saveDatabase(db);
+                        if (db.adminSessions) {
+                            delete db.adminSessions[targetUserId];
+                            saveDatabase(db);
+                        }
                         return ctx.reply('╔═════════════════════════════════╗\n║   ✅ অর্ডার সফলভাবে কমপ্লিট!    ║\n╚═════════════════════════════════╝\n\n🆔 User ID: `' + targetUserId + '`', { parse_mode: 'Markdown' });
                     } catch (e) {
                         return ctx.reply('❌ কাস্টমারের মেসেজ আপডেট করা যায়নি।');
                     }
+                } else {
+                    return ctx.reply('⚠️ দুঃখিত, এই অর্ডারের সেশনটি ডাটাবেজে পাওয়া যায়নি। দয়া করে নতুন করে চেষ্টা করুন।');
                 }
             }
 
@@ -1054,7 +1060,7 @@ bot.on('message', async (ctx) => {
         }
 
         if (text === '📜 Order History' || text === '📜 অর্ডার হিস্ট্রি') {
-            checkAndCleanFirstDayOfMonth(); // হিস্ট্রি ওপেন করার সময়ও চেক করবে আজ ১ তারিখ কিনা
+            checkAndCleanFirstDayOfMonth();
             const lang = getUserLang(userId);
             const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId] : [];
             let historyBoxText = t(userId, 'historyTitle');
@@ -1070,7 +1076,7 @@ bot.on('message', async (ctx) => {
                     }
                 });
             }
-            historyBoxText += t(userId, 'historyDisclaimer'); // ডিসক্লেমার যুক্ত করা হলো
+            historyBoxText += t(userId, 'historyDisclaimer');
             return ctx.reply(historyBoxText, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
@@ -1528,7 +1534,7 @@ bot.action('confirm_order', async (ctx) => {
             ])
         }).catch(() => {});
 
-        // [FIX] সেশন ডাটা মেমোরির পাশাপাশি ডাটাবেজে পার্মানেন্ট সেভ করা হলো যাতে যত ঘণ্টাই পার হোক না কেন সেশন হারাবে না
+        // [FIXED] ডাটাবেজে স্থায়ীভাবে সেশন সংরক্ষণ করা যাতে রেন্ডার সার্ভার ঘুমিয়ে গেলেও ডেটা না হারায়
         db.adminSessions[userId] = {
             loadingMessageId: procMsg.message_id,
             adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
@@ -1538,7 +1544,7 @@ bot.action('confirm_order', async (ctx) => {
             region: session.region,
             price: session.price,
             isGuild: session.isGuild,
-            holdIntervalRef: null // ডাটাবেজ থেকে লোড হলে ইন্টারভ্যাল নতুন করে শুরু হবে
+            holdIntervalRef: null
         };
         delete db.sessions[userId];
         saveDatabase(db);
@@ -1552,12 +1558,6 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         const userId = ctx.from.id.toString();
         if (userId !== ADMIN_ID.toString()) return;
         const db = loadDatabase();
-
-        // [FIX] যদি মেমোরিতে সেশন না থাকে কিন্তু ডাটাবেজে adminSessions এ ইউজারের ডেটা থাকে, তবে সেটি রিকভার করে নেওয়া হবে
-        if ((!db.adminSessions || !db.adminSessions[targetUserId]) && db.orderHistories) {
-            // এখানে নিশ্চিত করা হচ্ছে যে অ্যাডমিন যেন আরামসে ডিটেইলস দিতে পারেন
-        }
-
         if (!db.adminInputSession) db.adminInputSession = {};
         db.adminInputSession[userId] = { step: 'awaiting_order_details', targetUserId: targetUserId };
         saveDatabase(db);
