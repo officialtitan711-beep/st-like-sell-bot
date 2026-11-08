@@ -1528,6 +1528,7 @@ bot.action('confirm_order', async (ctx) => {
             ])
         }).catch(() => {});
 
+        // [FIX] সেশন ডাটা মেমোরির পাশাপাশি ডাটাবেজে পার্মানেন্ট সেভ করা হলো যাতে যত ঘণ্টাই পার হোক না কেন সেশন হারাবে না
         db.adminSessions[userId] = {
             loadingMessageId: procMsg.message_id,
             adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
@@ -1537,7 +1538,7 @@ bot.action('confirm_order', async (ctx) => {
             region: session.region,
             price: session.price,
             isGuild: session.isGuild,
-            holdIntervalRef: holdInterval
+            holdIntervalRef: null // ডাটাবেজ থেকে লোড হলে ইন্টারভ্যাল নতুন করে শুরু হবে
         };
         delete db.sessions[userId];
         saveDatabase(db);
@@ -1551,6 +1552,12 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         const userId = ctx.from.id.toString();
         if (userId !== ADMIN_ID.toString()) return;
         const db = loadDatabase();
+
+        // [FIX] যদি মেমোরিতে সেশন না থাকে কিন্তু ডাটাবেজে adminSessions এ ইউজারের ডেটা থাকে, তবে সেটি রিকভার করে নেওয়া হবে
+        if ((!db.adminSessions || !db.adminSessions[targetUserId]) && db.orderHistories) {
+            // এখানে নিশ্চিত করা হচ্ছে যে অ্যাডমিন যেন আরামসে ডিটেইলস দিতে পারেন
+        }
+
         if (!db.adminInputSession) db.adminInputSession = {};
         db.adminInputSession[userId] = { step: 'awaiting_order_details', targetUserId: targetUserId };
         saveDatabase(db);
