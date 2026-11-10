@@ -468,8 +468,8 @@ bot.on('message', async (ctx) => {
 
             const adminSession = db.adminInputSession[userId];
             if (adminSession && adminSession.step === 'awaiting_order_details') {
-                const targetUserId = adminSession.targetUserId;
-                let session = db.adminSessions && db.adminSessions[targetUserId] ? db.adminSessions[targetUserId] : null;
+                const uniqueOrderId = adminSession.uniqueOrderId;
+                let session = db.adminSessions && db.adminSessions[uniqueOrderId] ? db.adminSessions[uniqueOrderId] : null;
 
                 delete db.adminInputSession[userId];
                 saveDatabase(db);
@@ -479,6 +479,7 @@ bot.on('message', async (ctx) => {
                         clearInterval(session.holdIntervalRef);
                     }
 
+                    const targetUserId = session.targetUserId;
                     const userBal = db.balances[targetUserId] || 0;
                     
                     const rawLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -532,7 +533,7 @@ bot.on('message', async (ctx) => {
                         }
 
                         if (db.adminSessions) {
-                            delete db.adminSessions[targetUserId];
+                            delete db.adminSessions[uniqueOrderId];
                             saveDatabase(db);
                         }
                         return ctx.reply('╔═════════════════════════════════╗\n║   ✅ অর্ডার সফলভাবে কমপ্লিট!    ║\n╚═════════════════════════════════╝\n\n🆔 User ID: `' + targetUserId + '`', { parse_mode: 'Markdown' });
@@ -1522,17 +1523,21 @@ bot.action('confirm_order', async (ctx) => {
             }
         }, 600);
 
+        // [FIXED] প্রতি অর্ডারের জন্য ইউনিক অর্ডার আইডি তৈরি করা হলো যাতে মাল্টিপল অর্ডার ওভাররাইট না হয়
+        const uniqueOrderId = userId + '_' + Date.now();
+
         const adminNotifyText = "✦ ─────────────── ✦ ─────────────── ✦\n          🔔 NEW ORDER PENDING\n✦ ─────────────── ✦ ─────────────── ✦\n\n👤 Customer: " + ctx.from.first_name + "\n🆔 ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Name: `" + session.nickname + "`\n" + idLabel + ": `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n\n👇 Click below to enter order details:";
 
         const sentAdminMsg = await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.callback('✏️ Enter Details', 'admin_input_' + userId)],
-                [Markup.button.callback('❌ Cancel', 'admin_can_' + userId)]
+                [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
+                [Markup.button.callback('❌ Cancel', 'admin_can_' + uniqueOrderId)]
             ])
         }).catch(() => {});
 
-        db.adminSessions[userId] = {
+        db.adminSessions[uniqueOrderId] = {
+            targetUserId: userId,
             loadingMessageId: procMsg.message_id,
             adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
             product: session.product,
@@ -1551,12 +1556,12 @@ bot.action('confirm_order', async (ctx) => {
 
 bot.action(/admin_input_(.+)/, async (ctx) => {
     try {
-        const targetUserId = ctx.match[1];
+        const uniqueOrderId = ctx.match[1];
         const userId = ctx.from.id.toString();
         if (userId !== ADMIN_ID.toString()) return;
         const db = loadDatabase();
         if (!db.adminInputSession) db.adminInputSession = {};
-        db.adminInputSession[userId] = { step: 'awaiting_order_details', targetUserId: targetUserId };
+        db.adminInputSession[userId] = { step: 'awaiting_order_details', uniqueOrderId: uniqueOrderId };
         saveDatabase(db);
 
         await ctx.answerCbQuery('✍️ 3 line order details pathan!');
@@ -1566,22 +1571,31 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
 
 bot.action(/admin_can_(.+)/, async (ctx) => {
     try {
-        const targetUserId = ctx.match[1];
+        const uniqueOrderId = ctx.match[1];
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        await ctx.answerCbQuery('❌ Order cancelled!');
-        await ctx.editMessageText(ctx.callbackQuery.message.text + "\n\n**[STATUS: CANCELLED ❌]**", { parse_mode: 'Markdown' });
         
         const dbObj = loadDatabase();
-        if (dbObj.adminSessions && dbObj.adminSessions[targetUserId]) {
-            const loadingMsgId = dbObj.adminSessions[targetUserId].loadingMessageId;
-            const price = Number(dbObj.adminSessions[targetUserId].price || 0);
-            const holdRef = dbObj.adminSessions[targetUserId].holdIntervalRef;
+        if (dbObj.adminSessions && dbObj.adminSessions[uniqueOrderId]) {
+            const sessionData = dbObj.adminSessions[uniqueOrderId];
+            const targetUserId = sessionData.targetUserId;
+            const loadingMsgId = sessionData.loadingMessageId;
+            const price = Number(sessionData.price || 0);
+            const holdRef = sessionData.holdIntervalRef;
 
             if (holdRef) clearInterval(holdRef);
             
+            delete dbObj.adminSessions[uniqueOrderId];
+            saveDatabase(dbObj);
+
+            if (!dbObj.balances) dbObj.balances = {};
             if (!dbObj.balances[targetUserId]) dbObj.balances[targetUserId] = 0;
             dbObj.balances[targetUserId] += price;
             saveDatabase(dbObj);
+
+            await ctx.answerCbQuery('❌ Order cancelled & refunded successfully!');
+            try {
+                await ctx.editMessageText(ctx.callbackQuery.message.text + "\n\n**[STATUS: CANCELLED ❌]**", { parse_mode: 'Markdown' });
+            } catch (err) {}
 
             if (loadingMsgId) {
                 const lang = getUserLang(targetUserId);
@@ -1594,12 +1608,14 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
                     ...Markup.inlineKeyboard([[Markup.button.callback(getUserLang(targetUserId) === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
                 }).catch(() => {});
             }
-            delete dbObj.adminSessions[targetUserId];
-            saveDatabase(dbObj);
+            const lang = getUserLang(targetUserId);
+            await bot.telegram.sendMessage(targetUserId, lang === 'en' ? '❌ Your order has been cancelled.' : '❌ আপনার অর্ডারটি বাতিল করা হয়েছে।').catch(() => {});
+        } else {
+            await ctx.answerCbQuery('⚠️ Session already cleared or invalid!', { show_alert: true });
         }
-        const lang = getUserLang(targetUserId);
-        await bot.telegram.sendMessage(targetUserId, lang === 'en' ? '❌ Your order has been cancelled.' : '❌ আপনার অর্ডারটি বাতিল করা হয়েছে।').catch(() => {});
-    } catch (e) {}
+    } catch (e) {
+        console.error('Admin Cancel Error:', e);
+    }
 });
 
 bot.action('back_start_inline', async (ctx) => {
