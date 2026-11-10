@@ -469,8 +469,6 @@ bot.on('message', async (ctx) => {
             const adminSession = db.adminInputSession[userId];
             if (adminSession && adminSession.step === 'awaiting_order_details') {
                 const targetUserId = adminSession.targetUserId;
-                
-                // [FIXED] ডাটাবেজ বা মেমোরি থেকে পার্মানেন্ট সেশন উদ্ধার করার ফিক্সড লজিক
                 let session = db.adminSessions && db.adminSessions[targetUserId] ? db.adminSessions[targetUserId] : null;
 
                 delete db.adminInputSession[userId];
@@ -1495,7 +1493,7 @@ bot.action('confirm_order', async (ctx) => {
             return ctx.answerCbQuery('❌ পর্যাপ্ত ব্যালেন্স নেই!', { show_alert: true });
         }
 
-        db.balances[userId] -= session.price;
+        db.balances[userId] -= Number(session.price);
         if (!db.adminSessions) db.adminSessions = {};
         const idLabel = session.isGuild ? '🛡 Guild ID' : '🎮 UID';
         
@@ -1534,7 +1532,6 @@ bot.action('confirm_order', async (ctx) => {
             ])
         }).catch(() => {});
 
-        // [FIXED] ডাটাবেজে স্থায়ীভাবে সেশন সংরক্ষণ করা যাতে রেন্ডার সার্ভার ঘুমিয়ে গেলেও ডেটা না হারায়
         db.adminSessions[userId] = {
             loadingMessageId: procMsg.message_id,
             adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
@@ -1577,7 +1574,7 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
         const dbObj = loadDatabase();
         if (dbObj.adminSessions && dbObj.adminSessions[targetUserId]) {
             const loadingMsgId = dbObj.adminSessions[targetUserId].loadingMessageId;
-            const price = dbObj.adminSessions[targetUserId].price;
+            const price = Number(dbObj.adminSessions[targetUserId].price || 0);
             const holdRef = dbObj.adminSessions[targetUserId].holdIntervalRef;
 
             if (holdRef) clearInterval(holdRef);
