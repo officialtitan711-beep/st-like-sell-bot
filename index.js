@@ -156,8 +156,9 @@ function getMainKeyboard(userId) {
             [apiStatusText, '📊 Total Users'],
             ['➕ Add Bot', '❌ Remove Bot'],
             ['➕ Add Product', '❌ Remove Product'],
-            ['💳 Add/Minus Balance', '📱 Set Payment Numbers'],
-            ['📩 Send Message', '📢 All Users Msg']
+            ['✏️ Change Product Price', '💳 Add/Minus Balance'],
+            ['📱 Set Payment Numbers', '📩 Send Message'],
+            ['📢 All Users Msg']
         );
     }
     return Markup.keyboard(keyboard).resize();
@@ -360,6 +361,24 @@ bot.on('message', async (ctx) => {
                 delete db.adminInputSession[userId];
                 return ctx.reply('✅ প্রোডাক্ট রিমুভ করা হয়েছে!');
             }
+            if (actionType === 'change_product_price') {
+                const parts = text.split('|');
+                const searchName = parts[0] ? parts[0].trim().toLowerCase() : '';
+                const newPriceStr = parts[1] ? parts[1].trim() : '';
+                let updated = false;
+                for (let cat in db.customProducts) {
+                    db.customProducts[cat].forEach(p => {
+                        if (p.name.toLowerCase().includes(searchName)) {
+                            p.name = p.name.replace(/\d+/, newPriceStr);
+                            updated = true;
+                        }
+                    });
+                }
+                saveDatabase(db);
+                delete db.adminInputSession[userId];
+                if (updated) return ctx.reply('✅ প্রোডাক্টের দাম সফলভাবে আপডেট করা হয়েছে!');
+                return ctx.reply('❌ প্রোডাক্টটি পাওয়া যায়নি। সঠিক নাম ও নতুন দাম দিন।');
+            }
             if (actionType === 'add_minus_balance') {
                 const parts = text.split(' ');
                 const targetUser = parts[0], amount = Number(parts[1]);
@@ -479,6 +498,13 @@ bot.on('message', async (ctx) => {
                 db.adminInputSession[userId] = { type: 'remove_product' };
                 saveDatabase(db);
                 return ctx.reply('✍️ রিমুভ করার জন্য প্রোডাক্টের নাম লিখে পাঠান:');
+            }
+        }
+        if (text === '✏️ Change Product Price') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'change_product_price' };
+                saveDatabase(db);
+                return ctx.reply('✍️ ফরম্যাট:\n`Product Name | New Price`\n(যেমন: `100 Likes | 85`)', { parse_mode: 'Markdown' });
             }
         }
         if (text === '💳 Add/Minus Balance') {
@@ -824,7 +850,7 @@ bot.action('confirm_order', async (ctx) => {
         const db = loadDatabase();
         const session = db.sessions?.[userId];
         if (!session) return ctx.answerCbQuery('Session expired.', { show_alert: true });
-        if ((db.balances[userId] || 0) < session.price) return ctx.answerCbQuery('❌ পর্যাপ্ত ব্যালেন্স নেই!', { show_auth: true });
+        if ((db.balances[userId] || 0) < session.price) return ctx.answerCbQuery('❌ পর্যাপ্ত ব্যালেন্স নেই!', { show_alert: true });
 
         db.balances[userId] -= Number(session.price);
         saveDatabase(db);
