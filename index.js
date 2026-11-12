@@ -84,18 +84,22 @@ function saveDatabase(data) {
 syncDataFromFirebase();
 setInterval(syncDataFromFirebase, 5 * 60 * 1000);
 
-// Helper function to call LikesFF API
-function callLikesFFApi(params) {
+// Helper function to call LikesFF API with 30 Seconds Timeout Guard
+function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
     return new Promise((resolve) => {
         const queryParams = new URLSearchParams({ key: API_KEY, ...params });
         const url = `${API_BASE}?${queryParams.toString()}`;
         
-        https.get(url, {
+        let isFinished = false;
+
+        const req = https.get(url, {
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Accept': 'application/json' }
         }, (res) => {
             let data = '';
             res.on('data', (chunk) => { data += chunk; });
             res.on('end', () => {
+                if (isFinished) return;
+                isFinished = true;
                 try {
                     const parsed = JSON.parse(data);
                     resolve(parsed);
@@ -103,9 +107,20 @@ function callLikesFFApi(params) {
                     resolve({ success: false, error: 'Invalid JSON response from API', code: 'INVALID_JSON' });
                 }
             });
-        }).on('error', () => {
+        });
+
+        req.on('error', () => {
+            if (isFinished) return;
+            isFinished = true;
             resolve({ success: false, error: 'API connection failed', code: 'CONNECTION_ERROR' });
         });
+
+        setTimeout(() => {
+            if (isFinished) return;
+            isFinished = true;
+            req.destroy();
+            resolve({ success: false, error: 'API Request Timeout (30s exceeded)', code: 'TIMEOUT' });
+        }, timeoutMs);
     });
 }
 
@@ -933,8 +948,14 @@ bot.action('confirm_order', async (ctx) => {
 
         const lang = getUserLang(userId);
         const isAutoApiOn = db.settings && db.settings.autoApiEnabled;
+        
+        // Check if the product is explicitly supported by LikesFF API (e.g. checks if product name/details match API-supported quantities like 220, 540, 1100 etc.)
+        const prodNameLower = (session.product || '').toLowerCase();
+        const isApiSupportedQuantity = prodNameLower.includes('220') || prodNameLower.includes('540') || prodNameLower.includes('1100') || prodNameLower.includes('2200') || prodNameLower.includes('5500') || session.productId;
+        const isApiSupportedProduct = session.activeCategory === 'Free Fire Likes' && isApiSupportedQuantity;
 
-        if (!isAutoApiOn) {
+        // Intelligent Smart Routing: If Auto API is OFF OR Product is NOT in API-supported quantity list (e.g. 100 Likes pack), instantly bypass API in 3-4 seconds and route to admin panel
+        if (!isAutoApiOn || !isApiSupportedProduct) {
             if (!db.adminSessions) db.adminSessions = {};
             const uniqueOrderId = userId + '_' + Date.now();
             const idLabel = session.isGuild ? '🛡 Guild ID' : '🎮 UID';
@@ -943,14 +964,12 @@ bot.action('confirm_order', async (ctx) => {
             const procMsg = await ctx.editMessageText(processingTitle + `▰▱▱▱▱▱▱▱▱▱ [ 20% ]`, { parse_mode: 'Markdown' });
 
             const steps = [
-                { per: 35, bar: '▰▰▱▱▱▱▱▱▱▱' },
-                { per: 50, bar: '▰▰▰▰▱▱▱▱▱' },
-                { per: 80, bar: '▰▰▰▰▰▰▰▱▱▱' },
-                { per: 92, bar: '▰▰▰▰▰▰▰▰▰▱' }
+                { per: 40, bar: '▰▰▰▱▱▱▱▱▱▱' },
+                { per: 80, bar: '▰▰▰▰▰▰▰▱▱▱' }
             ];
 
             let sIdx = 0;
-            const holdInterval = setInterval(async () => {
+            const fastInterval = setInterval(async () => {
                 if (sIdx < steps.length) {
                     const currentStep = steps[sIdx];
                     try {
@@ -958,32 +977,42 @@ bot.action('confirm_order', async (ctx) => {
                     } catch (err) {}
                     sIdx++;
                 } else {
-                    clearInterval(holdInterval);
+                    clearInterval(fastInterval);
                 }
-            }, 600);
+            }, 300);
 
-            const adminNotifyText = "🔔 **নতুন ম্যানুয়াল অর্ডার**\n\n👤 Customer: " + ctx.from.first_name + "\n🆔 ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Name: `" + session.nickname + "`\n" + idLabel + ": `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n\n👇 নিচের বাটনে ক্লিক করে ডিটেইলস দিন:";
+            setTimeout(async () => {
+                clearInterval(fastInterval);
+                const adminNotifyText = "🔔 **নতুন ম্যানুয়াল অর্ডার (এপিআই এর বাইরে - ইনস্ট্যান্ট)**\n\n👤 Customer: " + ctx.from.first_name + "\n🆔 ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Name: `" + (session.nickname || 'N/A') + "`\n" + idLabel + ": `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n\n👇 নিচের বাটনে ক্লিক করে ডিটেইলস দিন:";
 
-            const sentAdminMsg = await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
-                    [Markup.button.callback('❌ Cancel & Refund', 'admin_can_' + uniqueOrderId)]
-                ])
-            }).catch(() => {});
+                const sentAdminMsg = await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
+                        [Markup.button.callback('❌ Cancel & Refund', 'admin_can_' + uniqueOrderId)]
+                    ])
+                }).catch(() => {});
 
-            db.adminSessions[uniqueOrderId] = {
-                targetUserId: userId,
-                loadingMessageId: procMsg.message_id,
-                adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
-                product: session.product,
-                nickname: session.nickname || 'N/A',
-                uid: session.uid,
-                region: session.region,
-                price: session.price,
-                isGuild: session.isGuild,
-                holdIntervalRef: holdInterval
-            };
+                db.adminSessions[uniqueOrderId] = {
+                    targetUserId: userId,
+                    loadingMessageId: procMsg.message_id,
+                    adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
+                    product: session.product,
+                    nickname: session.nickname || 'N/A',
+                    uid: session.uid,
+                    region: session.region,
+                    price: session.price,
+                    isGuild: session.isGuild,
+                    holdIntervalRef: null
+                };
+                saveDatabase(db);
+
+                const instantForwardText = lang === 'en' ? 
+                    `⏳ Order forwarded to admin for manual processing.` :
+                    `⏳ আপনার অর্ডারটি সফলভাবে প্রসেসিংয়ের জন্য পাঠানো হয়েছে।`;
+
+                await ctx.telegram.editMessageText(userId, procMsg.message_id, null, instantForwardText, { parse_mode: 'Markdown' }).catch(() => {});
+            }, 1000);
 
             delete db.sessions[userId];
             saveDatabase(db);
@@ -1000,7 +1029,8 @@ bot.action('confirm_order', async (ctx) => {
             apiParams = { action: 'auto', product: session.productId || 'AL-55F71F', uid: session.uid, server: session.region };
         }
 
-        const apiRes = await callLikesFFApi(apiParams);
+        // Call API with 30 Seconds Max Timeout Guard for API-supported packages
+        const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
 
         try {
             await ctx.telegram.editMessageText(userId, procMsg.message_id, null, processingTitle + `▰▰▰▰▰▰▰▰▰▰ [ 100% ]`, { parse_mode: 'Markdown' });
@@ -1038,7 +1068,7 @@ bot.action('confirm_order', async (ctx) => {
 
             const receiptBox = lang === 'en' ? 
                 `💠 ════════════════════════════ 💠\n           ✅ ORDER COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Product: \`${session.product}\`\n\n🆔 Order ID: \`${orderId}\`\n\n👤 Name: \`${playerNick}\`\n🛡 UID: \`${session.uid}\`\n🌐 Server: \`${session.region}\`\n📊 Status: \`${statusVal}\`\n\n📌 Previous Likes: ${apiPrevLikes}\n💖 Current Likes: ${apiCurrLikes}\n🚀 Added Likes: ${apiAddedLikes}\n\n🪶 Deducted: \`${session.price} BDT\`\n💰 Current Balance: \`${currentBal} BDT\`\n\n⚠️ *Note: You can take Daily likes on this UID after 24 hours.*\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙` :
-                `💠 ════════════════════════════ 💠\n           ✅ অর্ডার সফলভাবে সম্পন্ন\n💠 ════════════════════════════ 💠\n\n📦 প্যাকেজ: \`${session.product}\`\n\n🆔 অর্ডার আইডি: \`${orderId}\`\n\n👤 নাম: \`${playerNick}\`\n🛡 ইউআইডি: \`${session.uid}\`\n🌐 সার্ভার: \`${session.region}\`\n📊 স্ট্যাটাস: \`${statusVal}\`\n\n📌 পূর্বের লাইক: ${apiPrevLikes}\n💖 বর্তমান লাইক: ${apiCurrLikes}\n🚀 অ্যাড লাইক: ${apiAddedLikes}\n\n🪶 কাটা হয়েছে: \`${session.price} টাকা\`\n💰 বর্তমান ব্যালেন্স: \`${currentBal} টাকা\`\n\n⚠️ *নোট: এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।*\n\n💠 ════════════════════════════ 💠\nSIR TOPUP এর সাথেই থাকুন 💙`;
+                `💠 ════════════════════════════ 💠\n           ✅ অর্ডার সফলভাবে সম্পন্ন\n💠 ════════════════════════════ 💠\n\n📦 প্যাকেজ: \`${session.product}\`\n\n🆔 অর্ডার আইডি: \`${orderId}\`\n\n👤 নাম: \`${playerNick}\`\n🛡 ইউআইডি: \`${session.uid}\`\n🌐 সার্ভার: \`${session.region}\`\n📊 স্ট্যাটাস: \`${statusVal}\`\n\n📌 পূর্বের লাইক: ${apiPrevLikes}\n💖 বর্তমান লাইক: ${apiCurrLikes}\n🚀 অ্যাড লাইক: ${apiAddedLikes}\n\n🪶 কাটা হয়েছে: \`${session.price} টাকাচিহ্ন\n💰 বর্তমান ব্যালেন্স: \`${currentBal} টাকাচিহ্ন\n\n⚠️ *নোট: এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।*\n\n💠 ════════════════════════════ 💠\nSIR TOPUP এর সাথেই থাকুন 💙`;
 
             setTimeout(async () => {
                 await ctx.telegram.editMessageText(userId, procMsg.message_id, null, receiptBox, { 
@@ -1047,23 +1077,45 @@ bot.action('confirm_order', async (ctx) => {
                 }).catch(() => {});
             }, 500);
 
-            const adminDuplicateMsg = "📋 **[ডুপ্লিকেট কপি - অটো এপিআই সাকসেস রিসিট]**\n\n" + receiptBox + "\n\n👤 **Customer ID:** `" + userId + "`";
+            // Duplicate Receipt to Admin ID (Works for both API and Manual completion)
+            const adminDuplicateMsg = "📋 **[ডুপ্লিকেট কপি - সফল অর্ডার রিসিট]**\n\n" + receiptBox + "\n\n👤 **Customer ID:** `" + userId + "`";
             await bot.telegram.sendMessage(ADMIN_ID, adminDuplicateMsg, { parse_mode: 'Markdown' }).catch(() => {});
 
         } else {
-            db.balances[userId] += Number(session.price);
+            // API failed or 30s Timeout occurred -> Fallback to Admin Panel automatically!
+            if (!db.adminSessions) db.adminSessions = {};
+            const uniqueOrderId = userId + '_' + Date.now();
+            const idLabel = session.isGuild ? '🛡 Guild ID' : '🎮 UID';
+
+            const adminNotifyText = "⚠️ **[API TIMEOUT / FAIL] - অটো অর্ডার ফলব্যাক হয়ে এসেছে**\n\n👤 Customer: " + ctx.from.first_name + "\n🆔 ID: `" + userId + "`\n\n📦 Product: `" + session.product + "` (" + session.region + ")\n👤 Name: `" + (session.nickname || 'N/A') + "`\n" + idLabel + ": `" + session.uid + "`\n💵 Price: `৳" + session.price + "`\n\n👇 এপিআই রেসপন্স না করায় অর্ডারটি আপনার কাছে পাঠানো হয়েছে। নিচের বাটন থেকে কমপ্লিট বা ক্যানসেল করুন:";
+
+            const sentAdminMsg = await bot.telegram.sendMessage(ADMIN_ID, adminNotifyText, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
+                    [Markup.button.callback('❌ Cancel & Refund', 'admin_can_' + uniqueOrderId)]
+                ])
+            }).catch(() => {});
+
+            db.adminSessions[uniqueOrderId] = {
+                targetUserId: userId,
+                loadingMessageId: procMsg.message_id,
+                adminMsgId: sentAdminMsg ? sentAdminMsg.message_id : null,
+                product: session.product,
+                nickname: session.nickname || 'N/A',
+                uid: session.uid,
+                region: session.region,
+                price: session.price,
+                isGuild: session.isGuild,
+                holdIntervalRef: null
+            };
             saveDatabase(db);
 
-            const failBox = lang === 'en' ? 
-                `╔═════════════════════════════════╗\n║       ❌ ORDER CANCELLED        ║\n╚═════════════════════════════════╝\n\n⚠️ Due to some technical and mechanical issues, your order has been cancelled. Please try again after a moment.\n\n💰 Your deducted balance has been refunded to your account successfully.\n\n─────────────────────────────────\nStay with SIR TOPUP 💙` :
-                `╔═════════════════════════════════╗\n║       ❌ অর্ডার ক্যানসেলড         ║\n╚═════════════════════════════════╝\n\n⚠️ আমাদের কিছু যান্ত্রিক এবং টেকনিক্যাল সমস্যার কারণে অর্ডারটি ক্যানসেল করা হলো। কিছুক্ষণ পর আবার অর্ডার করুন।\n\n💰 আপনার কেটে নেওয়া টাকা অ্যাকাউন্টে সফলভাবে ফেরত দেওয়া হয়েছে।\n\n─────────────────────────────────\nSIR TOPUP এর সাথেই থাকুন 💙`;
+            const fallbackNotifyText = lang === 'en' ? 
+                `⏳ API is busy. Your order has been forwarded to admin for manual processing.` :
+                `⏳ এপিআই সার্ভার ব্যস্ত থাকায় আপনার অর্ডারটি অ্যাডমিনের কাছে পাঠানো হয়েছে। খুব দ্রুত সম্পন্ন হবে।`;
 
-            setTimeout(async () => {
-                await ctx.telegram.editMessageText(userId, procMsg.message_id, null, failBox, { 
-                    parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([[Markup.button.callback(lang === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
-                }).catch(() => {});
-            }, 500);
+            await ctx.telegram.editMessageText(userId, procMsg.message_id, null, fallbackNotifyText, { parse_mode: 'Markdown' }).catch(() => {});
         }
 
         delete db.sessions[userId];
