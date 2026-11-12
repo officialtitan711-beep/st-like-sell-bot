@@ -822,7 +822,11 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
         const db = loadDatabase();
         const prod = db.customProducts[catName]?.[index] || { name: 'Package' };
         const translated = translateProductName(prod.name, userId);
-        const price = Number((prod.name.match(/\d+/) || [0])[0]);
+        
+        // সঠিক প্রাইস বের করার জন্য লজিক ফিক্স করা হলো (যেমন - ৩শ টাকার প্যাকেজ সঠিকভাবে রিড করবে)
+        const priceMatch = prod.name.match(/-?\s*(\d+)\s*(৳|tk|BDT)?/i);
+        const price = priceMatch ? Number(priceMatch[1]) : Number((prod.name.match(/\d+/) || [0])[0]);
+
         db.sessions[userId] = { product: translated, price, activeCategory: catName };
         saveDatabase(db);
         await ctx.editMessageText(t(userId, 'serverTitle') + `\`${translated}\`\n\n👇 রিজিওন সিলেক্ট করুন:`, {
