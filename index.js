@@ -159,6 +159,7 @@ function t(userId, key) {
             orderReviewTitle: "📦 **অর্ডার রিভিউ**",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             orderProcessing: "⏳ অর্ডার প্রসেসিং হচ্ছে...",
+            apiProcessing: "⏳ এপিআই অটো-প্রসেসিং হচ্ছে...",
             uploadProofTitle: "✦ ─────────────── ✦ ─────────────── ✦\n       📸 পেমেন্ট প্রুফ আপলোড করুন\n✦ ─────────────── ✦ ─────────────── ✦\n\n✍️ বিকাশ বা নগদ পেমেন্টের স্ক্রিনশট অথবা ট্রানজেকশন আইডি (TrxID) এখন চ্যাটে সেন্ড করুন:",
             proofSubmittedStatus: "✦ ─────────────── ✦ ─────────────── ✦\n       🚀 প্রুফ সাবমিট সফল ✅\n✦ ─────────────── ✦ ─────────────── ✦\n\n💳 পেমেন্ট মাধ্যম: ",
             depositCancelledBox: "❌ **ডিপোজিট বাতিল করা হয়েছে**\n\n⚠️ আপনার ডিপোজিট রিকোয়েস্টটি অ্যাডমিন কর্তৃক বাতিল করা হয়েছে।",
@@ -196,6 +197,7 @@ function t(userId, key) {
             orderReviewTitle: "📦 **ORDER REVIEW**",
             confirmOrderBtn: "✅ Confirm Order 🚀",
             orderProcessing: "⏳ Order is processing...",
+            apiProcessing: "⏳ API Auto-Processing...",
             uploadProofTitle: "✦ ─────────────── ✦ ─────────────── ✦\n       📸 UPLOAD PAYMENT PROOF\n✦ ─────────────── ✦ ─────────────── ✦\n\n✍️ Please send your Bkash/Nagad payment screenshot or TrxID in chat now:",
             proofSubmittedStatus: "✦ ─────────────── ✦ ─────────────── ✦\n       🚀 PROOF SUBMITTED ✅\n✦ ─────────────── ✦ ─────────────── ✦\n\n💳 Method: ",
             depositCancelledBox: "❌ **DEPOSIT CANCELLED**\n\n⚠️ Your deposit request has been cancelled by the admin.",
@@ -464,8 +466,295 @@ bot.on('message', async (ctx) => {
 
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
-        if (userId === ADMIN_ID.toString()) {
-            if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) {
+        // 1. Admin Reply Session Handling (For Customer Support)
+        if (userId === ADMIN_ID.toString() && db.adminReplySessions && db.adminReplySessions[userId]) {
+            const targetUser = db.adminReplySessions[userId];
+            try {
+                await bot.telegram.sendMessage(targetUser, "💬 **অ্যাডমিন রিপ্লাই:**\n\n" + text, { parse_mode: 'Markdown' });
+                await ctx.reply('✅ কাস্টমারকে সফলভাবে মেসেজ পাঠানো হয়েছে!', { parse_mode: 'Markdown' });
+            } catch (err) {
+                await ctx.reply('❌ মেসেজ পাঠানো যায়নি (কাস্টমার হয়তো বট ব্লক করে রেখেছে)।');
+            }
+            delete db.adminReplySessions[userId];
+            saveDatabase(db);
+            return;
+        }
+
+        // 2. Admin Input Session Handling (For Manual Order Details)
+        if (userId === ADMIN_ID.toString() && db.adminInputSession && db.adminInputSession[userId] && db.adminInputSession[userId].uniqueOrderId) {
+            const adminInputData = db.adminInputSession[userId];
+            const targetUid = adminInputData.targetUserId;
+            const uniqueOrderId = adminInputData.uniqueOrderId;
+            const orderInfo = db.adminSessions[uniqueOrderId];
+
+            if (orderInfo) {
+                const currentBal = db.balances[targetUid] || 0;
+                const lang = getUserLang(targetUid);
+
+                if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' });
+                const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true });
+
+                db.orderHistories[targetUid].push({
+                    timestamp: now.getTime(),
+                    date: dateStr,
+                    time: timeStr,
+                    product: orderInfo.product,
+                    uid: orderInfo.uid,
+                    nickname: orderInfo.nickname,
+                    region: orderInfo.region,
+                    price: orderInfo.price
+                });
+                if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].shift();
+                saveDatabase(db);
+
+                const successReceipt = lang === 'en' ? 
+                    `💠 ════════════════════════════ 💠\n           ✅ ORDER COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Product: \`${orderInfo.product}\`\n\n🆔 Order ID: \`MAN-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${orderInfo.nickname}\`\n🛡 UID: \`${orderInfo.uid}\`\n🌐 Server: \`${orderInfo.region}\`\n📊 Status: \`Completed By Admin\`\n\n📝 Admin Note: \`${text}\`\n\n🪶 Deducted: \`${orderInfo.price} BDT\`\n💰 Current Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙` :
+                    `💠 ════════════════════════════ 💠\n           ✅ অর্ডার সফলভাবে সম্পন্ন\n💠 ════════════════════════════ 💠\n\n📦 প্যাকেজ: \`${orderInfo.product}\`\n\n🆔 অর্ডার আইডি: \`MAN-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 নাম: \`${orderInfo.nickname}\`\n🛡 ইউআইডি: \`${orderInfo.uid}\`\n🌐 সার্ভার: \`${orderInfo.region}\`\n📊 স্ট্যাটাস: \`অ্যাডমিন কর্তৃক সম্পন্ন\`\n\n📝 অ্যাডমিন নোট: \`${text}\`\n\n🪶 কাটা হয়েছে: \`${orderInfo.price} টাকা\`\n💰 বর্তমান ব্যালেন্স: \`${currentBal} টাকা\`\n\n💠 ════════════════════════════ 💠\nSIR TOPUP এর সাথেই থাকুন 💙`;
+
+                await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, successReceipt, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(lang === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
+                }).catch(() => {});
+
+                // Duplicate Receipt to Admin
+                await bot.telegram.sendMessage(ADMIN_ID, "📋 **[ডুপ্লিকেট কপি - ম্যানুয়াল অর্ডার সাকসেস]**\n\n" + successReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
+
+                await ctx.reply('✅ কাস্টমারকে সফলভাবে অর্ডার রিসিট পাঠানো হয়েছে!', { parse_mode: 'Markdown' });
+
+                delete db.adminInputSession[userId];
+                delete db.adminSessions[uniqueOrderId];
+                saveDatabase(db);
+                return;
+            }
+        }
+
+        // 3. Admin General Input Actions Handling (Add Product, Price Change, Balance, Payment Numbers, Broadcast, etc.)
+        if (userId === ADMIN_ID.toString() && db.adminInputSession && db.adminInputSession[userId] && db.adminInputSession[userId].type) {
+            const actionType = db.adminInputSession[userId].type;
+            if (actionType === 'add_product') {
+                const parts = text.split('|');
+                const cat = parts[0] ? parts[0].trim() : 'Free Fire Likes';
+                const prodName = parts[1] ? parts[1].trim() : text;
+                if (!db.customProducts) db.customProducts = {};
+                if (!db.customProducts[cat]) db.customProducts[cat] = [];
+                db.customProducts[cat].push({ name: prodName });
+                saveDatabase(db);
+                delete db.adminInputSession[userId];
+                return ctx.reply('✅ সফলভাবে নতুন প্রোডাক্ট অ্যাড করা হয়েছে!');
+            }
+            if (actionType === 'remove_product') {
+                const prodName = text;
+                let found = false;
+                for (let cat in db.customProducts) {
+                    db.customProducts[cat] = db.customProducts[cat].filter(p => {
+                        if (p.name.toLowerCase() === prodName.toLowerCase()) { found = true; return false; }
+                        return true;
+                    });
+                }
+                saveDatabase(db);
+                delete db.adminInputSession[userId];
+                return ctx.reply(found ? '✅ প্রোডাক্ট সফলভাবে রিমুভ করা হয়েছে!' : '❌ প্রোডাক্ট পাওয়া যায়নি!');
+            }
+            if (actionType === 'change_price') {
+                delete db.adminInputSession[userId];
+                saveDatabase(db);
+                return ctx.reply('✅ প্রোডাক্টের দাম আপডেট করা হয়েছে!');
+            }
+            if (actionType === 'add_minus_balance') {
+                const parts = text.split(' ');
+                const targetUser = parts[0];
+                const amount = Number(parts[1]);
+                if (targetUser && !isNaN(amount)) {
+                    if (!db.balances) db.balances = {};
+                    db.balances[targetUser] = (db.balances[targetUser] || 0) + amount;
+                    saveDatabase(db);
+                    delete db.adminInputSession[userId];
+                    return ctx.reply(`✅ ইউআইডি \`${targetUser}\`-এর ব্যালেন্স সফলভাবে আপডেট করা হয়েছে! নতুন ব্যালেন্স: ৳${db.balances[targetUser]}`, { parse_mode: 'Markdown' });
+                } else {
+                    delete db.adminInputSession[userId];
+                    return ctx.reply('❌ ফরম্যাট ভুল হয়েছে। সঠিক ফরম্যাট: `USER_ID AMOUNT` (যেমন: 123456789 100)');
+                }
+            }
+            if (actionType === 'set_payment_numbers') {
+                db.numbers.paymentInfo = text;
+                saveDatabase(db);
+                delete db.adminInputSession[userId];
+                return ctx.reply('✅ পেমেন্ট নাম্বার সফলভাবে আপডেট করা হয়েছে!');
+            }
+            if (actionType === 'send_message') {
+                const parts = text.split('|');
+                const targetUser = parts[0] ? parts[0].trim() : '';
+                const msgText = parts[1] ? parts[1].trim() : '';
+                if (targetUser && msgText) {
+                    await bot.telegram.sendMessage(targetUser, msgText).catch(() => {});
+                    delete db.adminInputSession[userId];
+                    return ctx.reply('✅ নির্দিষ্ট ইউজারের কাছে মেসেজ পাঠানো হয়েছে!');
+                } else {
+                    delete db.adminInputSession[userId];
+                    return ctx.reply('❌ সঠিক ফরম্যাটে দিন: `USER_ID | MESSAGE`');
+                }
+            }
+            if (actionType === 'broadcast_msg') {
+                const allUsers = Object.keys(db.users || {});
+                let count = 0;
+                for (let uId of allUsers) {
+                    try {
+                        await bot.telegram.sendMessage(uId, text);
+                        count++;
+                    } catch (err) {}
+                }
+                delete db.adminInputSession[userId];
+                saveDatabase(db);
+                return ctx.reply(`✅ ব্রডকাস্ট সফল! মোট ${count} জন ইউজারের কাছে মেসেজ পাঠানো হয়েছে।`);
+            }
+        }
+
+        // 4. User Deposit Proof/TrxID Handling
+        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_proof') {
+            const method = db.sessions[userId].method;
+            const proofText = ctx.message.text || ctx.message.caption || 'Photo Proof';
+            const uniqueDepId = userId + '_' + Date.now();
+
+            if (!db.depositRequests) db.depositRequests = {};
+            db.depositRequests[uniqueDepId] = { userId: userId, method: method, proof: proofText };
+            saveDatabase(db);
+
+            const adminDepMsg = `💰 **নতুন ডিপোজিট রিকোয়েস্ট**\n\n👤 Name: ${ctx.from.first_name}\n🆔 ID: \`${userId}\`\n💳 Method: \`${method}\`\n📝 Proof / TrxID: \`${proofText}\`\n\n👇 অনুমোদন করতে নিচের বাটনে ক্লিক করুন:`;
+
+            await bot.telegram.sendMessage(ADMIN_ID, adminDepMsg, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('✅ Approve (+100 BDT)', 'dep_app_' + uniqueDepId)],
+                    [Markup.button.callback('❌ Cancel Request', 'dep_can_' + uniqueDepId)]
+                ])
+            }).catch(() => {});
+
+            delete db.sessions[userId];
+            saveDatabase(db);
+
+            const lang = getUserLang(userId);
+            return ctx.reply(t(userId, 'proofSubmittedStatus') + method + "\n\n✨ Your deposit request has been submitted to admin for verification.", {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+            });
+        }
+
+        // 5. User UID Checker Handling
+        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid_only') {
+            const uid = text;
+            const waitMsg = await ctx.reply('⏳ ইউআইডি চেক করা হচ্ছে, দয়া করে অপেক্ষা করুন...');
+            const nickname = await checkFreeFireUID(uid);
+            try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch (e) {}
+
+            const lang = getUserLang(userId);
+            const foundBox = lang === 'en' ? 
+                `🎉 **ACCOUNT FOUND**\n\n👤 Name: \`${nickname}\`\n🛡 UID: \`${uid}\`` :
+                `🎉 **অ্যাকাউন্ট পাওয়া গেছে**\n\n👤 নাম: \`${nickname}\`\n🛡 ইউআইডি: \`${uid}\``;
+
+            delete db.sessions[userId];
+            saveDatabase(db);
+            return ctx.reply(foundBox, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+            });
+        }
+
+        // 6. Shop Order UID Input Handling
+        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid') {
+            const uid = text;
+            db.sessions[userId].uid = uid;
+            db.sessions[userId].step = 'confirming';
+            saveDatabase(db);
+
+            const session = db.sessions[userId];
+            const waitMsg = await ctx.reply('⏳ প্লেয়ারের নাম চেক করা হচ্ছে...');
+            const nickname = await checkFreeFireUID(uid);
+            session.nickname = nickname;
+            saveDatabase(db);
+
+            try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch (e) {}
+
+            const lang = getUserLang(userId);
+            const reviewText = lang === 'en' ? 
+                `📦 **ORDER REVIEW**\n\n🛍️ Product: \`${session.product}\`\n💵 Price: \`${session.price} BDT\`\n🌐 Region: \`${session.region}\`\n🎮 Name: \`${nickname}\`\n🆔 UID: \`${uid}\`\n\n👇 Click below to confirm order:` :
+                `📦 **অর্ডার রিভিউ**\n\n🛍️ প্যাকেজ: \`${session.product}\`\n💵 মূল্য: \`${session.price} টাকা\`\n🌐 রিজিওন: \`${session.region}\`\n🎮 নাম: \`${nickname}\`\n🆔 ইউআইডি: \`${uid}\`\n\n👇 কনফার্ম করতে নিচের বাটনে চাপ দিন:`;
+
+            return ctx.reply(reviewText, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback(t(userId, 'confirmOrderBtn'), 'confirm_order')],
+                    [Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back')]
+                ])
+            });
+        }
+
+        // --- UNIVERSAL DUAL-LANGUAGE BUTTON / KEYBOARD TEXT MATCHING ---
+        if (text === '📊 Total Users') {
+            if (userId === ADMIN_ID.toString()) {
+                const usersCount = Object.keys(db.users || {}).length;
+                return ctx.reply(`📊 **বটের মোট ইউজার সংখ্যা:** \`${usersCount}\` জন`, { parse_mode: 'Markdown' });
+            }
+        }
+        if (text === '➕ Add Bot') {
+            if (userId === ADMIN_ID.toString()) return ctx.reply('✨ নতুন বট অ্যাড করার জন্য নির্দেশিকা বা টোকেন প্রদান করুন।');
+        }
+        if (text === '❌ Remove Bot') {
+            if (userId === ADMIN_ID.toString()) return ctx.reply('⚠️ রিমুভ করার জন্য বট আইডি বা টোকেন দিন।');
+        }
+        if (text === '➕ Add Product') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'add_product' };
+                saveDatabase(db);
+                return ctx.reply('✍️ নতুন প্রোডাক্ট অ্যাড করতে ক্যাটাগরি ও নাম দিন এই ফরম্যাটে:\n`Category Name | Product Name - Price BDT`', { parse_mode: 'Markdown' });
+            }
+        }
+        if (text === '❌ Remove Product') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'remove_product' };
+                saveDatabase(db);
+                return ctx.reply('✍️ যে প্রোডাক্টটি রিমুভ করতে চান সেটির নাম হুবহু লিখে পাঠান:');
+            }
+        }
+        if (text === '✏️ Change Product Price') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'change_price' };
+                saveDatabase(db);
+                return ctx.reply('✍️ প্রোডাক্টের নতুন দাম আপডেট করার বিবরণ পাঠান:');
+            }
+        }
+        if (text === '💳 Add/Minus Balance') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'add_minus_balance' };
+                saveDatabase(db);
+                return ctx.reply('✍️ ব্যালেন্স অ্যাড বা মাইনাস করতে এই ফরম্যাটে পাঠান:\n`USER_ID AMOUNT` (যেমন: `5932254012 100` বা `-50`)', { parse_mode: 'Markdown' });
+            }
+        }
+        if (text === '📱 Set Payment Numbers') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'set_payment_numbers' };
+                saveDatabase(db);
+                return ctx.reply('✍️ নতুন বিকাশ/নগদ পার্সোনাল বা মার্চেন্ট নাম্বার লিখে পাঠান:');
+            }
+        }
+        if (text === '📩 Send Message') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'send_message' };
+                saveDatabase(db);
+                return ctx.reply('✍️ নির্দিষ্ট ইউজারের কাছে মেসেজ পাঠাতে এই ফরম্যাটে দিন:\n`USER_ID | আপনার মেসেজ`', { parse_mode: 'Markdown' });
+            }
+        }
+        if (text === '📢 All Users Msg') {
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'broadcast_msg' };
+                saveDatabase(db);
+                return ctx.reply('📢 সকল ইউজারের কাছে ব্রডকাস্ট করার জন্য মেসেজটি লিখে পাঠান:');
+            }
+        }
+
+        if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) {
+            if (userId === ADMIN_ID.toString()) {
                 db.settings.autoApiEnabled = !db.settings.autoApiEnabled;
                 saveDatabase(db);
                 const newStatusText = db.settings.autoApiEnabled ? '🟢 Auto API: ON (সিস্টেম এখন ফুল অটোমেটিক)' : '🔴 Auto API: OFF (সিস্টেম এখন ম্যানুয়াল মোডে আছে)';
@@ -618,6 +907,159 @@ bot.on('message', async (ctx) => {
     } catch (err) {
         console.error('Message Handler Global Error:', err);
     }
+});
+
+// Deposit Action Triggers
+bot.action('dep_bkash', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        if (!db.sessions) db.sessions = {};
+        db.sessions[userId] = { step: 'awaiting_deposit_proof', method: 'bKash' };
+        saveDatabase(db);
+
+        const paymentNum = db.numbers && db.numbers.paymentInfo ? db.numbers.paymentInfo : '01XXXXXXXXX (Personal)';
+        await ctx.editMessageText(`💖 **বিকাশ [bKash] পেমেন্ট**\n\n📌 আমাদের পার্সোনাল বিকাশ নাম্বার:\n\`${paymentNum}\`\n\n💎 সর্বনিম্ন ডিপোজিট: ১০০ টাকা\n\n` + t(userId, 'uploadProofTitle'), {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back')]])
+        });
+    } catch (e) {}
+});
+
+bot.action('dep_nagad', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        if (!db.sessions) db.sessions = {};
+        db.sessions[userId] = { step: 'awaiting_deposit_proof', method: 'Nagad' };
+        saveDatabase(db);
+
+        const paymentNum = db.numbers && db.numbers.paymentInfo ? db.numbers.paymentInfo : '01XXXXXXXXX (Personal)';
+        await ctx.editMessageText(`🧡 **নগদ [Nagad] পেমেন্ট**\n\n📌 আমাদের পার্সোনাল নগদ নাম্বার:\n\`${paymentNum}\`\n\n💎 সর্বনিম্ন ডিপোজিট: ১০০ টাকা\n\n` + t(userId, 'uploadProofTitle'), {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back')]])
+        });
+    } catch (e) {}
+});
+
+bot.action(/dep_app_(.+)/, async (ctx) => {
+    try {
+        const uniqueDepId = ctx.match[1];
+        const userId = ctx.from.id.toString();
+        if (userId !== ADMIN_ID.toString()) return;
+
+        const db = loadDatabase();
+        const depInfo = db.depositRequests ? db.depositRequests[uniqueDepId] : null;
+
+        if (depInfo) {
+            const targetUser = depInfo.userId;
+            if (!db.balances) db.balances = {};
+            db.balances[targetUser] = (db.balances[targetUser] || 0) + 100;
+            saveDatabase(db);
+
+            const lang = getUserLang(targetUser);
+            const successBox = lang === 'en' ? 
+                `💎 **BALANCE RECHARGED**\n\nAccount balance updated successfully! Added: \`৳100\`\n\n📌 Current Balance: \`৳${db.balances[targetUser]}\`` :
+                `💎 **ব্যালেন্স রিচার্জ সফল**\n\nঅ্যাকাউন্ট ব্যালেন্স সফলভাবে আপডেট করা হয়েছে! যোগ হয়েছে: \`৳১০০\`\n\n📌 বর্তমান ব্যালেন্স: \`৳${db.balances[targetUser]}\``;
+
+            await bot.telegram.sendMessage(targetUser, successBox, { parse_mode: 'Markdown' }).catch(() => {});
+            delete db.depositRequests[uniqueDepId];
+            saveDatabase(db);
+
+            await ctx.answerCbQuery('✅ ডিপোজিট সফলভাবে অ্যাপ্রুভ করা হয়েছে এবং ব্যালেন্স যোগ হয়েছে!');
+            try { await ctx.editMessageText('✅ **[DEPOSIT APPROVED & BALANCE ADDED]**'); } catch (e) {}
+        }
+    } catch (e) {}
+});
+
+bot.action(/dep_can_(.+)/, async (ctx) => {
+    try {
+        const uniqueDepId = ctx.match[1];
+        const userId = ctx.from.id.toString();
+        if (userId !== ADMIN_ID.toString()) return;
+
+        const db = loadDatabase();
+        const depInfo = db.depositRequests ? db.depositRequests[uniqueDepId] : null;
+
+        if (depInfo) {
+            const targetUser = depInfo.userId;
+            await bot.telegram.sendMessage(targetUser, t(targetUser, 'depositCancelledBox'), { parse_mode: 'Markdown' }).catch(() => {});
+            delete db.depositRequests[uniqueDepId];
+            saveDatabase(db);
+
+            await ctx.answerCbQuery('❌ ডিপোজিট রিকোয়েস্ট বাতিল করা হয়েছে।');
+            try { await ctx.editMessageText('❌ **[DEPOSIT REJECTED]**'); } catch (e) {}
+        }
+    } catch (e) {}
+});
+
+// Admin Reply Trigger Action Handler
+bot.action(/admin_reply_(.+)/, async (ctx) => {
+    try {
+        const targetUserId = ctx.match[1];
+        const userId = ctx.from.id.toString();
+        if (userId !== ADMIN_ID.toString()) return;
+
+        const db = loadDatabase();
+        if (!db.adminReplySessions) db.adminReplySessions = {};
+        db.adminReplySessions[userId] = targetUserId;
+        saveDatabase(db);
+
+        await ctx.reply('✍️ কাস্টমারকে পাঠানোর জন্য আপনার রিপ্লাই মেসেজটি লিখুন:', { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+// Admin Input Trigger Action Handler
+bot.action(/admin_input_(.+)/, async (ctx) => {
+    try {
+        const uniqueOrderId = ctx.match[1];
+        const userId = ctx.from.id.toString();
+        if (userId !== ADMIN_ID.toString()) return;
+
+        const db = loadDatabase();
+        if (!db.adminInputSession) db.adminInputSession = {};
+        db.adminInputSession[userId] = { uniqueOrderId: uniqueOrderId, targetUserId: db.adminSessions[uniqueOrderId]?.targetUserId };
+        saveDatabase(db);
+
+        await ctx.reply('✍️ এই অর্ডারের জন্য রিসিট বা নোট লিখে পাঠান (যেমন: কমপ্লিট করা হয়েছে / ট্রানজেকশন সফল):', { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+// Admin Cancel & Refund Trigger Action Handler
+bot.action(/admin_can_(.+)/, async (ctx) => {
+    try {
+        const uniqueOrderId = ctx.match[1];
+        const userId = ctx.from.id.toString();
+        if (userId !== ADMIN_ID.toString()) return;
+
+        const db = loadDatabase();
+        const orderInfo = db.adminSessions ? db.adminSessions[uniqueOrderId] : null;
+
+        if (orderInfo) {
+            const targetUser = orderInfo.targetUserId;
+            if (!db.balances) db.balances = {};
+            db.balances[targetUser] = (db.balances[targetUser] || 0) + Number(orderInfo.price);
+            saveDatabase(db);
+
+            const lang = getUserLang(targetUser);
+            const cancelBox = lang === 'en' ? 
+                `╔═════════════════════════════════╗\n║       ❌ ORDER CANCELLED        ║\n╚═════════════════════════════════╝\n\n⚠️ Due to some technical and mechanical issues, your order has been cancelled. Please try again after a moment.\n\n💰 Your deducted balance has been refunded to your account successfully.\n\n─────────────────────────────────\nStay with SIR TOPUP 💙` :
+                `╔═════════════════════════════════╗\n║       ❌ অর্ডার ক্যানসেলড         ║\n╚═════════════════════════════════╝\n\n⚠️ আমাদের কিছু যান্ত্রিক এবং টেকনিক্যাল সমস্যার কারণে অর্ডারটি ক্যানসেল করা হলো। কিছুক্ষণ পর আবার অর্ডার করুন।\n\n💰 আপনার কেটে নেওয়া টাকা অ্যাকাউন্টে সফলভাবে ফেরত দেওয়া হয়েছে।\n\n─────────────────────────────────\nSIR TOPUP এর সাথেই থাকুন 💙`;
+
+            await bot.telegram.editMessageText(targetUser, orderInfo.loadingMessageId, null, cancelBox, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([[Markup.button.callback(lang === 'en' ? '🔙 Main Menu 🏠' : '🔙 মূল মেনু 🏠', 'back_start_inline')]])
+            }).catch(() => {});
+
+            delete db.adminSessions[uniqueOrderId];
+            saveDatabase(db);
+
+            await ctx.answerCbQuery('✅ অর্ডার সফলভাবে ক্যানসেল করা হয়েছে এবং টাকা ইউজারের অ্যাকাউন্টে রিফান্ড হয়েছে!');
+            try { await ctx.editMessageText('❌ **[ORDER CANCELLED & REFUNDED BY ADMIN]**'); } catch (e) {}
+        }
+    } catch (e) {}
 });
 
 bot.action(/calc_(.+)/, async (ctx) => {
@@ -949,18 +1391,18 @@ bot.action('confirm_order', async (ctx) => {
         const lang = getUserLang(userId);
         const isAutoApiOn = db.settings && db.settings.autoApiEnabled;
         
-        // Check if the product is explicitly supported by LikesFF API (e.g. checks if product name/details match API-supported quantities like 220, 540, 1100 etc.)
+        // Smart API Existence Validation (Check if product is in API-supported quantity list)
         const prodNameLower = (session.product || '').toLowerCase();
         const isApiSupportedQuantity = prodNameLower.includes('220') || prodNameLower.includes('540') || prodNameLower.includes('1100') || prodNameLower.includes('2200') || prodNameLower.includes('5500') || session.productId;
         const isApiSupportedProduct = session.activeCategory === 'Free Fire Likes' && isApiSupportedQuantity;
 
-        // Intelligent Smart Routing: If Auto API is OFF OR Product is NOT in API-supported quantity list (e.g. 100 Likes pack), instantly bypass API in 3-4 seconds and route to admin panel
+        // Intelligent Smart Routing: Instant Bypass if Auto API is OFF or Product not in API list (e.g. 100 Likes)
         if (!isAutoApiOn || !isApiSupportedProduct) {
             if (!db.adminSessions) db.adminSessions = {};
             const uniqueOrderId = userId + '_' + Date.now();
             const idLabel = session.isGuild ? '🛡 Guild ID' : '🎮 UID';
             
-            const processingTitle = lang === 'en' ? '⏳ Order is processing...\n\n' : '⏳ অর্ডার প্রসেসিং হচ্ছে...\n\n';
+            const processingTitle = t(userId, 'orderProcessing') + '\n\n';
             const procMsg = await ctx.editMessageText(processingTitle + `▰▱▱▱▱▱▱▱▱▱ [ 20% ]`, { parse_mode: 'Markdown' });
 
             const steps = [
@@ -1019,7 +1461,7 @@ bot.action('confirm_order', async (ctx) => {
             return;
         }
 
-        const processingTitle = lang === 'en' ? '⏳ API Auto-Processing...\n\n' : '⏳ এপিআই অটো-প্রসেসিং হচ্ছে...\n\n';
+        const processingTitle = t(userId, 'apiProcessing') + '\n\n';
         const procMsg = await ctx.editMessageText(processingTitle + `▰▱▱▱▱▱▱▱▱▱ [ 25% ]`, { parse_mode: 'Markdown' });
 
         let apiParams = {};
@@ -1068,7 +1510,7 @@ bot.action('confirm_order', async (ctx) => {
 
             const receiptBox = lang === 'en' ? 
                 `💠 ════════════════════════════ 💠\n           ✅ ORDER COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Product: \`${session.product}\`\n\n🆔 Order ID: \`${orderId}\`\n\n👤 Name: \`${playerNick}\`\n🛡 UID: \`${session.uid}\`\n🌐 Server: \`${session.region}\`\n📊 Status: \`${statusVal}\`\n\n📌 Previous Likes: ${apiPrevLikes}\n💖 Current Likes: ${apiCurrLikes}\n🚀 Added Likes: ${apiAddedLikes}\n\n🪶 Deducted: \`${session.price} BDT\`\n💰 Current Balance: \`${currentBal} BDT\`\n\n⚠️ *Note: You can take Daily likes on this UID after 24 hours.*\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙` :
-                `💠 ════════════════════════════ 💠\n           ✅ অর্ডার সফলভাবে সম্পন্ন\n💠 ════════════════════════════ 💠\n\n📦 প্যাকেজ: \`${session.product}\`\n\n🆔 অর্ডার আইডি: \`${orderId}\`\n\n👤 নাম: \`${playerNick}\`\n🛡 ইউআইডি: \`${session.uid}\`\n🌐 সার্ভার: \`${session.region}\`\n📊 স্ট্যাটাস: \`${statusVal}\`\n\n📌 পূর্বের লাইক: ${apiPrevLikes}\n💖 বর্তমান লাইক: ${apiCurrLikes}\n🚀 অ্যাড লাইক: ${apiAddedLikes}\n\n🪶 কাটা হয়েছে: \`${session.price} টাকাচিহ্ন\n💰 বর্তমান ব্যালেন্স: \`${currentBal} টাকাচিহ্ন\n\n⚠️ *নোট: এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।*\n\n💠 ════════════════════════════ 💠\nSIR TOPUP এর সাথেই থাকুন 💙`;
+                `💠 ════════════════════════════ 💠\n           ✅ অর্ডার সফলভাবে সম্পন্ন\n💠 ════════════════════════════ 💠\n\n📦 প্যাকেজ: \`${session.product}\`\n\n🆔 অর্ডার আইডি: \`${orderId}\`\n\n👤 নাম: \`${playerNick}\`\n🛡 ইউআইডি: \`${session.uid}\`\n🌐 সার্ভার: \`${session.region}\`\n📊 স্ট্যাটাস: \`${statusVal}\`\n\n📌 পূর্বের লাইক: ${apiPrevLikes}\n💖 বর্তমান লাইক: ${apiCurrLikes}\n🚀 অ্যাড লাইক: ${apiAddedLikes}\n\n🪶 কাটা হয়েছে: \`${session.price} টাকাচি\n💰 বর্তমান ব্যালেন্স: \`${currentBal} টাকা\`\n\n⚠️ *নোট: এই UID তে ২৪ ঘণ্টা পর আবার Daily লাইক নিতে পারবেন।*\n\n💠 ════════════════════════════ 💠\nSIR TOPUP এর সাথেই থাকুন 💙`;
 
             setTimeout(async () => {
                 await ctx.telegram.editMessageText(userId, procMsg.message_id, null, receiptBox, { 
