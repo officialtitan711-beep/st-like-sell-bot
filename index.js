@@ -154,6 +154,7 @@ function getMainKeyboard(userId) {
         keyboard.push(
             ['-----------------------------------'],
             [apiStatusText, '📊 Total Users'],
+            ['➕ Add Bot', '❌ Remove Bot'],
             ['➕ Add Product', '❌ Remove Product'],
             ['💳 Add/Minus Balance', '📱 Set Payment Numbers'],
             ['📩 Send Message', '📢 All Users Msg']
@@ -459,6 +460,12 @@ bot.on('message', async (ctx) => {
 
         if (text === '📊 Total Users') {
             if (userId === ADMIN_ID.toString()) return ctx.reply(`📊 **মোট ইউজার:** \`${Object.keys(db.users || {}).length}\``, { parse_mode: 'Markdown' });
+        }
+        if (text === '➕ Add Bot') {
+            if (userId === ADMIN_ID.toString()) return ctx.reply('✨ নতুন বট অ্যাড করার নির্দেশিকা।');
+        }
+        if (text === '❌ Remove Bot') {
+            if (userId === ADMIN_ID.toString()) return ctx.reply('⚠️ রিমুভ করার জন্য বট টোকেন দিন।');
         }
         if (text === '➕ Add Product') {
             if (userId === ADMIN_ID.toString()) {
@@ -817,7 +824,7 @@ bot.action('confirm_order', async (ctx) => {
         const db = loadDatabase();
         const session = db.sessions?.[userId];
         if (!session) return ctx.answerCbQuery('Session expired.', { show_alert: true });
-        if ((db.balances[userId] || 0) < session.price) return ctx.answerCbQuery('❌ পর্যাপ্ত ব্যালেন্স নেই!', { show_alert: true });
+        if ((db.balances[userId] || 0) < session.price) return ctx.answerCbQuery('❌ পর্যাপ্ত ব্যালেন্স নেই!', { show_auth: true });
 
         db.balances[userId] -= Number(session.price);
         saveDatabase(db);
