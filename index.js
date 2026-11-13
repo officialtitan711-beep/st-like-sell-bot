@@ -453,7 +453,7 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // --- Deposit Step 1: Awaiting Amount (Minimum 100 BDT) ---
+        // --- Deposit Step 1: Awaiting Amount (Minimum 100 BDT Strict Check) ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_amount' && !isMenuCommand(text)) {
             const amountNum = Number(text);
             if (isNaN(amountNum) || amountNum < 100) {
