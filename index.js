@@ -162,7 +162,7 @@ function t(userId, key) {
             serverTitle: "🌍 **সার্ভার নির্বাচন**\n\nপ্যাকেজ: ",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             cancelBtn: "❌ বাতিল করুন",
-            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
+            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন።",
             historyTitle: "📜 **শেষ ১০টি অর্ডারের ইতিহাস**\n\n",
             historyDisclaimer: "\n⚠️ *নোট: সুরক্ষার জন্য এখানে শুধুমাত্র আপনার সর্বশেষ ১০টি অর্ডার দেখানো হয়।*",
             noHistory: "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n"
@@ -220,6 +220,7 @@ function isMenuCommand(text) {
     if (!text) return false;
     if (text.startsWith('/')) return true;
     if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) return true;
+    if (text.includes('Shop Now') || text.includes('শপ নাও') || text.includes('🛍️')) return true;
     
     const clean = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]/gu, '').toLowerCase();
     
@@ -237,7 +238,7 @@ function isMenuCommand(text) {
         'sendmessage', 'allusersmsg', '-----------------------------------'
     ];
     
-    return keywords.some(k => clean.includes(k) || text.includes('🛍️') || text.includes('🔍') || text.includes('💰') || text.includes('👤') || text.includes('📜') || text.includes('📞') || text.includes('🧮') || text.includes('🌍') || text.includes('📊') || text.includes('➕') || text.includes('❌') || text.includes('💳') || text.includes('📱') || text.includes('📩') || text.includes('📢'));
+    return keywords.some(k => clean.includes(k) || text.includes('🔍') || text.includes('💰') || text.includes('👤') || text.includes('📜') || text.includes('📞') || text.includes('🧮') || text.includes('🌍') || text.includes('📊') || text.includes('➕') || text.includes('❌') || text.includes('💳') || text.includes('📱') || text.includes('📩') || text.includes('📢'));
 }
 
 function translateCategoryName(catName, userId) {
@@ -828,7 +829,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- User Main Menu Buttons (Universal Dispatcher) ---
-        if (cleanText.includes('shopnow') || cleanText.includes('শপনাও') || text.includes('🛍️')) {
+        if (text.includes('Shop Now') || text.includes('শপ নাও') || cleanText.includes('shopnow') || cleanText.includes('শপনাও') || text.includes('🛍️')) {
             let inlineButtons = [];
             if (db.categories['Free Fire Likes']) {
                 inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
