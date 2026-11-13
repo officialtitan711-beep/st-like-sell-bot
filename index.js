@@ -718,6 +718,11 @@ bot.on('message', async (ctx) => {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('🇧🇩 Bangladesh', 'clock_bd'), Markup.button.callback('🇳🇵 Nepal', 'clock_np')],
+                    [Markup.button.callback('🇮🇳 India', 'clock_in'), Markup.button.callback('🇵🇰 Pakistan', 'clock_pk')],
+                    [Markup.button.callback('🇸🇦 Saudi Arabia', 'clock_sa'), Markup.button.callback('🇦🇪 Dubai (UAE)', 'clock_ae')],
+                    [Markup.button.callback('🇲🇾 Malaysia', 'clock_my'), Markup.button.callback('🇸🇬 Singapore', 'clock_sg')],
+                    [Markup.button.callback('🇺🇸 USA (NY)', 'clock_us'), Markup.button.callback('🇬🇧 UK (London)', 'clock_gb')],
+                    [Markup.button.callback('🇨🇦 Canada', 'clock_ca'), Markup.button.callback('🇦🇺 Australia', 'clock_au')],
                     [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
                 ])
             });
@@ -1032,12 +1037,29 @@ bot.action(/calc_(.+)/, async (ctx) => {
     } catch (e) {}
 });
 
-bot.action(/clock_(bd|np)/, async (ctx) => {
+bot.action(/clock_(bd|np|in|pk|sa|ae|my|sg|us|gb|ca|au)/, async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
-        const tzMap = { bd: 'Asia/Dhaka', np: 'Asia/Kathmandu' };
+        const tzMap = { 
+            bd: 'Asia/Dhaka', 
+            np: 'Asia/Kathmandu', 
+            in: 'Asia/Kolkata', 
+            pk: 'Asia/Karachi', 
+            sa: 'Asia/Riyadh', 
+            ae: 'Asia/Dubai', 
+            my: 'Asia/Kuala_Lumpur', 
+            sg: 'Asia/Singapore', 
+            us: 'America/New_York', 
+            gb: 'Europe/London', 
+            ca: 'America/Toronto', 
+            au: 'Australia/Sydney' 
+        };
         const now = new Date();
-        await ctx.editMessageText(`🌍 **World Clock**\n🕒 Time: \`${now.toLocaleTimeString('en-US', { timeZone: tzMap[ctx.match[1]] })}\``, {
+        const selectedKey = ctx.match[1];
+        const timeStr = now.toLocaleTimeString('en-US', { timeZone: tzMap[selectedKey] });
+        const dateStr = now.toLocaleDateString('en-GB', { timeZone: tzMap[selectedKey], weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+
+        await ctx.editMessageText(`🌍 **World Clock & Date**\n\n📅 Date: \`${dateStr}\`\n🕒 Time: \`${timeStr}\``, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'backBtn'), 'back_to_clock'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
         });
@@ -1051,6 +1073,11 @@ bot.action('back_to_clock', async (ctx) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('🇧🇩 Bangladesh', 'clock_bd'), Markup.button.callback('🇳🇵 Nepal', 'clock_np')],
+                [Markup.button.callback('🇮🇳 India', 'clock_in'), Markup.button.callback('🇵🇰 Pakistan', 'clock_pk')],
+                [Markup.button.callback('🇸🇦 Saudi Arabia', 'clock_sa'), Markup.button.callback('🇦🇪 Dubai (UAE)', 'clock_ae')],
+                [Markup.button.callback('🇲🇾 Malaysia', 'clock_my'), Markup.button.callback('🇸🇬 Singapore', 'clock_sg')],
+                [Markup.button.callback('🇺🇸 USA (NY)', 'clock_us'), Markup.button.callback('🇬🇧 UK (London)', 'clock_gb')],
+                [Markup.button.callback('🇨🇦 Canada', 'clock_ca'), Markup.button.callback('🇦🇺 Australia', 'clock_au')],
                 [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
             ])
         });
