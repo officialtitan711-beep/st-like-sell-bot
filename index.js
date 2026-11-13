@@ -220,23 +220,24 @@ function isMenuCommand(text) {
     if (!text) return false;
     if (text.startsWith('/')) return true;
     
-    const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{2B50}\u{2728}\u{1F4F1}\u{1F4B0}\u{1F464}\u{1F4DC}\u{1F4DE}\u{1F9EE}\u{1F30D}\u{1F4CA}\u{2795}\u{274C}\u{1F4B3}\u{1F4E9}\u{1F4E2}\u{1F4F7}\u{1F50D}\u{1F3AE}\u{1F4C1}\u{1F4CC}\u{2328}\u{1F310}\s]/gu, '').toLowerCase();
+    const lowerText = text.trim().toLowerCase();
     
-    if (clean.includes('shopnow') || clean.includes('শপনাও') || clean.includes('shop') || clean.includes('শপ')) return true;
-    if (clean.includes('checkffuid') || clean.includes('ইউআইডিচেক') || clean.includes('ইউআইডি')) return true;
-    if (clean.includes('addbalance') || clean.includes('ব্যালেন্সঅ্যাড') || clean.includes('ব্যালেন্স')) return true;
-    if (clean.includes('myprofile') || clean.includes('আমারপ্রোফাইল') || clean.includes('প্রোফাইল')) return true;
-    if (clean.includes('orderhistory') || clean.includes('অর্ডারহিস্ট্রি') || clean.includes('হিস্ট্রি')) return true;
-    if (clean.includes('supportdesk') || clean.includes('সাপোর্টডেস্ক') || clean.includes('সাপোর্ট')) return true;
-    if (clean.includes('calculator') || clean.includes('ক্যালকুলেটর')) return true;
-    if (clean.includes('worldclock') || clean.includes('ওয়ার্ল্ডক্লক') || clean.includes('ওয়ার্ল্ড')) return true;
+    if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText === 'shop now' || lowerText === 'শপ নাও' || lowerText.includes('shop') || lowerText.includes('শপ')) return true;
+    if (lowerText.includes('check ff uid') || lowerText.includes('ইউআইডি চেক') || lowerText.includes('ইউআইডি')) return true;
+    if (lowerText.includes('add balance') || lowerText.includes('ব্যালেন্স অ্যাড') || lowerText.includes('ব্যালেন্স')) return true;
+    if (lowerText.includes('my profile') || lowerText.includes('আমার প্রোফাইল') || lowerText.includes('প্রোফাইল')) return true;
+    if (lowerText.includes('order history') || lowerText.includes('অর্ডার হিস্ট্রি') || lowerText.includes('হিস্ট্রি')) return true;
+    if (lowerText.includes('support desk') || lowerText.includes('সাপোর্ট ডেস্ক') || lowerText.includes('সাপোর্ট')) return true;
+    if (lowerText.includes('calculator') || lowerText.includes('ক্যালকুলেটর')) return true;
+    if (lowerText.includes('world clock') || lowerText.includes('ওয়ার্ল্ড ক্লক') || lowerText.includes('ওয়ার্ল্ড')) return true;
     
     const keywords = [
-        'totalusers', 'addbot', 'removebot', 'add/minusbalance', 
-        'setpaymentnumbers', 'sendmessage', 'allusersmsg', '-----------------------------------'
+        'total users', 'add bot', 'remove bot', 'add/minus balance', 
+        'set payment numbers', 'send message', 'all users msg', '-----------------------------------',
+        'auto api: on', 'auto api: off'
     ];
     
-    return keywords.some(k => clean.includes(k) || text.includes('🔍') || text.includes('💰') || text.includes('👤') || text.includes('📜') || text.includes('📞') || text.includes('🧮') || text.includes('🌍') || text.includes('📊') || text.includes('➕') || text.includes('❌') || text.includes('💳') || text.includes('📱') || text.includes('📩') || text.includes('📢'));
+    return keywords.some(k => lowerText.includes(k));
 }
 
 function translateCategoryName(catName, userId) {
@@ -375,6 +376,7 @@ bot.on('message', async (ctx) => {
         if (!ctx.message) return;
         const userId = ctx.from.id.toString();
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
+        const lowerText = text.toLowerCase();
         const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{2B50}\u{2728}\u{1F4F1}\u{1F4B0}\u{1F464}\u{1F4DC}\u{1F4DE}\u{1F9EE}\u{1F30D}\u{1F4CA}\u{2795}\u{274C}\u{1F4B3}\u{1F4E9}\u{1F4E2}\u{1F4F7}\u{1F50D}\u{1F3AE}\u{1F4C1}\u{1F4CC}\u{2328}\u{1F310}\s]/gu, '').trim().toLowerCase();
 
         const db = loadDatabase();
@@ -827,7 +829,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- User Main Menu Buttons (Universal Dispatcher) ---
-        if (cleanText.includes('shopnow') || cleanText.includes('শপনাও') || cleanText.includes('shop') || cleanText.includes('শপ') || text.includes('Shop Now') || text.includes('শপ নাও')) {
+        if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText === 'shop now' || lowerText === 'শপ নাও' || lowerText.includes('shop') || lowerText.includes('শপ')) {
             let inlineButtons = [];
             if (db.categories['Free Fire Likes']) {
                 inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
