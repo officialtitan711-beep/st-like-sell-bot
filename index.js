@@ -1,5 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
-const http = require('http');
+const http = http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -98,8 +98,6 @@ function t(userId, key) {
             serverTitle: "🌍 **সার্ভার নির্বাচন**\n\nপ্যাকেজ: ",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             cancelBtn: "❌ বাতিল করুন",
-            proofSubmittedStatus: "✦ ─────────────── ✦ ─────────────── ✦\n       🚀 প্রুফ সাবমিট সফল ✅\n✦ ─────────────── ✦ ─────────────── ✦\n\n💳 পেমেন্ট মাধ্যম: ",
-            depositCancelledBox: "❌ **ডিপোজিট বাতিল করা হয়েছে**\n\n⚠️ আপনার ডিপোজিট রিকোয়েস্টটি অ্যাডমিন কর্তৃক বাতিল করা হয়েছে।",
             supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **শেষ ১০টি অর্ডারের ইতিহাস**\n\n",
             historyDisclaimer: "\n⚠️ *নোট: সুরক্ষার জন্য এখানে শুধুমাত্র আপনার সর্বশেষ ১০টি অর্ডার দেখানো হয়।*",
@@ -117,8 +115,6 @@ function t(userId, key) {
             serverTitle: "🌍 **SERVER SELECTION**\n\nPackage: ",
             confirmOrderBtn: "✅ Confirm Order 🚀",
             cancelBtn: "❌ Cancel",
-            proofSubmittedStatus: "✦ ─────────────── ✦ ─────────────── ✦\n       🚀 PROOF SUBMITTED ✅\n✦ ─────────────── ✦ ─────────────── ✦\n\n💳 Method: ",
-            depositCancelledBox: "❌ **DEPOSIT CANCELLED**\n\n⚠️ Your deposit request has been cancelled by the admin.",
             supportSentSuccess: "✨ Your message or screenshot has been sent directly to the admin! Please wait.",
             historyTitle: "📜 **LAST 10 ORDERS HISTORY**\n\n",
             historyDisclaimer: "\n⚠️ *Note: Only the latest 10 orders are displayed here.*",
@@ -351,16 +347,6 @@ bot.on('message', async (ctx) => {
                 const targetUid = orderInfo.targetUserId;
                 const currentBal = db.balances[targetUid] || 0;
 
-                const cleanText = text.replace(/[^\d\s|.-]/g, ' ').replace(/\s+/g, ' ').trim();
-                const parts = cleanText.includes('|') ? cleanText.split('|').map(s => s.trim()) : cleanText.split(' ').filter(Boolean);
-                
-                const numbers = parts.map(p => Number(p)).filter(n => !isNaN(n));
-                const pLikes = numbers[0] !== undefined ? numbers[0] : 'N/A';
-                const cLikes = numbers[1] !== undefined ? numbers[1] : (numbers[0] !== undefined ? numbers[0] + 50 : 'N/A');
-                const addedNum = numbers[2] !== undefined ? numbers[2] : (typeof cLikes === 'number' && typeof pLikes === 'number' ? cLikes - pLikes : 'N/A');
-                const aLikes = addedNum !== 'N/A' ? `+${addedNum} Likes` : 'N/A';
-                const adminNote = text.split('|').length > 2 ? text.split('|')[2].trim() : 'Completed by Admin';
-
                 if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
                 const now = new Date();
                 db.orderHistories[targetUid].unshift({
@@ -372,15 +358,15 @@ bot.on('message', async (ctx) => {
                 if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
                 saveDatabase(db);
 
-                const manualReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`MAN-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${orderInfo.nickname || 'Unknown'}\`\n🛡️ UID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n👍 **Previous Likes:** \`${pLikes}\`\n👍 **Current Likes:** \`${cLikes}\`\n📈 **Added Likes:** \`${aLikes}\`\n\n📊 Status: \`Completed by Admin\`\n📝 Note/Details: \`${adminNote}\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`\n📝 Note/Details: \`${text}\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
-                await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, manualReceipt, {
+                await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
                 }).catch(() => {});
 
-                await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy]**\n\n" + manualReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
-                await ctx.reply('✅ Receipt sent successfully!');
+                await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
+                await ctx.reply('✅ Order successfully completed & receipt updated to customer!');
                 delete db.adminInputSession[userId];
                 delete db.adminSessions[uniqueOrderId];
                 saveDatabase(db);
@@ -498,9 +484,9 @@ bot.on('message', async (ctx) => {
             let instructionBox = '';
             if (isBn) {
                 if (method === 'bKash') {
-                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 বিকাশ (bKash) সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল বিকাশ নম্বর:** \`${targetNum}\`\n*(নম্বরের উপর ট্যাপ করলেই কপি হয়ে যাবে)*\n\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n📱 **বিকাশ অ্যাপের মাধ্যমে যেভাবে পাঠাবেন:**\n১️⃣ আপনার বিকাশ অ্যাপ ওপেন করে **Send Money** অপশনে যান।\n২️⃣ উপরের নম্বরটি বসান এবং অ্যামাউন্ট **${amountNum} BDT** দিন।\n৩️⃣ আপনার পিন দিয়ে পেমেন্ট কনফার্ম করুন এবং **TrxID** কপি করুন।\n\n✍️ **টাকা পাঠানোর পর আপনার ট্রানজেকশন আইডি (TrxID) অথবা পেমেন্টের স্ক্রিনশট এখানে সেন্ড করুন। অ্যাডমিন ম্যানুয়াল রিসিভ করে আপনার ব্যালেন্স অ্যাড করে দেবেন।**`;
+                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 বিকাশ (bKash) সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল বিকাশ নম্বর:** \`${targetNum}\`\n*(নম্বরের উপর ট্যাপ করলেই কপি হয়ে যাবে)*\n\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n📱 **বিকাশ অ্যাপের মাধ্যমে যেভাবে পাঠাবেন:**\n১️⃣ আপনার বিকাশ অ্যাপ ওপেন করে **Send Money** অপশনে যান।\n২️⃣ উপরের নম্বরটি বসান এবং অ্যামাউন্ট **${amountNum} BDT** দিন।\n৩️⃣ আপনার পিন দিয়ে পেমেন্ট কনফার্ম করুন এবং **TrxID** কপি করুন।\n\n✍️ **টাকা পাঠানোর পর আপনার ট্রানজেকশন আইডি (TrxID) অথবা স্ক্রিনশট এখানে সেন্ড করুন। অ্যাডমিন ম্যানুয়াল রিসিভ করে আপনার ব্যালেন্স অ্যাড করে দেবেন।**`;
                 } else {
-                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     🧡 নগদ (Nagad) সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল নগদ নম্বর:** \`${targetNum}\`\n*(নম্বরের উপর ট্যাপ করলেই কপি হয়ে যাবে)*\n\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n📱 **নগদ অ্যাপের মাধ্যমে যেভাবে পাঠাবেন:**\n১️⃣ আপনার নগদ অ্যাপ ওপেন করে **Send Money** অপশনে যান।\n২️⃣ উপরের নম্বরটি বসান এবং অ্যামাউন্ট **${amountNum} BDT** দিন।\n৩️⃣ আপনার পিন দিয়ে পেমেন্ট কনফার্ম করুন এবং **TrxID** কপি করুন।\n\n✍️ **টাকা পাঠানোর পর আপনার ট্রানজেকশন আইডি (TrxID) অথবা পেমেন্টের স্ক্রিনশট এখানে সেন্ড করুন। অ্যাডমিন ম্যানুয়াল রিসিভ করে আপনার ব্যালেন্স অ্যাড করে দেবেন।**`;
+                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     🧡 নগদ (Nagad) সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল নগদ নম্বর:** \`${targetNum}\`\n*(নম্বরের উপর ট্যাপ করলেই কপি হয়ে যাবে)*\n\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n📱 **নগদ অ্যাপের মাধ্যমে যেভাবে পাঠাবেন:**\n১️⃣ আপনার নগদ অ্যাপ ওপেন করে **Send Money** অপশনে যান।\n২️⃣ উপরের নম্বরটি বসান এবং অ্যামাউন্ট **${amountNum} BDT** দিন।\n৩️⃣ আপনার পিন দিয়ে পেমেন্ট কনফার্ম করুন এবং **TrxID** কপি করুন।\n\n✍️ **টাকা পাঠানোর পর আপনার ট্রানজেকশন আইডি (TrxID) অথবা স্ক্রিনশট এখানে সেন্ড করুন। অ্যাডমিন ম্যানুয়াল রিসিভ করে আপনার ব্যালেন্স অ্যাড করে দেবেন।**`;
                 }
             } else {
                 if (method === 'bKash') {
@@ -573,11 +559,11 @@ bot.on('message', async (ctx) => {
             saveDatabase(db);
 
             const loadingMsg = await ctx.reply(`⏳ Checking UID...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 200));
             try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 200));
             try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 200));
 
             const resInfo = await checkFreeFireUID(uidText);
             const resultBox = lang === 'bn'
@@ -609,11 +595,11 @@ bot.on('message', async (ctx) => {
 
             if (isFFCategory) {
                 const loadingMsg = await ctx.reply(`⏳ Checking UID...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
-                await new Promise(r => setTimeout(r, 300));
+                await new Promise(r => setTimeout(r, 200));
                 try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-                await new Promise(r => setTimeout(r, 300));
+                await new Promise(r => setTimeout(r, 200));
                 try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-                await new Promise(r => setTimeout(r, 300));
+                await new Promise(r => setTimeout(r, 200));
 
                 const resInfo = await checkFreeFireUID(uidText);
                 nickname = resInfo.nickname;
@@ -1070,7 +1056,7 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         const db = loadDatabase();
         db.adminInputSession[ADMIN_ID] = { uniqueOrderId: ctx.match[1] };
         saveDatabase(db);
-        await ctx.reply('✍️ Enter manual details format:\n`PreviousLikes | CurrentLikes | Admin Note`\n(Example: `1200 | 1300 | Successfully delivered`)', { parse_mode: 'Markdown' });
+        await ctx.reply('✍️ Enter completion note/details for customer:\n(Example: `Successfully completed!`)', { parse_mode: 'Markdown' });
         await ctx.answerCbQuery();
     } catch (e) {}
 });
@@ -1285,13 +1271,15 @@ bot.action('confirm_order', async (ctx) => {
         db.balances[userId] -= Number(session.price);
         saveDatabase(db);
 
-        // Smooth 1 to 100% progress animation simulation
+        // Fast Progress Animation
         const procMsg = await ctx.reply(`⏳ Processing Order...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 200));
         try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 200));
 
-        const isAutoEnabled = db.settings && db.settings.autoApiEnabled;
+        const isFFLikeCategory = session.activeCategory === 'Free Fire Likes' || (session.product && session.product.toLowerCase().includes('like'));
+        const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory;
+        
         let apiRes = { success: false };
         if (isAutoEnabled) {
             apiRes = await callLikesFFApiWithTimeout({ action: 'like', uid: session.uid, server: session.region }, 30000);
@@ -1299,7 +1287,7 @@ bot.action('confirm_order', async (ctx) => {
 
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 200));
 
             const postCheck = await checkFreeFireUID(session.uid);
             const prevLikes = session.initialLikes || 0;
@@ -1326,8 +1314,7 @@ bot.action('confirm_order', async (ctx) => {
 
             await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Auto Order]**\n\n" + autoReceipt + "\n\n👤 **Customer ID:** `" + userId + "`", { parse_mode: 'Markdown' }).catch(() => {});
 
-        } else {
-            // API failed or disabled -> Hold at 95% and notify admin for manual entry
+        } else if (isFFLikeCategory) {
             try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▱ 95% (Pending Admin Review)\``, { parse_mode: 'Markdown' }); } catch (e) {}
 
             const uniqueOrderId = userId + '_' + Date.now();
@@ -1342,11 +1329,43 @@ bot.action('confirm_order', async (ctx) => {
             };
             saveDatabase(db);
 
-            const modeLabel = isAutoEnabled ? '⚠️ API Failed / Fallback Order (Manual Needed)' : '🛠️ Manual Mode Order';
-            await bot.telegram.sendMessage(ADMIN_ID, `${modeLabel}\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
+            await bot.telegram.sendMessage(ADMIN_ID, `⚠️ API Failed / Fallback Order (Manual Needed)\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
+                    [Markup.button.callback('❌ Cancel & Refund', 'admin_can_' + uniqueOrderId)]
+                ])
+            });
+
+        } else {
+            // Guild Glory / Service Order: Show Pending Status to user immediately & send to admin
+            try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+            await new Promise(r => setTimeout(r, 200));
+
+            const uniqueOrderId = userId + '_' + Date.now();
+            
+            const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+
+            const userMsg = await ctx.telegram.editMessageText(userId, procMsg.message_id, null, pendingReceipt, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+            });
+
+            db.adminSessions[uniqueOrderId] = {
+                targetUserId: userId,
+                loadingMessageId: userMsg.message_id, // Saving message_id so admin completion edits this exact message
+                product: session.product,
+                uid: session.uid,
+                nickname: session.nickname || 'Guild/Service ID',
+                region: session.region,
+                price: session.price
+            };
+            saveDatabase(db);
+
+            await bot.telegram.sendMessage(ADMIN_ID, `🛠️ **New Guild/Service Order (Pending)**\n\n📦 Package: \`${session.product}\`\n🛡️ Target ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
+                parse_mode: 'Markdown',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('✅ Complete Order', 'admin_input_' + uniqueOrderId)],
                     [Markup.button.callback('❌ Cancel & Refund', 'admin_can_' + uniqueOrderId)]
                 ])
             });
