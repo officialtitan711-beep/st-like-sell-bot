@@ -145,10 +145,8 @@ function getMainKeyboard(userId) {
             ['-----------------------------------'],
             [apiStatusText, '📊 Total Users'],
             ['➕ Add Bot', '❌ Remove Bot'],
-            ['➕ Add Product', '❌ Remove Product'],
-            ['✏️ Change Product Price', '💳 Add/Minus Balance'],
-            ['📱 Set Payment Numbers', '📩 Send Message'],
-            ['📢 All Users Msg']
+            ['💳 Add/Minus Balance', '📱 Set Payment Numbers'],
+            ['📩 Send Message', '📢 All Users Msg']
         );
     }
     return Markup.keyboard(keyboard).resize();
@@ -164,7 +162,6 @@ const KNOWN_MENU_COMMANDS = [
     '🧮 Calculator', '🧮 ক্যালকুলেটর',
     '🌍 World Clock', '🌍 ওয়ার্ল্ড ক্লক',
     '📊 Total Users', '➕ Add Bot', '❌ Remove Bot',
-    '➕ Add Product', '❌ Remove Product', '✏️ Change Product Price',
     '💳 Add/Minus Balance', '📱 Set Payment Numbers',
     '📩 Send Message', '📢 All Users Msg',
     '-----------------------------------'
@@ -374,41 +371,51 @@ bot.on('message', async (ctx) => {
             }
 
             const actionType = sessionData.type;
-            if (actionType === 'add_product') {
-                const parts = text.split('|');
-                const cat = parts[0] ? parts[0].trim() : 'Free Fire Likes';
-                const prodName = parts[1] ? parts[1].trim() : text;
-                if (!db.customProducts[cat]) db.customProducts[cat] = [];
-                db.customProducts[cat].push({ name: prodName });
-                saveDatabase(db);
-                delete db.adminInputSession[userId];
-                return ctx.reply('✅ Product added successfully!');
-            }
-            if (actionType === 'remove_product') {
-                for (let cat in db.customProducts) {
-                    db.customProducts[cat] = db.customProducts[cat].filter(p => p.name.toLowerCase() !== text.toLowerCase());
+            if (actionType === 'add_category') {
+                const catName = text;
+                if (catName) {
+                    db.categories[catName] = true;
+                    if (!db.customProducts[catName]) db.customProducts[catName] = [];
+                    saveDatabase(db);
+                    delete db.adminInputSession[userId];
+                    return ctx.reply(`✅ Category "${catName}" created successfully! Now go to Shop Menu, enter this category and add products.`);
                 }
-                saveDatabase(db);
                 delete db.adminInputSession[userId];
-                return ctx.reply('✅ Product removed successfully!');
+                return ctx.reply('❌ Invalid category name.');
             }
-            if (actionType === 'change_product_price') {
+            if (actionType === 'add_shop_product') {
+                const catName = sessionData.category;
                 const parts = text.split('|');
-                const searchName = parts[0] ? parts[0].trim().toLowerCase() : '';
-                const newPriceStr = parts[1] ? parts[1].trim() : '';
-                let updated = false;
-                for (let cat in db.customProducts) {
-                    db.customProducts[cat].forEach(p => {
-                        if (p.name.toLowerCase().includes(searchName)) {
-                            p.name = p.name.replace(/-\s*\d+/, `- ${newPriceStr}`);
-                            updated = true;
-                        }
-                    });
-                }
+                const prodName = parts[0] ? parts[0].trim() : text;
+                const priceVal = parts[1] ? parts[1].trim() : '100';
+                const formattedProd = `${prodName} - ${priceVal} BDT`;
+
+                if (!db.customProducts[catName]) db.customProducts[catName] = [];
+                db.customProducts[catName].push({ name: formattedProd });
                 saveDatabase(db);
                 delete db.adminInputSession[userId];
-                if (updated) return ctx.reply('✅ Product price updated successfully!');
-                return ctx.reply('❌ Product not found. Provide correct name and new price.');
+                return ctx.reply(`✅ Product added successfully to "${catName}"!`);
+            }
+            if (actionType === 'change_shop_price') {
+                const catName = sessionData.category;
+                const prodIndex = sessionData.prodIndex;
+                const newPrice = text.replace(/[^0-9]/g, '');
+
+                if (db.customProducts[catName] && db.customProducts[catName][prodIndex]) {
+                    let oldName = db.customProducts[catName][prodIndex].name;
+                    // Replace old price with new price
+                    if (oldName.includes('-')) {
+                        oldName = oldName.replace(/-\s*\d+.*$/, `- ${newPrice} BDT`);
+                    } else {
+                        oldName = `${oldName} - ${newPrice} BDT`;
+                    }
+                    db.customProducts[catName][prodIndex].name = oldName;
+                    saveDatabase(db);
+                    delete db.adminInputSession[userId];
+                    return ctx.reply(`✅ Product price successfully updated to ${newPrice} BDT!`);
+                }
+                delete db.adminInputSession[userId];
+                return ctx.reply('❌ Product not found.');
             }
             if (actionType === 'add_minus_balance') {
                 const parts = text.split(' ');
@@ -454,7 +461,7 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // --- Deposit Step 1: Awaiting Amount (Strict Minimum 100 BDT Check) ---
+        // --- Deposit Step 1: Awaiting Amount ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_amount' && !isMenuCommand(text)) {
             const amountNum = Number(text);
             const isBn = getUserLang(userId) === 'bn';
@@ -481,20 +488,9 @@ bot.on('message', async (ctx) => {
             const method = db.sessions[userId].method;
             const targetNum = method === 'bKash' ? (db.numbers?.bkash || '01XXXXXXXXX') : (db.numbers?.nagad || '01XXXXXXXXX');
 
-            let instructionBox = '';
-            if (isBn) {
-                if (method === 'bKash') {
-                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 বিকাশ (bKash) সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল বিকাশ নম্বর:** \`${targetNum}\`\n*(নম্বরের উপর ট্যাপ করলেই কপি হয়ে যাবে)*\n\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n📱 **বিকাশ অ্যাপের মাধ্যমে যেভাবে পাঠাবেন:**\n১️⃣ আপনার বিকাশ অ্যাপ ওপেন করে **Send Money** অপশনে যান।\n২️⃣ উপরের নম্বরটি বসান এবং অ্যামাউন্ট **${amountNum} BDT** দিন।\n৩️⃣ আপনার পিন দিয়ে পেমেন্ট কনফার্ম করুন এবং **TrxID** কপি করুন।\n\n✍️ **টাকা পাঠানোর পর আপনার ট্রানজেকশন আইডি (TrxID) অথবা স্ক্রিনশট এখানে সেন্ড করুন। অ্যাডমিন ম্যানুয়াল রিসিভ করে আপনার ব্যালেন্স অ্যাড করে দেবেন।**`;
-                } else {
-                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     🧡 নগদ (Nagad) সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল নগদ নম্বর:** \`${targetNum}\`\n*(নম্বরের উপর ট্যাপ করলেই কপি হয়ে যাবে)*\n\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n📱 **নগদ অ্যাপের মাধ্যমে যেভাবে পাঠাবেন:**\n১️⃣ আপনার নগদ অ্যাপ ওপেন করে **Send Money** অপশনে যান।\n২️⃣ উপরের নম্বরটি বসান এবং অ্যামাউন্ট **${amountNum} BDT** দিন।\n৩️⃣ আপনার পিন দিয়ে পেমেন্ট কনফার্ম করুন এবং **TrxID** কপি করুন।\n\n✍️ **টাকা পাঠানোর পর আপনার ট্রানজেকশন আইডি (TrxID) অথবা স্ক্রিনশট এখানে সেন্ড করুন। অ্যাডমিন ম্যানুয়াল রিসিভ করে আপনার ব্যালেন্স অ্যাড করে দেবেন।**`;
-                }
-            } else {
-                if (method === 'bKash') {
-                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 bKash Send Money Guide\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **Official bKash Number:** \`${targetNum}\`\n*(Tap on the number to copy)*\n\n💵 **Amount to Send:** \`${amountNum} BDT\`\n\n📱 **Steps via bKash App:**\n1️⃣ Open your bKash app and tap **Send Money**.\n2️⃣ Enter the number above and amount **${amountNum} BDT**.\n3️⃣ Enter your PIN and copy the **TrxID**.\n\n✍️ **After sending money, send your TrxID or payment screenshot here. Admin will manually verify and add your balance.**`;
-                } else {
-                    instructionBox = `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     🧡 Nagad Send Money Guide\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **Official Nagad Number:** \`${targetNum}\`\n*(Tap on the number to copy)*\n\n💵 **Amount to Send:** \`${amountNum} BDT\`\n\n📱 **Steps via Nagad App:**\n1️⃣ Open your Nagad app and tap **Send Money**.\n2️⃣ Enter the number above and amount **${amountNum} BDT**.\n3️⃣ Enter your PIN and copy the **TrxID**.\n\n✍️ **After sending money, send your TrxID or payment screenshot here. Admin will manually verify and add your balance.**`;
-                }
-            }
+            let instructionBox = isBn
+                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 ${method} সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল নম্বর:** \`${targetNum}\`\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n✍️ টাকা পাঠানোর পর TrxID অথবা স্ক্রিনশট এখানে পাঠান।`
+                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 ${method} Send Money Guide\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **Official Number:** \`${targetNum}\`\n💵 **Amount to Send:** \`${amountNum} BDT\`\n\n✍️ After sending, send TrxID or screenshot here.`;
 
             const backText = isBn ? "🔙 পেছনের মেনু ↩️" : "🔙 Back ↩️";
             return ctx.reply(instructionBox, {
@@ -503,13 +499,12 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        // --- Deposit Step 2: Awaiting TrxID or Screenshot Proof ---
+        // --- Deposit Step 2: Awaiting Proof ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_proof' && !isMenuCommand(text)) {
             const method = db.sessions[userId].method;
             const amount = db.sessions[userId].depositAmount || 100;
             const uniqueDepId = userId + '_' + Date.now();
             const proofText = text || (ctx.message.photo ? '[Photo Screenshot Attached]' : 'N/A');
-            const isBn = getUserLang(userId) === 'bn';
 
             if (!db.depositRequests) db.depositRequests = {};
             db.depositRequests[uniqueDepId] = { userId: userId, method: method, amount: amount, proof: proofText };
@@ -536,9 +531,10 @@ bot.on('message', async (ctx) => {
                 }).catch(() => {});
             }
 
+            const isBn = getUserLang(userId) === 'bn';
             const pendingBoxMsg = isBn
-                ? `╭──────────────────────────────╮\n     ⏳ অ্যাড মানি রিকোয়েস্ট পেন্ডিং\n╰──────────────────────────────╯\n\n💳 মাধ্যম: \`${method}\`\n💵 পেন্ডিং অ্যামাউন্ট: \`${amount} BDT\`\n\n✨ আপনার ট্রানজেকশন বা স্ক্রিনশট সফলভাবে জমা হয়েছে। অ্যাডমিন যাচাই-বাছাই করে খুব শীঘ্রই আপনার ব্যালেন্স অ্যাড করে দেবেন!`
-                : `╭──────────────────────────────╮\n     ⏳ DEPOSIT REQUEST PENDING\n╰──────────────────────────────╯\n\n💳 Method: \`${method}\`\n💵 Pending Amount: \`${amount} BDT\`\n\n✨ Your proof has been submitted successfully. Admin will review and add your balance shortly!`;
+                ? `╭──────────────────────────────╮\n     ⏳ অ্যাড মানি রিকোয়েস্ট পেন্ডিং\n╰──────────────────────────────╯\n\n💳 মাধ্যম: \`${method}\`\n💵 পেন্ডিং অ্যামাউন্ট: \`${amount} BDT\`\n\n✨ আপনার প্রমাণ সফলভাবে জমা হয়েছে। অ্যাডমিন যাচাই করে ব্যালেন্স অ্যাড করে দেবেন!`
+                : `╭──────────────────────────────╮\n     ⏳ DEPOSIT REQUEST PENDING\n╰──────────────────────────────╯\n\n💳 Method: \`${method}\`\n💵 Pending Amount: \`${amount} BDT\`\n\n✨ Your proof has been submitted successfully!`;
 
             const userMsg = await ctx.reply(pendingBoxMsg, {
                 parse_mode: 'Markdown',
@@ -551,7 +547,7 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // --- Check FF UID Only (Smooth 1 to 100% Animation & Clean Name/UID) ---
+        // --- Check FF UID Only ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid_only' && !isMenuCommand(text)) {
             const uidText = text;
             const lang = getUserLang(userId);
@@ -644,7 +640,7 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // --- Admin Panel Commands ---
+        // --- Admin Main Menu Commands ---
         if (text === '📊 Total Users') {
             if (userId === ADMIN_ID.toString()) {
                 const usersObj = db.users || {};
@@ -668,27 +664,6 @@ bot.on('message', async (ctx) => {
         }
         if (text === '❌ Remove Bot') {
             if (userId === ADMIN_ID.toString()) return ctx.reply('⚠️ Send bot token to remove.');
-        }
-        if (text === '➕ Add Product') {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'add_product' };
-                saveDatabase(db);
-                return ctx.reply('✍️ Enter category and product name:\n`Category Name | Product Name - Price BDT`', { parse_mode: 'Markdown' });
-            }
-        }
-        if (text === '❌ Remove Product') {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'remove_product' };
-                saveDatabase(db);
-                return ctx.reply('✍️ Enter exact product name to remove:');
-            }
-        }
-        if (text === '✏️ Change Product Price') {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'change_product_price' };
-                saveDatabase(db);
-                return ctx.reply('✍️ Format:\n`Product Name | New Price`\n(Example: `100 Likes | 85`)', { parse_mode: 'Markdown' });
-            }
         }
         if (text === '💳 Add/Minus Balance') {
             if (userId === ADMIN_ID.toString()) {
@@ -759,6 +734,9 @@ bot.on('message', async (ctx) => {
             let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
             for (let c of Object.keys(db.categories || {})) {
                 inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + c)]);
+            }
+            if (userId === ADMIN_ID.toString()) {
+                inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
             }
             inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
             return ctx.reply(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
@@ -837,6 +815,100 @@ bot.on('message', async (ctx) => {
             return ctx.reply(t(userId, 'supportSentSuccess'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
     } catch (err) {}
+});
+
+// --- Admin Shop Management Actions (Inside Shop Menu) ---
+bot.action('admin_create_cat', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'add_category' };
+        saveDatabase(db);
+        await ctx.editMessageText('✍️ Enter new category name:', {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'shop_now_back')]])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action(/admin_add_prod_(.+)/, async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const catName = ctx.match[1];
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'add_shop_product', category: catName };
+        saveDatabase(db);
+        await ctx.editMessageText(`✍️ Enter product name and price for **${catName}**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`Squad Bot 3 Days | 120\`)`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catName)]])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action(/admin_rem_cat_(.+)/, async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const catName = ctx.match[1];
+        const db = loadDatabase();
+        if (db.categories[catName]) delete db.categories[catName];
+        if (db.customProducts[catName]) delete db.customProducts[catName];
+        saveDatabase(db);
+        await ctx.answerCbQuery('✅ Category removed successfully!');
+        // Return to shop menu
+        let inlineButtons = [[Markup.button.callback(t(ADMIN_ID, 'buyLikes'), 'cat_ff_likes')]];
+        for (let c of Object.keys(db.categories || {})) {
+            inlineButtons.push([Markup.button.callback(translateCategoryName(c, ADMIN_ID), 'custom_cat_' + c)]);
+        }
+        inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
+        inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
+        await ctx.editMessageText(t(ADMIN_ID, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
+    } catch (e) {}
+});
+
+bot.action(/admin_rem_prod_(.+)_(.+)/, async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const catName = ctx.match[1];
+        const prodIndex = parseInt(ctx.match[2]);
+        const db = loadDatabase();
+        if (db.customProducts[catName]) {
+            db.customProducts[catName].splice(prodIndex, 1);
+            saveDatabase(db);
+        }
+        await ctx.answerCbQuery('✅ Product removed successfully!');
+        // Refresh category view
+        let inlineButtons = [];
+        (db.customProducts?.[catName] || []).forEach((p, idx) => {
+            let row = [Markup.button.callback(translateProductName(p.name, ADMIN_ID), 'sub_prod_' + catName + '_' + idx)];
+            if (ADMIN_ID === ADMIN_ID.toString()) {
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${catName}_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${catName}_${idx}`));
+            }
+            inlineButtons.push(row);
+        });
+        inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_' + catName)]);
+        inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_' + catName)]);
+        inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
+        await ctx.editMessageText(`📂 **${translateCategoryName(catName, ADMIN_ID)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
+    } catch (e) {}
+});
+
+bot.action(/admin_chg_price_(.+)_(.+)/, async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const catName = ctx.match[1];
+        const prodIndex = parseInt(ctx.match[2]);
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'change_shop_price', category: catName, prodIndex: prodIndex };
+        saveDatabase(db);
+        await ctx.editMessageText(`✍️ Enter new price for this product (Only number):\n(Example: \`90\`)`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catName)]])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
 });
 
 // --- Language Menu & Switching ---
@@ -939,8 +1011,8 @@ bot.action('dep_bkash', async (ctx) => {
 
         const isBn = getUserLang(userId) === 'bn';
         const amountPromptBox = isBn 
-            ? `╭──────────────────────────────╮\n     💖 বিকাশ (bKash) ডিপোজিট\n╰──────────────────────────────╯\n\n💎 **নোটিশ:** সর্বনিম্ন ডিপোজিট বা অ্যাড ব্যালেন্স করতে হলে **১০০ টাকা বা তার বেশি** করতে হবে। ১০০ টাকার নিচে কোনো ব্যালেন্স অ্যাড করা যাবে না।\n\n✍️ আপনার কাঙ্ক্ষিত অ্যামাউন্টটি লিখে পাঠান:`
-            : `╭──────────────────────────────╮\n     💖 bKash Deposit\n╰──────────────────────────────╯\n\n💎 **Notice:** Minimum deposit to add balance is **100 BDT or more**. Balance cannot be added below 100 BDT.\n\n✍️ Please enter your amount to add:`;
+            ? `╭──────────────────────────────╮\n     💖 বিকাশ (bKash) ডিপোজিট\n╰──────────────────────────────╯\n\n💎 **নোটিশ:** সর্বনিম্ন ডিপোজিট বা অ্যাড ব্যালেন্স করতে হলে **১০০ টাকা বা তার বেশি** করতে হবে।\n\n✍️ আপনার কাঙ্ক্ষিত অ্যামাউন্টটি লিখে পাঠান:`
+            : `╭──────────────────────────────╮\n     💖 bKash Deposit\n╰──────────────────────────────╯\n\n💎 **Notice:** Minimum deposit is **100 BDT or more**.\n\n✍️ Please enter your amount to add:`;
 
         const cancelBtnText = isBn ? "❌ বাতিল করুন" : "❌ Cancel";
 
@@ -963,8 +1035,8 @@ bot.action('dep_nagad', async (ctx) => {
 
         const isBn = getUserLang(userId) === 'bn';
         const amountPromptBox = isBn 
-            ? `╭──────────────────────────────╮\n     🧡 নগদ (Nagad) ডিপোজিট\n╰──────────────────────────────╯\n\n💎 **নোটিশ:** সর্বনিম্ন ডিপোজিট বা অ্যাড ব্যালেন্স করতে হলে **১০০ টাকা বা তার বেশি** করতে হবে। ১০০ টাকার নিচে কোনো ব্যালেন্স অ্যাড করা যাবে না।\n\n✍️ আপনার কাঙ্ক্ষিত অ্যামাউন্টটি লিখে পাঠান:`
-            : `╭──────────────────────────────╮\n     🧡 Nagad Deposit\n╰──────────────────────────────╯\n\n💎 **Notice:** Minimum deposit to add balance is **100 BDT or more**. Balance cannot be added below 100 BDT.\n\n✍️ Please enter your amount to add:`;
+            ? `╭──────────────────────────────╮\n     🧡 নগদ (Nagad) ডিপোজিট\n╰──────────────────────────────╯\n\n💎 **নোটিশ:** সর্বনিম্ন ডিপোজিট বা অ্যাড ব্যালেন্স করতে হলে **১০০ টাকা বা তার বেশি** করতে হবে।\n\n✍️ আপনার কাঙ্ক্ষিত অ্যামাউন্টটি লিখে পাঠান:`
+            : `╭──────────────────────────────╮\n     🧡 Nagad Deposit\n╰──────────────────────────────╯\n\n💎 **Notice:** Minimum deposit is **100 BDT or more**.\n\n✍️ Please enter your amount to add:`;
 
         const cancelBtnText = isBn ? "❌ বাতিল করুন" : "❌ Cancel";
 
@@ -1163,6 +1235,9 @@ bot.action('shop_now_back', async (ctx) => {
         for (let c of Object.keys(db.categories || {})) {
             inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + c)]);
         }
+        if (userId === ADMIN_ID.toString()) {
+            inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
+        }
         inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
@@ -1174,8 +1249,16 @@ bot.action('cat_ff_likes', async (ctx) => {
         const db = loadDatabase();
         let inlineButtons = [];
         (db.customProducts?.['Free Fire Likes'] || []).forEach((p, idx) => {
-            inlineButtons.push([Markup.button.callback(translateProductName(p.name, userId), 'sub_prod_Free Fire Likes_' + idx)]);
+            let row = [Markup.button.callback(translateProductName(p.name, userId), 'sub_prod_Free Fire Likes_' + idx)];
+            if (userId === ADMIN_ID.toString()) {
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_Free Fire Likes_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_Free Fire Likes_${idx}`));
+            }
+            inlineButtons.push(row);
         });
+        if (userId === ADMIN_ID.toString()) {
+            inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_Free Fire Likes')]);
+        }
         inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText("🔥 **Select Package:**", { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
@@ -1187,8 +1270,17 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
         const db = loadDatabase();
         let inlineButtons = [];
         (db.customProducts?.[catName] || []).forEach((p, idx) => {
-            inlineButtons.push([Markup.button.callback(translateProductName(p.name, userId), 'sub_prod_' + catName + '_' + idx)]);
+            let row = [Markup.button.callback(translateProductName(p.name, userId), 'sub_prod_' + catName + '_' + idx)];
+            if (userId === ADMIN_ID.toString()) {
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${catName}_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${catName}_${idx}`));
+            }
+            inlineButtons.push(row);
         });
+        if (userId === ADMIN_ID.toString()) {
+            inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_' + catName)]);
+            inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_' + catName)]);
+        }
         inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText(`📂 **${translateCategoryName(catName, userId)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
@@ -1271,7 +1363,6 @@ bot.action('confirm_order', async (ctx) => {
         db.balances[userId] -= Number(session.price);
         saveDatabase(db);
 
-        // Fast Progress Animation
         const procMsg = await ctx.reply(`⏳ Processing Order...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
         await new Promise(r => setTimeout(r, 200));
         try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
@@ -1338,7 +1429,6 @@ bot.action('confirm_order', async (ctx) => {
             });
 
         } else {
-            // Guild Glory / Service Order: Show Pending Status to user immediately & send to admin
             try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             await new Promise(r => setTimeout(r, 200));
 
@@ -1353,7 +1443,7 @@ bot.action('confirm_order', async (ctx) => {
 
             db.adminSessions[uniqueOrderId] = {
                 targetUserId: userId,
-                loadingMessageId: userMsg.message_id, // Saving message_id so admin completion edits this exact message
+                loadingMessageId: userMsg.message_id,
                 product: session.product,
                 uid: session.uid,
                 nickname: session.nickname || 'Guild/Service ID',
