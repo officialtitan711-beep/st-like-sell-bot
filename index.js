@@ -1,5 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
-const http = require('http');
+const http = http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -162,7 +162,7 @@ function t(userId, key) {
             serverTitle: "🌍 **সার্ভার নির্বাচন**\n\nপ্যাকেজ: ",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             cancelBtn: "❌ বাতিল করুন",
-            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন።",
+            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **শেষ ১০টি অর্ডারের ইতিহাস**\n\n",
             historyDisclaimer: "\n⚠️ *নোট: সুরক্ষার জন্য এখানে শুধুমাত্র আপনার সর্বশেষ ১০টি অর্ডার দেখানো হয়।*",
             noHistory: "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n"
@@ -188,57 +188,32 @@ function t(userId, key) {
     return dict[lang][key] || dict['en'][key];
 }
 
-function getMainKeyboard(userId) {
+// --- Main Menu (Inline Buttons Panel - 100% Bug-Free) ---
+function getMainInlineKeyboard(userId) {
     const lang = getUserLang(userId);
-    let keyboard = lang === 'en' ? [
-        ['🛍️ Shop Now', '🔍 Check FF UID'],
-        ['💰 Add Balance', '👤 My Profile'],
-        ['📜 Order History', '📞 Support Desk'],
-        ['🧮 Calculator', '🌍 World Clock']
+    let buttons = lang === 'en' ? [
+        [Markup.button.callback('🛍️ Shop Now', 'menu_shop'), Markup.button.callback('🔍 Check FF UID', 'menu_checkuid')],
+        [Markup.button.callback('💰 Add Balance', 'menu_deposit'), Markup.button.callback('👤 My Profile', 'menu_profile')],
+        [Markup.button.callback('📜 Order History', 'menu_history'), Markup.button.callback('📞 Support Desk', 'menu_support')],
+        [Markup.button.callback('🧮 Calculator', 'menu_calc'), Markup.button.callback('🌍 World Clock', 'menu_clock')]
     ] : [
-        ['🛍️ শপ নাও', '🔍 ইউআইডি চেক'],
-        ['💰 ব্যালেন্স অ্যাড', '👤 আমার প্রোফাইল'],
-        ['📜 অর্ডার হিস্ট্রি', '📞 সাপোর্ট ডেস্ক'],
-        ['🧮 ক্যালকুলেটর', '🌍 ওয়ার্ল্ড ক্লক']
+        [Markup.button.callback('🛍️ শপ নাও', 'menu_shop'), Markup.button.callback('🔍 ইউআইডি চেক', 'menu_checkuid')],
+        [Markup.button.callback('💰 ব্যালেন্স অ্যাড', 'menu_deposit'), Markup.button.callback('👤 আমার প্রোফাইল', 'menu_profile')],
+        [Markup.button.callback('📜 অর্ডার হিস্ট্রি', 'menu_history'), Markup.button.callback('📞 সাপোর্ট ডেস্ক', 'menu_support')],
+        [Markup.button.callback('🧮 ক্যালকুলেটর', 'menu_calc'), Markup.button.callback('🌍 ওয়ার্ল্ড ক্লক', 'menu_clock')]
     ];
 
     if (userId.toString() === ADMIN_ID.toString()) {
         const db = loadDatabase();
         const apiStatusText = (db.settings && db.settings.autoApiEnabled) ? '🟢 Auto API: ON' : '🔴 Auto API: OFF';
-        keyboard.push(
-            ['-----------------------------------'],
-            [apiStatusText, '📊 Total Users'],
-            ['➕ Add Bot', '❌ Remove Bot'],
-            ['💳 Add/Minus Balance', '📱 Set Payment Numbers'],
-            ['📩 Send Message', '📢 All Users Msg']
+        buttons.push(
+            [Markup.button.callback(apiStatusText, 'admin_toggle_api'), Markup.button.callback('📊 Total Users', 'admin_total_users')],
+            [Markup.button.callback('➕ Add Bot', 'admin_add_bot_prompt'), Markup.button.callback('❌ Remove Bot', 'admin_rem_bot_prompt')],
+            [Markup.button.callback('💳 Add/Minus Balance', 'admin_bal_prompt'), Markup.button.callback('📱 Set Payment Numbers', 'admin_pay_nums')],
+            [Markup.button.callback('📩 Send Message', 'admin_msg_prompt'), Markup.button.callback('📢 All Users Msg', 'admin_broadcast_prompt')]
         );
     }
-    return Markup.keyboard(keyboard).resize();
-}
-
-function isMenuCommand(text) {
-    if (!text) return false;
-    if (text.startsWith('/')) return true;
-    if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) return true;
-    if (text.includes('Shop Now') || text.includes('শপ নাও') || text.includes('🛍️')) return true;
-    
-    const clean = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]/gu, '').toLowerCase();
-    
-    const keywords = [
-        'shopnow', 'শপনাও',
-        'checkffuid', 'ইউআইডিচেক',
-        'addbalance', 'ব্যালেন্সঅ্যাড',
-        'myprofile', 'আমারপ্রোফাইল',
-        'orderhistory', 'অর্ডারহিস্ট্রি',
-        'supportdesk', 'সাপোর্টডেস্ক',
-        'calculator', 'ক্যালকুলেটর',
-        'worldclock', 'ওয়ার্ল্ডক্লক',
-        'totalusers', 'addbot', 'removebot',
-        'add/minusbalance', 'setpaymentnumbers',
-        'sendmessage', 'allusersmsg', '-----------------------------------'
-    ];
-    
-    return keywords.some(k => clean.includes(k) || text.includes('🔍') || text.includes('💰') || text.includes('👤') || text.includes('📜') || text.includes('📞') || text.includes('🧮') || text.includes('🌍') || text.includes('📊') || text.includes('➕') || text.includes('❌') || text.includes('💳') || text.includes('📱') || text.includes('📩') || text.includes('📢'));
+    return Markup.inlineKeyboard(buttons);
 }
 
 function translateCategoryName(catName, userId) {
@@ -309,40 +284,20 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// --- BOT USE MIDDLEWARE ---
-bot.use(async (ctx, next) => {
-    try {
-        if (ctx && ctx.from) {
-            const userId = ctx.from.id.toString();
-            const db = loadDatabase();
-            if (!db.users) db.users = {};
-            db.users[userId] = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
-            saveDatabase(db);
-            if (userId === ADMIN_ID) return next();
-            if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_sub') return next();
-            
-            if (ctx.message && ctx.message.text) {
-                const msgText = ctx.message.text;
-                if (msgText.startsWith('/start') || isMenuCommand(msgText)) {
-                    return next();
-                }
-            }
-
-            if (!(await checkUserSubscription(userId))) return sendForceSubMessage(ctx, false);
-            if (!db.allowedUsers || !db.allowedUsers[userId]) return sendForceSubMessage(ctx, true);
-        }
-        await next();
-    } catch (err) {}
-});
-
+// --- BOT START COMMAND ---
 bot.start(async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
-        if (!(await checkUserSubscription(userId))) return sendForceSubMessage(ctx, false);
         const db = loadDatabase();
+        if (!db.users) db.users = {};
+        db.users[userId] = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
+        saveDatabase(db);
+
+        if (!(await checkUserSubscription(userId))) return sendForceSubMessage(ctx, false);
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
         if (userId.toString() !== ADMIN_ID.toString() && (!db.allowedUsers || !db.allowedUsers[userId])) return sendForceSubMessage(ctx, true);
-        return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        
+        return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainInlineKeyboard(userId) });
     } catch (e) {}
 });
 
@@ -358,7 +313,7 @@ bot.action('verify_sub', async (ctx) => {
         }
         await ctx.answerCbQuery('🎉 ভেরিফিকেশন সফল!');
         try { await ctx.deleteMessage(); } catch (e) {}
-        return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainInlineKeyboard(userId) });
     } catch (e) {}
 });
 
@@ -372,12 +327,246 @@ function getCalcKeyboard() {
     ]);
 }
 
+// --- ALL INLINE MENU CALLBACKS (Shop Now, Balance, etc.) ---
+bot.action('menu_shop', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        let inlineButtons = [];
+        if (db.categories['Free Fire Likes']) {
+            inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
+        }
+        for (let c of Object.keys(db.categories || {})) {
+            if (c === 'Free Fire Likes') continue;
+            let encodedC = encodeURIComponent(c);
+            inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
+        }
+        if (userId === ADMIN_ID.toString()) {
+            inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
+        }
+        inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
+        await ctx.editMessageText(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('menu_checkuid', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        db.sessions[userId] = { step: 'awaiting_uid_only' };
+        saveDatabase(db);
+        await ctx.editMessageText(t(userId, 'checkUidPrompt'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('menu_deposit', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const lang = getUserLang(userId);
+        const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
+        await ctx.editMessageText(t(userId, 'depositPortal'), {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('💖 বিকাশ [bKash]', 'dep_bkash'), Markup.button.callback('🧡 নগদ [Nagad]', 'dep_nagad')],
+                [Markup.button.callback(cancelBtnText, 'back_start_inline')]
+            ])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('menu_profile', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        const lang = getUserLang(userId);
+        const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
+        const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\``;
+
+        await ctx.editMessageText(profileBox, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback(langBtn, 'open_lang_menu')],
+                [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
+            ])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('menu_history', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId].slice(0, 10) : [];
+        let historyText = t(userId, 'historyTitle');
+        if (userHistories.length === 0) {
+            historyText += t(userId, 'noHistory');
+        } else {
+            userHistories.forEach((h, i) => {
+                const statusText = h.status === 'Cancelled' ? '❌ Cancelled' : '✅ Complete';
+                historyText += `${i + 1}. 📦 **${translateProductName(h.product, userId)}** — 💵 \`${h.price} BDT\`\n` +
+                               `   💰 Cost: \`${h.price} BDT\`\n` +
+                               `   ───────────────────────\n` +
+                               `   👤 Name: \`${h.nickname || 'N/A'}\`\n` +
+                               `   🛡️ UID: \`${h.uid}\`\n` +
+                               `   ✦ ───────────────── ✦\n` +
+                               `   🕒 \`${h.time} | ${h.date}\`\n` +
+                               `   📊 Status: ${statusText}\n\n`;
+            });
+        }
+        await ctx.editMessageText(historyText + t(userId, 'historyDisclaimer'), {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('menu_support', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        await ctx.editMessageText(t(userId, 'supportText'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('menu_calc', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        db.calcStates[userId] = '0';
+        saveDatabase(db);
+        await ctx.editMessageText("🧮 **Calculator**\n\nScreen: `0`", { parse_mode: 'Markdown', ...getCalcKeyboard() });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('menu_clock', async (ctx) => {
+    try {
+        const userId = ctx.from.id.toString();
+        await ctx.editMessageText("🌍 **World Clock & Date**\n\n👇 Select country:", {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🇧🇩 Bangladesh', 'clock_bd'), Markup.button.callback('🇳🇵 Nepal', 'clock_np')],
+                [Markup.button.callback('🇮🇳 India', 'clock_in'), Markup.button.callback('🇵🇰 Pakistan', 'clock_pk')],
+                [Markup.button.callback('🇸🇦 Saudi Arabia', 'clock_sa'), Markup.button.callback('🇦🇪 Dubai (UAE)', 'clock_ae')],
+                [Markup.button.callback('🇲🇾 Malaysia', 'clock_my'), Markup.button.callback('🇸🇬 Singapore', 'clock_sg')],
+                [Markup.button.callback('🇺🇸 USA (NY)', 'clock_us'), Markup.button.callback('🇬🇧 UK (London)', 'clock_gb')],
+                [Markup.button.callback('🇨🇦 Canada', 'clock_ca'), Markup.button.callback('🇦🇺 Australia', 'clock_au')],
+                [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
+            ])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+// --- ADMIN QUICK ACTION CALLBACKS ---
+bot.action('admin_toggle_api', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.settings.autoApiEnabled = !db.settings.autoApiEnabled;
+        saveDatabase(db);
+        await ctx.editMessageText(t(ADMIN_ID, 'welcome'), { parse_mode: 'Markdown', ...getMainInlineKeyboard(ADMIN_ID) });
+        await ctx.answerCbQuery(db.settings.autoApiEnabled ? '🟢 Auto API enabled!' : '🔴 Auto API disabled!');
+    } catch (e) {}
+});
+
+bot.action('admin_total_users', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        const usersObj = db.users || {};
+        const userKeys = Object.keys(usersObj);
+        let listText = `📊 **TOTAL USERS: ${userKeys.length}**\n\n`;
+        userKeys.forEach((uId, idx) => {
+            const uInfo = usersObj[uId];
+            const bal = db.balances[uId] || 0;
+            listText += `${idx + 1}. 👤 Name: \`${uInfo.first_name}\`\n   🔗 Username: \`${uInfo.username}\`\n   🆔 ID: \`${uId}\`\n   💰 Balance: \`${bal} BDT\`\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n`;
+        });
+        await ctx.reply(listText, { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('admin_add_bot_prompt', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'add_bot_user' };
+        saveDatabase(db);
+        await ctx.reply('➕ **অ্যাড বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) দিয়ে বট এক্সেস দিতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('admin_rem_bot_prompt', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'remove_bot_user' };
+        saveDatabase(db);
+        await ctx.reply('❌ **রিমুভ বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) বট থেকে রিমুভ করতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('admin_bal_prompt', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'add_minus_balance' };
+        saveDatabase(db);
+        await ctx.reply('✍️ Format: `USER_ID AMOUNT` (Example: `5932254012 100`)', { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('admin_pay_nums', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        await ctx.reply('📱 **Payment Number Management**\n\n👇 Select which payment number to update:', {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('💖 Set bKash Number', 'admin_set_bkash')],
+                [Markup.button.callback('🧡 Set Nagad Number', 'admin_set_nagad')]
+            ])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('admin_msg_prompt', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'send_message' };
+        saveDatabase(db);
+        await ctx.reply('✍️ Format: `USER_ID | MESSAGE`', { parse_mode: 'Markdown' });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('admin_broadcast_prompt', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'broadcast_msg' };
+        saveDatabase(db);
+        await ctx.reply('📢 Enter broadcast message for all users:');
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+// --- TEXT MESSAGE HANDLER (Inputs, Support, Admin Actions) ---
 bot.on('message', async (ctx) => {
     try {
         if (!ctx.message) return;
         const userId = ctx.from.id.toString();
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
-        const cleanText = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]/gu, '').trim().toLowerCase();
 
         const db = loadDatabase();
         if (!db.balances) db.balances = {};
@@ -394,18 +583,7 @@ bot.on('message', async (ctx) => {
         if (!db.calcStates) db.calcStates = {};
         if (!db.userLang) db.userLang = {};
 
-        if (isMenuCommand(text)) {
-            if (db.sessions && db.sessions[userId]) {
-                delete db.sessions[userId];
-                saveDatabase(db);
-            }
-            if (userId === ADMIN_ID.toString() && db.adminInputSession && db.adminInputSession[userId]) {
-                delete db.adminInputSession[userId];
-                saveDatabase(db);
-            }
-        }
-
-        if (userId === ADMIN_ID.toString() && db.adminReplySessions && db.adminReplySessions[userId] && !isMenuCommand(text)) {
+        if (userId === ADMIN_ID.toString() && db.adminReplySessions && db.adminReplySessions[userId]) {
             const targetUser = db.adminReplySessions[userId];
             try {
                 await bot.telegram.sendMessage(targetUser, "💬 **Admin Reply:**\n\n" + text, { parse_mode: 'Markdown' });
@@ -416,7 +594,7 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        if (userId === ADMIN_ID.toString() && db.adminInputSession && db.adminInputSession[userId] && !isMenuCommand(text)) {
+        if (userId === ADMIN_ID.toString() && db.adminInputSession && db.adminInputSession[userId]) {
             const sessionData = db.adminInputSession[userId];
 
             if (sessionData.type === 'add_bot_user') {
@@ -437,9 +615,7 @@ bot.on('message', async (ctx) => {
             if (sessionData.type === 'remove_bot_user') {
                 const targetUid = text.replace(/[^0-9]/g, '');
                 if (targetUid) {
-                    if (db.allowedUsers[targetUid]) {
-                        delete db.allowedUsers[targetUid];
-                    }
+                    if (db.allowedUsers[targetUid]) delete db.allowedUsers[targetUid];
                     saveDatabase(db);
                     delete db.adminInputSession[userId];
                     try {
@@ -491,7 +667,7 @@ bot.on('message', async (ctx) => {
                     if (!db.customProducts[catName]) db.customProducts[catName] = [];
                     saveDatabase(db);
                     delete db.adminInputSession[userId];
-                    return ctx.reply(`✅ Category "${catName}" created successfully! Now go to Shop Menu, enter this category and add products.`);
+                    return ctx.reply(`✅ Category "${catName}" created successfully!`);
                 }
                 delete db.adminInputSession[userId];
                 return ctx.reply('❌ Invalid category name.');
@@ -574,7 +750,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- Deposit Step 1: Awaiting Amount ---
-        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_amount' && !isMenuCommand(text)) {
+        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_amount') {
             const amountNum = Number(text);
             const lang = getUserLang(userId);
 
@@ -587,9 +763,7 @@ bot.on('message', async (ctx) => {
 
                 return ctx.reply(errBox, {
                     parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([
-                        [Markup.button.callback(cancelBtnText, 'deposit_portal_back')]
-                    ])
+                    ...Markup.inlineKeyboard([[Markup.button.callback(cancelBtnText, 'deposit_portal_back')]])
                 });
             }
 
@@ -612,7 +786,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- Deposit Step 2: Awaiting Proof ---
-        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_proof' && !isMenuCommand(text)) {
+        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_proof') {
             const method = db.sessions[userId].method;
             const amount = db.sessions[userId].depositAmount || 100;
             const uniqueDepId = userId + '_' + Date.now();
@@ -660,7 +834,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- Check FF UID Only ---
-        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid_only' && !isMenuCommand(text)) {
+        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid_only') {
             const uidText = text;
             const lang = getUserLang(userId);
             delete db.sessions[userId];
@@ -690,7 +864,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- Order Flow: Awaiting UID ---
-        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid' && !isMenuCommand(text)) {
+        if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid') {
             const uidText = text;
             db.sessions[userId].uid = uidText;
             db.sessions[userId].step = 'confirming';
@@ -752,183 +926,8 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // --- Admin Main Menu Commands ---
-        if (cleanText.includes('totalusers') || text.includes('📊')) {
-            if (userId === ADMIN_ID.toString()) {
-                const usersObj = db.users || {};
-                const userKeys = Object.keys(usersObj);
-                let listText = `📊 **TOTAL USERS: ${userKeys.length}**\n\n`;
-                userKeys.forEach((uId, idx) => {
-                    const uInfo = usersObj[uId];
-                    const bal = db.balances[uId] || 0;
-                    listText += `${idx + 1}. 👤 Name: \`${uInfo.first_name}\`\n   🔗 Username: \`${uInfo.username}\`\n   🆔 ID: \`${uId}\`\n   💰 Balance: \`${bal} BDT\`\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n`;
-                    if (listText.length > 3700) {
-                        ctx.reply(listText, { parse_mode: 'Markdown' });
-                        listText = '';
-                    }
-                });
-                if (listText.length > 0) return ctx.reply(listText, { parse_mode: 'Markdown' });
-                return;
-            }
-        }
-        if (cleanText.includes('addbot') || text.includes('➕')) {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'add_bot_user' };
-                saveDatabase(db);
-                return ctx.reply('➕ **অ্যাড বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) দিয়ে বট এক্সেস দিতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
-            }
-        }
-        if (cleanText.includes('removebot') || text.includes('❌')) {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'remove_bot_user' };
-                saveDatabase(db);
-                return ctx.reply('❌ **রিমুভ বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) বট থেকে রিমুভ করতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
-            }
-        }
-        if (cleanText.includes('add/minusbalance') || text.includes('💳')) {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'add_minus_balance' };
-                saveDatabase(db);
-                return ctx.reply('✍️ Format: `USER_ID AMOUNT` (Example: `5932254012 100`)', { parse_mode: 'Markdown' });
-            }
-        }
-        if (cleanText.includes('setpaymentnumbers') || text.includes('📱')) {
-            if (userId === ADMIN_ID.toString()) {
-                return ctx.reply('📱 **Payment Number Management**\n\n👇 Select which payment number to update:', {
-                    parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([
-                        [Markup.button.callback('💖 Set bKash Number', 'admin_set_bkash')],
-                        [Markup.button.callback('🧡 Set Nagad Number', 'admin_set_nagad')]
-                    ])
-                });
-            }
-        }
-        if (cleanText.includes('sendmessage') || text.includes('📩')) {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'send_message' };
-                saveDatabase(db);
-                return ctx.reply('✍️ Format: `USER_ID | MESSAGE`', { parse_mode: 'Markdown' });
-            }
-        }
-        if (cleanText.includes('allusersmsg') || text.includes('📢')) {
-            if (userId === ADMIN_ID.toString()) {
-                db.adminInputSession[userId] = { type: 'broadcast_msg' };
-                saveDatabase(db);
-                return ctx.reply('📢 Enter broadcast message for all users:');
-            }
-        }
-        if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) {
-            if (userId === ADMIN_ID.toString()) {
-                db.settings.autoApiEnabled = !db.settings.autoApiEnabled;
-                saveDatabase(db);
-                const msg = db.settings.autoApiEnabled
-                    ? "🟢 বটটি বর্তমানে অটোমেটিক মোডে আছে, এপিআই সফলভাবে অন হয়েছে।"
-                    : "🔴 বটটি বর্তমানে ম্যানুয়াল মোডে আছে, এপিআই অফ হয়ে গেছে।";
-                return ctx.reply(msg, { ...getMainKeyboard(userId) });
-            }
-        }
-
-        // --- User Main Menu Buttons (Universal Dispatcher) ---
-        if (text.includes('Shop Now') || text.includes('শপ নাও') || cleanText.includes('shopnow') || cleanText.includes('শপনাও') || text.includes('🛍️')) {
-            let inlineButtons = [];
-            if (db.categories['Free Fire Likes']) {
-                inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
-            }
-            for (let c of Object.keys(db.categories || {})) {
-                if (c === 'Free Fire Likes') continue;
-                let encodedC = encodeURIComponent(c);
-                inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
-            }
-            if (userId === ADMIN_ID.toString()) {
-                inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
-            }
-            inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
-            return ctx.reply(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
-        }
-
-        if (cleanText.includes('calculator') || cleanText.includes('ক্যালকুলেটর') || text.includes('🧮')) {
-            db.calcStates[userId] = '0';
-            saveDatabase(db);
-            return ctx.reply("🧮 **Calculator**\n\nScreen: `0`", { parse_mode: 'Markdown', ...getCalcKeyboard() });
-        }
-
-        if (cleanText.includes('worldclock') || cleanText.includes('ওয়ার্ল্ডক্লক') || text.includes('🌍')) {
-            return ctx.reply("🌍 **World Clock & Date**\n\n👇 Select country:", {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('🇧🇩 Bangladesh', 'clock_bd'), Markup.button.callback('🇳🇵 Nepal', 'clock_np')],
-                    [Markup.button.callback('🇮🇳 India', 'clock_in'), Markup.button.callback('🇵🇰 Pakistan', 'clock_pk')],
-                    [Markup.button.callback('🇸🇦 Saudi Arabia', 'clock_sa'), Markup.button.callback('🇦🇪 Dubai (UAE)', 'clock_ae')],
-                    [Markup.button.callback('🇲🇾 Malaysia', 'clock_my'), Markup.button.callback('🇸🇬 Singapore', 'clock_sg')],
-                    [Markup.button.callback('🇺🇸 USA (NY)', 'clock_us'), Markup.button.callback('🇬🇧 UK (London)', 'clock_gb')],
-                    [Markup.button.callback('🇨🇦 Canada', 'clock_ca'), Markup.button.callback('🇦🇺 Australia', 'clock_au')],
-                    [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
-                ])
-            });
-        }
-
-        if (cleanText.includes('checkffuid') || cleanText.includes('ইউআইডিচেক') || text.includes('🔍')) {
-            db.sessions[userId] = { step: 'awaiting_uid_only' };
-            saveDatabase(db);
-            return ctx.reply(t(userId, 'checkUidPrompt'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
-        }
-
-        if (cleanText.includes('addbalance') || cleanText.includes('ব্যালেন্সঅ্যাড') || text.includes('💰')) {
-            const lang = getUserLang(userId);
-            const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
-
-            return ctx.reply(t(userId, 'depositPortal'), {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('💖 বিকাশ [bKash]', 'dep_bkash'), Markup.button.callback('🧡 নগদ [Nagad]', 'dep_nagad')],
-                    [Markup.button.callback(cancelBtnText, 'back_start_inline')]
-                ])
-            });
-        }
-
-        if (cleanText.includes('myprofile') || cleanText.includes('আমারপ্রোফাইল') || text.includes('👤')) {
-            const lang = getUserLang(userId);
-            const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
-            const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\``;
-
-            return ctx.reply(profileBox, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback(langBtn, 'open_lang_menu')],
-                    [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
-                ])
-            });
-        }
-
-        if (cleanText.includes('orderhistory') || cleanText.includes('অর্ডারহিস্ট্রি') || text.includes('📜')) {
-            const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId].slice(0, 10) : [];
-            let historyText = t(userId, 'historyTitle');
-            if (userHistories.length === 0) {
-                historyText += t(userId, 'noHistory');
-            } else {
-                userHistories.forEach((h, i) => {
-                    const statusText = h.status === 'Cancelled' ? '❌ Cancelled' : '✅ Complete';
-                    historyText += `${i + 1}. 📦 **${translateProductName(h.product, userId)}** — 💵 \`${h.price} BDT\`\n` +
-                                   `   💰 Cost: \`${h.price} BDT\`\n` +
-                                   `   ───────────────────────\n` +
-                                   `   👤 Name: \`${h.nickname || 'N/A'}\`\n` +
-                                   `   🛡️ UID: \`${h.uid}\`\n` +
-                                   `   ✦ ───────────────── ✦\n` +
-                                   `   🕒 \`${h.time} | ${h.date}\`\n` +
-                                   `   📊 Status: ${statusText}\n\n`;
-                });
-            }
-            return ctx.reply(historyText + t(userId, 'historyDisclaimer'), {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
-            });
-        }
-
-        if (cleanText.includes('supportdesk') || cleanText.includes('সাপোর্টডেস্ক') || text.includes('📞')) {
-            return ctx.reply(t(userId, 'supportText'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
-        }
-
-        if (userId !== ADMIN_ID.toString() && !isMenuCommand(text)) {
+        // Support desk message forwarding for regular users
+        if (userId !== ADMIN_ID.toString()) {
             const box = `📥 **New Customer Message**\n\n👤 Name: ${ctx.from.first_name}\n🆔 ID: \`${userId}\`\n\n💬 Message:\n${text}`;
             try {
                 if (ctx.message.photo) {
@@ -1086,7 +1085,7 @@ bot.action(/set_lang_(bn|en)/, async (ctx) => {
         saveDatabase(db);
         await ctx.answerCbQuery(lang === 'bn' ? '🇧🇩 বাংলা ভাষা সেট করা হয়েছে!' : '🇬🇧 English language selected!');
         try { await ctx.deleteMessage(); } catch (e) {}
-        return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainInlineKeyboard(userId) });
     } catch (e) {}
 });
 
@@ -1149,9 +1148,7 @@ bot.action('dep_bkash', async (ctx) => {
 
         await ctx.editMessageText(amountPromptBox, {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback(cancelBtnText, 'deposit_portal_back')]
-            ])
+            ...Markup.inlineKeyboard([[Markup.button.callback(cancelBtnText, 'deposit_portal_back')]])
         });
         await ctx.answerCbQuery();
     } catch (e) {}
@@ -1173,9 +1170,7 @@ bot.action('dep_nagad', async (ctx) => {
 
         await ctx.editMessageText(amountPromptBox, {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback(cancelBtnText, 'deposit_portal_back')]
-            ])
+            ...Markup.inlineKeyboard([[Markup.button.callback(cancelBtnText, 'deposit_portal_back')]])
         });
         await ctx.answerCbQuery();
     } catch (e) {}
@@ -1636,8 +1631,7 @@ bot.action('back_start_inline', async (ctx) => {
         const db = loadDatabase();
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
         await ctx.answerCbQuery();
-        try { await ctx.deleteMessage(); } catch (e) {}
-        return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
+        await ctx.editMessageText(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainInlineKeyboard(userId) });
     } catch (e) {}
 });
 
