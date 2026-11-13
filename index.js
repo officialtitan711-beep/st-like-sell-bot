@@ -191,12 +191,12 @@ function t(userId, key) {
 function getMainKeyboard(userId) {
     const lang = getUserLang(userId);
     let keyboard = lang === 'en' ? [
-        ['🛍️ Shop Now', '🔍 Check FF UID'],
+        ['Shop Now', '🔍 Check FF UID'],
         ['💰 Add Balance', '👤 My Profile'],
         ['📜 Order History', '📞 Support Desk'],
         ['🧮 Calculator', '🌍 World Clock']
     ] : [
-        ['🛍️ শপ নাও', '🔍 ইউআইডি চেক'],
+        ['শপ নাও', '🔍 ইউআইডি চেক'],
         ['💰 ব্যালেন্স অ্যাড', '👤 আমার প্রোফাইল'],
         ['📜 অর্ডার হিস্ট্রি', '📞 সাপোর্ট ডেস্ক'],
         ['🧮 ক্যালকুলেটর', '🌍 ওয়ার্ল্ড ক্লক']
@@ -220,7 +220,6 @@ function isMenuCommand(text) {
     if (!text) return false;
     if (text.startsWith('/')) return true;
     
-    // ইমোজি রিমুভ করে একদম ক্লিন টেক্সট বের করা
     const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{2B50}\u{2728}\u{1F4F1}\u{1F4B0}\u{1F464}\u{1F4DC}\u{1F4DE}\u{1F9EE}\u{1F30D}\u{1F4CA}\u{2795}\u{274C}\u{1F4B3}\u{1F4E9}\u{1F4E2}\u{1F4F7}\u{1F50D}\u{1F3AE}\u{1F4C1}\u{1F4CC}\u{2328}\u{1F310}\s]/gu, '').toLowerCase();
     
     if (clean.includes('shopnow') || clean.includes('শপনাও') || clean.includes('shop') || clean.includes('শপ')) return true;
@@ -828,7 +827,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- User Main Menu Buttons (Universal Dispatcher) ---
-        if (text.includes('Shop Now') || text.includes('শপ নাও') || cleanText.includes('shopnow') || cleanText.includes('শপনাও') || cleanText.includes('shop') || cleanText.includes('শপ') || text.includes('🛍️')) {
+        if (cleanText.includes('shopnow') || cleanText.includes('শপনাও') || cleanText.includes('shop') || cleanText.includes('শপ') || text.includes('Shop Now') || text.includes('শপ নাও')) {
             let inlineButtons = [];
             if (db.categories['Free Fire Likes']) {
                 inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
