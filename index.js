@@ -234,10 +234,15 @@ function checkFreeFireUID(uid) {
                     const parsed = JSON.parse(data);
                     let nickname = parsed.nickname || parsed.message || parsed.name || parsed.username || parsed.AccountName;
                     let level = parsed.level || parsed.AccountLevel || parsed.lvl || '';
-                    resolve({ nickname: (nickname && nickname.trim() !== '') ? nickname : 'Unknown Player', level: level ? String(level) : '' });
-                } catch (err) { resolve({ nickname: 'Unknown Player', level: '' }); }
+                    let likes = parsed.likes || parsed.AccountLikes || parsed.Like || parsed.like || 0;
+                    resolve({ 
+                        nickname: (nickname && nickname.trim() !== '') ? nickname : 'Unknown Player', 
+                        level: level ? String(level) : '',
+                        likes: Number(likes) || 0
+                    });
+                } catch (err) { resolve({ nickname: 'Unknown Player', level: '', likes: 0 }); }
             });
-        }).on('error', () => { resolve({ nickname: 'Unknown Player', level: '' }); });
+        }).on('error', () => { resolve({ nickname: 'Unknown Player', level: '', likes: 0 }); });
     });
 }
 
@@ -346,6 +351,13 @@ bot.on('message', async (ctx) => {
                 const targetUid = orderInfo.targetUserId;
                 const currentBal = db.balances[targetUid] || 0;
 
+                // Admin input format for manual completion: "prevLikes | currLikes | Note" (or just numbers/note)
+                const parts = text.split('|');
+                const pLikes = parts[0] ? parts[0].trim() : 'N/A';
+                const cLikes = parts[1] ? parts[1].trim() : 'N/A';
+                const aLikes = (!isNaN(pLikes) && !isNaN(cLikes)) ? `+${Number(cLikes) - Number(pLikes)} Likes` : 'N/A';
+                const adminNote = parts[2] ? parts[2].trim() : (parts[0] && !parts[1] ? parts[0].trim() : 'Completed by Admin');
+
                 if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
                 const now = new Date();
                 db.orderHistories[targetUid].unshift({
@@ -357,14 +369,14 @@ bot.on('message', async (ctx) => {
                 if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
                 saveDatabase(db);
 
-                const successReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n\n🆔 Order ID: \`MAN-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${orderInfo.nickname || 'Unknown'}\`\n🛡 UID: \`${orderInfo.uid}\`\n🌐 Server: \`${orderInfo.region}\`\n📊 Status: \`Completed by Admin\`\n\n📝 Admin Note: \`${text}\`\n\n🪶 Cost: \`${orderInfo.price} BDT\`\n💰 Current Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                const manualReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`MAN-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${orderInfo.nickname || 'Unknown'}\`\n🛡️ UID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n👍 **Previous Likes:** \`${pLikes}\`\n👍 **Current Likes:** \`${cLikes}\`\n📈 **Added Likes:** \`${aLikes}\`\n\n📊 Status: \`Completed by Admin\`\n📝 Note/Details: \`${adminNote}\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
-                await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, successReceipt, {
+                await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, manualReceipt, {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
                 }).catch(() => {});
 
-                await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy]**\n\n" + successReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
+                await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy]**\n\n" + manualReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
                 await ctx.reply('✅ Receipt sent successfully!');
                 delete db.adminInputSession[userId];
                 delete db.adminSessions[uniqueOrderId];
@@ -541,9 +553,10 @@ bot.on('message', async (ctx) => {
 
             const resInfo = await checkFreeFireUID(uidText);
             const levelLine = resInfo.level ? (lang === 'bn' ? `\n⭐ লেভেল: \`${resInfo.level}\`` : `\n⭐ Level: \`${resInfo.level}\``) : '';
+            const likesLine = `\n👍 লাইক: \`${resInfo.likes}\``;
             const resultBox = lang === 'bn'
-                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 ফ্রি ফায়ার প্লেয়ার ইনফো\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 নাম: \`${resInfo.nickname}\`\n🛡 ইউআইডি: \`${uidText}\`${levelLine}`
-                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 FREE FIRE PLAYER INFO\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 Name: \`${resInfo.nickname}\`\n🛡 UID: \`${uidText}\`${levelLine}`;
+                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 ফ্রি ফায়ার প্লেয়ার ইনফো\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 নাম: \`${resInfo.nickname}\`\n🛡 ইউআইডি: \`${uidText}\`${levelLine}${likesLine}`
+                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 FREE FIRE PLAYER INFO\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 Name: \`${resInfo.nickname}\`\n🛡 UID: \`${uidText}\`${levelLine}\n👍 Likes: \`${resInfo.likes}\``;
 
             try {
                 await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, resultBox, {
@@ -579,6 +592,7 @@ bot.on('message', async (ctx) => {
                 level = resInfo.level;
                 session.nickname = nickname;
                 session.level = level;
+                session.initialLikes = resInfo.likes;
                 saveDatabase(db);
 
                 const levelStr = level ? `\n⭐ Level: \`${level}\`` : '';
@@ -986,7 +1000,7 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         const db = loadDatabase();
         db.adminInputSession[ADMIN_ID] = { uniqueOrderId: ctx.match[1] };
         saveDatabase(db);
-        await ctx.reply('✍️ Enter order note or receipt:');
+        await ctx.reply('✍️ Enter manual details format:\n`PreviousLikes | CurrentLikes | Admin Note`\n(Example: `1200 | 1300 | Successfully delivered`)', { parse_mode: 'Markdown' });
         await ctx.answerCbQuery();
     } catch (e) {}
 });
@@ -1213,6 +1227,12 @@ bot.action('confirm_order', async (ctx) => {
         }
 
         if (isAutoEnabled && apiRes.success) {
+            // Re-check UID to get real current likes after API completion
+            const postCheck = await checkFreeFireUID(session.uid);
+            const prevLikes = session.initialLikes || 0;
+            const currLikes = postCheck.likes || prevLikes;
+            const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : 'N/A';
+
             if (!db.orderHistories[userId]) db.orderHistories[userId] = [];
             const now = new Date();
             db.orderHistories[userId].unshift({
@@ -1224,11 +1244,16 @@ bot.action('confirm_order', async (ctx) => {
             if (db.orderHistories[userId].length > 10) db.orderHistories[userId].pop();
             saveDatabase(db);
 
-            const receipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n💠 ════════════════════════════ 💠`;
-            await ctx.telegram.editMessageText(userId, procMsg.message_id, null, receipt, {
+            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+
+            await ctx.telegram.editMessageText(userId, procMsg.message_id, null, autoReceipt, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
             });
+
+            // Send duplicate copy to admin as well
+            await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Auto Order]**\n\n" + autoReceipt + "\n\n👤 **Customer ID:** `" + userId + "`", { parse_mode: 'Markdown' }).catch(() => {});
+
         } else {
             const uniqueOrderId = userId + '_' + Date.now();
             db.adminSessions[uniqueOrderId] = {
@@ -1242,7 +1267,7 @@ bot.action('confirm_order', async (ctx) => {
             };
             saveDatabase(db);
 
-            const modeLabel = isAutoEnabled ? '⚠️ API Fallback Order' : '🛠️ Manual Mode Order';
+            const modeLabel = isAutoEnabled ? '⚠️ API Fallback Order (Manual Needed)' : '🛠️ Manual Mode Order';
             await bot.telegram.sendMessage(ADMIN_ID, `${modeLabel}\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
