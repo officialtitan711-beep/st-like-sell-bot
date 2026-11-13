@@ -18,7 +18,7 @@ const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
 
 const bot = new Telegraf(BOT_TOKEN);
-let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: { bkash: '01XXXXXXXXX (Personal)', nagad: '01XXXXXXXXX (Personal)' }, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {}, lastCleanMonth: '', userLang: {}, depositRequests: {}, adminReplySessions: {}, adminInputSession: {}, adminSessions: {}, calcStates: {}, settings: { autoApiEnabled: true } };
+let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' }, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {}, lastCleanMonth: '', userLang: {}, depositRequests: {}, adminReplySessions: {}, adminInputSession: {}, adminSessions: {}, calcStates: {}, settings: { autoApiEnabled: true } };
 
 const userLastMsgTime = {};
 
@@ -37,7 +37,7 @@ function syncDataFromFirebase() {
                     if (parsed) {
                         cachedDb = parsed;
                         if (!cachedDb.settings) cachedDb.settings = { autoApiEnabled: true };
-                        if (!cachedDb.numbers) cachedDb.numbers = { bkash: '01XXXXXXXXX (Personal)', nagad: '01XXXXXXXXX (Personal)' };
+                        if (!cachedDb.numbers) cachedDb.numbers = { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' };
                         if (!cachedDb.allowedUsers) cachedDb.allowedUsers = {};
                     }
                 }
@@ -312,7 +312,7 @@ bot.on('message', async (ctx) => {
         const db = loadDatabase();
         if (!db.balances) db.balances = {};
         if (!db.sessions) db.sessions = {};
-        if (!db.numbers) db.numbers = { bkash: '01XXXXXXXXX (Personal)', nagad: '01XXXXXXXXX (Personal)' };
+        if (!db.numbers) db.numbers = { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' };
         if (!db.categories) db.categories = {};
         if (!db.customProducts) db.customProducts = {};
         if (!db.users) db.users = {};
@@ -349,7 +349,6 @@ bot.on('message', async (ctx) => {
         if (userId === ADMIN_ID.toString() && db.adminInputSession && db.adminInputSession[userId] && !isMenuCommand(text)) {
             const sessionData = db.adminInputSession[userId];
 
-            // --- Add Bot Logic ( শুধুমাত্র ইউজার আইডি দিলে পারমিশন পেয়ে যাবে ) ---
             if (sessionData.type === 'add_bot_user') {
                 const targetUid = text.replace(/[^0-9]/g, '');
                 if (targetUid) {
@@ -365,7 +364,6 @@ bot.on('message', async (ctx) => {
                 return ctx.reply('❌ সঠিক ইউজার আইডি দিন।');
             }
 
-            // --- Remove Bot Logic ( শুধুমাত্র ইউজার আইডি দিলে এক্সেস রিমুভ হয়ে যাবে ) ---
             if (sessionData.type === 'remove_bot_user') {
                 const targetUid = text.replace(/[^0-9]/g, '');
                 if (targetUid) {
@@ -508,14 +506,14 @@ bot.on('message', async (ctx) => {
         // --- Deposit Step 1: Awaiting Amount ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_amount' && !isMenuCommand(text)) {
             const amountNum = Number(text);
-            const isBn = getUserLang(userId) === 'bn';
+            const lang = getUserLang(userId);
 
             if (isNaN(amountNum) || amountNum < 100) {
-                const errBox = isBn
+                const errBox = lang === 'bn'
                     ? "╔════════════════════════════╗\n⚠️ ১০০ টাকার নিচে অ্যামাউন্ট অ্যাড হবে না। সর্বনিম্ন ১০০ বা তার বেশি অ্যামাউন্ট অ্যাড ব্যালেন্স করতে হবে।\n╚════════════════════════════╝\n\n✍️ আপনার কাঙ্ক্ষিত অ্যামাউন্টটি আবার লিখে পাঠান:"
                     : "╔════════════════════════════╗\n⚠️ Amount below 100 BDT cannot be added. Minimum deposit is 100 BDT or more.\n╚════════════════════════════╝\n\n✍️ Please enter your amount again:";
                 
-                const cancelBtnText = isBn ? "❌ বাতিল করুন" : "❌ Cancel";
+                const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
                 return ctx.reply(errBox, {
                     parse_mode: 'Markdown',
@@ -532,11 +530,11 @@ bot.on('message', async (ctx) => {
             const method = db.sessions[userId].method;
             const targetNum = method === 'bKash' ? (db.numbers?.bkash || '01XXXXXXXXX') : (db.numbers?.nagad || '01XXXXXXXXX');
 
-            let instructionBox = isBn
-                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 ${method} সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল নম্বর:** \`${targetNum}\`\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n✍️ টাকা পাঠানোর পর TrxID অথবা স্ক্রিনশট এখানে পাঠান।`
-                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 ${method} Send Money Guide\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **Official Number:** \`${targetNum}\`\n💵 **Amount to Send:** \`${amountNum} BDT\`\n\n✍️ After sending, send TrxID or screenshot here.`;
+            let instructionBox = lang === 'bn'
+                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 ${method} সেন্ড মানি নিয়ম\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **অফিসিয়াল নম্বর:** \`${targetNum}\`\n*(নম্বরের উপর ট্যাপ করে কপি করে নিন)*\n\n💵 **টাকার পরিমাণ:** \`${amountNum} BDT\`\n\n📋 **${method} অ্যাপ থেকে পেমেন্ট করার নিয়ম:**\n1️⃣ ${method} অ্যাপে গিয়ে **Send Money** এ যান।\n2️⃣ উপরের অফিশিয়াল নম্বরটি দিন।\n3️⃣ অ্যামাউন্ট দিন: \`${amountNum} BDT\`\n4️⃣ পিন দিয়ে সেন্ড মানি কনফার্ম করুন।\n5️⃣ টাকা পাঠানোর পর আপনার **TrxID** অথবা পেমেন্টের **স্ক্রিনশট** এই চ্যাটে পাঠিয়ে দিন।\n\n✍️ দ্রুত TrxID অথবা স্ক্রিনশট চ্যাটে পাঠান:`
+                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n     💖 ${method} Send Money Guide\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n📌 **Official Number:** \`${targetNum}\`\n*(Tap on the number to copy)*\n\n💵 **Amount to Send:** \`${amountNum} BDT\`\n\n📋 **Steps to Pay:**\n1️⃣ Open ${method} app and go to **Send Money**.\n2️⃣ Enter the official number above.\n3️⃣ Enter amount: \`${amountNum} BDT\`\n4️⃣ Confirm with your PIN.\n5️⃣ After sending, send your **TrxID** or payment **screenshot** in this chat.\n\n✍️ Send TrxID or screenshot here:`;
 
-            const backText = isBn ? "🔙 পেছনের মেনু ↩️" : "🔙 Back ↩️";
+            const backText = lang === 'bn' ? "🔙 পেছনের মেনু ↩️" : "🔙 Back ↩️";
             return ctx.reply(instructionBox, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([[Markup.button.callback(backText, method === 'bKash' ? 'dep_bkash' : 'dep_nagad')]])
@@ -575,8 +573,8 @@ bot.on('message', async (ctx) => {
                 }).catch(() => {});
             }
 
-            const isBn = getUserLang(userId) === 'bn';
-            const pendingBoxMsg = isBn
+            const lang = getUserLang(userId);
+            const pendingBoxMsg = lang === 'bn'
                 ? `╭──────────────────────────────╮\n     ⏳ অ্যাড মানি রিকোয়েস্ট পেন্ডিং\n╰──────────────────────────────╯\n\n💳 মাধ্যম: \`${method}\`\n💵 পেন্ডিং অ্যামাউন্ট: \`${amount} BDT\`\n\n✨ আপনার প্রমাণ সফলভাবে জমা হয়েছে। অ্যাডমিন যাচাই করে ব্যালেন্স অ্যাড করে দেবেন!`
                 : `╭──────────────────────────────╮\n     ⏳ DEPOSIT REQUEST PENDING\n╰──────────────────────────────╯\n\n💳 Method: \`${method}\`\n💵 Pending Amount: \`${amount} BDT\`\n\n✨ Your proof has been submitted successfully!`;
 
@@ -782,7 +780,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (text === '🛍️ Shop Now' || text === '🛍️ শপ নাও' || text.includes('Shop Now') || text.includes('শপ নাও')) {
+        if (text === '🛍️ Shop Now' || text === '🛍️ শপ নাও' || text.toLowerCase().includes('shop now') || text.includes('শপ নাও')) {
             let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
             for (let c of Object.keys(db.categories || {})) {
                 let encodedC = encodeURIComponent(c);
@@ -802,8 +800,8 @@ bot.on('message', async (ctx) => {
         }
 
         if (text === '💰 Add Balance' || text === '💰 ব্যালেন্স অ্যাড') {
-            const isBn = getUserLang(userId) === 'bn';
-            const cancelBtnText = isBn ? "❌ বাতিল করুন" : "❌ Cancel";
+            const lang = getUserLang(userId);
+            const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
             return ctx.reply(t(userId, 'depositPortal'), {
                 parse_mode: 'Markdown',
@@ -1043,8 +1041,8 @@ bot.action('deposit_portal_back', async (ctx) => {
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
-        const isBn = getUserLang(userId) === 'bn';
-        const cancelBtnText = isBn ? "❌ বাতিল করুন" : "❌ Cancel";
+        const lang = getUserLang(userId);
+        const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
         await ctx.editMessageText(t(userId, 'depositPortal'), {
             parse_mode: 'Markdown',
@@ -1064,12 +1062,12 @@ bot.action('dep_bkash', async (ctx) => {
         db.sessions[userId] = { step: 'awaiting_deposit_amount', method: 'bKash' };
         saveDatabase(db);
 
-        const isBn = getUserLang(userId) === 'bn';
-        const amountPromptBox = isBn 
+        const lang = getUserLang(userId);
+        const amountPromptBox = lang === 'bn' 
             ? `╭──────────────────────────────╮\n     💖 বিকাশ (bKash) ডিপোজিট\n╰──────────────────────────────╯\n\n💎 **নোটিশ:** সর্বনিম্ন ডিপোজিট বা অ্যাড ব্যালেন্স করতে হলে **১০০ টাকা বা তার বেশি** করতে হবে।\n\n✍️ আপনার কাঙ্ক্ষিত অ্যামাউন্টটি লিখে পাঠান:`
             : `╭──────────────────────────────╮\n     💖 bKash Deposit\n╰──────────────────────────────╯\n\n💎 **Notice:** Minimum deposit is **100 BDT or more**.\n\n✍️ Please enter your amount to add:`;
 
-        const cancelBtnText = isBn ? "❌ বাতিল করুন" : "❌ Cancel";
+        const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
         await ctx.editMessageText(amountPromptBox, {
             parse_mode: 'Markdown',
@@ -1088,12 +1086,12 @@ bot.action('dep_nagad', async (ctx) => {
         db.sessions[userId] = { step: 'awaiting_deposit_amount', method: 'Nagad' };
         saveDatabase(db);
 
-        const isBn = getUserLang(userId) === 'bn';
-        const amountPromptBox = isBn 
+        const lang = getUserLang(userId);
+        const amountPromptBox = lang === 'bn' 
             ? `╭──────────────────────────────╮\n     🧡 নগদ (Nagad) ডিপোজিট\n╰──────────────────────────────╯\n\n💎 **নোটিশ:** সর্বনিম্ন ডিপোজিট বা অ্যাড ব্যালেন্স করতে হলে **১০০ টাকা বা তার বেশি** করতে হবে।\n\n✍️ আপনার কাঙ্ক্ষিত অ্যামাউন্টটি লিখে পাঠান:`
             : `╭──────────────────────────────╮\n     🧡 Nagad Deposit\n╰──────────────────────────────╯\n\n💎 **Notice:** Minimum deposit is **100 BDT or more**.\n\n✍️ Please enter your amount to add:`;
 
-        const cancelBtnText = isBn ? "❌ বাতিল করুন" : "❌ Cancel";
+        const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
         await ctx.editMessageText(amountPromptBox, {
             parse_mode: 'Markdown',
@@ -1117,8 +1115,8 @@ bot.action(/dep_app_(.+)/, async (ctx) => {
             const currBal = db.balances[targetUser];
             saveDatabase(db);
 
-            const isBn = getUserLang(targetUser) === 'bn';
-            const depositReceipt = isBn
+            const lang = getUserLang(targetUser);
+            const depositReceipt = lang === 'bn'
                 ? `💠 ════════════════════════════ 💠\n           ✅ ডিপোজিট সফলভাবে সম্পন্ন\n💠 ════════════════════════════ 💠\n\n💳 পেমেন্ট মাধ্যম: \`${info.method}\`\n💵 অ্যাডকৃত অ্যামাউন্ট: \`+${addAmt} BDT\`\n\n💰 **আগের ব্যালেন্স:** \`${prevBal} BDT\`\n💰 **বর্তমান ব্যালেন্স:** \`${currBal} BDT\`\n\n📊 স্ট্যাটাস: \`অ্যাডমিন কর্তৃক এপ্রুভড\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`
                 : `💠 ════════════════════════════ 💠\n           ✅ DEPOSIT SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n💳 Method: \`${info.method}\`\n💵 Added Amount: \`+${addAmt} BDT\`\n\n💰 **Previous Balance:** \`${prevBal} BDT\`\n💰 **Current Balance:** \`${currBal} BDT\`\n\n📊 Status: \`Approved by Admin\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
@@ -1154,7 +1152,7 @@ bot.action(/dep_can_(.+)/, async (ctx) => {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const db = loadDatabase(), info = db.depositRequests?.[ctx.match[1]];
         if (info) {
-            await bot.telegram.sendMessage(info.userId, t(info.userId, 'depositCancelledBox'), { parse_mode: 'Markdown' }).catch(() => {});
+            await bot.telegram.sendMessage(info.userId, "❌ আপনার ডিপোজিট রিকোয়েস্টটি বাতিল করা হয়েছে।", { parse_mode: 'Markdown' }).catch(() => {});
             delete db.depositRequests[ctx.match[1]];
             saveDatabase(db);
             await ctx.answerCbQuery('❌ Cancelled.');
