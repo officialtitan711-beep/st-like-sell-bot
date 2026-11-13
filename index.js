@@ -1458,10 +1458,20 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
         const translated = translateProductName(prod.name, userId);
 
         let price = 0;
+        const takaMatch = prod.name.match(/(\d+)\s*৳/);
         const dashMatch = prod.name.match(/-\s*(\d+)/);
-        const currMatch = prod.name.match(/(\d+)\s*(৳|tk|BDT)/i);
-        if (dashMatch) {
-            price = Number(dashMatch[1]);
+        const currMatch = prod.name.match(/(\d+)\s*(tk|BDT)/i);
+
+        if (takaMatch) {
+            price = Number(takaMatch[1]);
+        } else if (dashMatch) {
+            // যদি হাইফেনের পরে সংখ্যা থাকে, সেটিকে প্রাইস ধরবে (যদি একাধিক থাকে তবে শেষেরটি বা সঠিকটি)
+            const allMatches = [...prod.name.matchAll(/-\s*(\d+)/g)];
+            if (allMatches.length > 0) {
+                price = Number(allMatches[allMatches.length - 1][1]);
+            } else {
+                price = Number(dashMatch[1]);
+            }
         } else if (currMatch) {
             price = Number(currMatch[1]);
         } else {
