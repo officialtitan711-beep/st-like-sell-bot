@@ -160,23 +160,24 @@ function isMenuCommand(text) {
     if (text.startsWith('/')) return true;
     if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) return true;
     
-    const clean = text.replace(/[\u{1F000}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim().toLowerCase();
+    // Future-proof universal emoji & whitespace stripper
+    const clean = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]/gu, '').toLowerCase();
     
     const keywords = [
-        'shop now', 'শপ নাও',
-        'check ff uid', 'ইউআইডি চেক',
-        'add balance', 'ব্যালেন্স অ্যাড',
-        'my profile', 'আমার প্রোফাইল',
-        'order history', 'অর্ডার হিস্ট্রি',
-        'support desk', 'সাপোর্ট ডেস্ক',
+        'shopnow', 'শপনাও',
+        'checkffuid', 'ইউআইডিচেক',
+        'addbalance', 'ব্যালেন্সঅ্যাড',
+        'myprofile', 'আমারপ্রোফাইল',
+        'orderhistory', 'অর্ডারহিস্ট্রি',
+        'supportdesk', 'সাপোর্টডেস্ক',
         'calculator', 'ক্যালকুলেটর',
-        'world clock', 'ওয়ার্ল্ড ক্লক',
-        'total users', 'add bot', 'remove bot',
-        'add/minus balance', 'set payment numbers',
-        'send message', 'all users msg', '-----------------------------------'
+        'worldclock', 'ওয়ার্ল্ডক্লক',
+        'totalusers', 'addbot', 'removebot',
+        'add/minusbalance', 'setpaymentnumbers',
+        'sendmessage', 'allusersmsg', '-----------------------------------'
     ];
     
-    return keywords.some(k => clean.includes(k) || text.includes(k));
+    return keywords.some(k => clean.includes(k) || text.includes('🛍️') || text.includes('🔍') || text.includes('💰') || text.includes('👤') || text.includes('📜') || text.includes('📞') || text.includes('🧮') || text.includes('🌍') || text.includes('📊') || text.includes('➕') || text.includes('❌') || text.includes('💳') || text.includes('📱') || text.includes('📩') || text.includes('📢'));
 }
 
 function translateCategoryName(catName, userId) {
@@ -244,7 +245,7 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// --- FIXED BOT USE MIDDLEWARE (इমোজি সহ সব মেনু বাটন বাইপাস করার জন্য) ---
+// --- FUTURE-PROOF BULLETPROOF BOT USE MIDDLEWARE ---
 bot.use(async (ctx, next) => {
     try {
         if (ctx && ctx.from) {
@@ -258,7 +259,7 @@ bot.use(async (ctx, next) => {
             
             if (ctx.message && ctx.message.text) {
                 const msgText = ctx.message.text;
-                if (msgText.startsWith('/start') || msgText.includes('Shop Now') || msgText.includes('শপ নাও') || msgText.includes('🛍️') || isMenuCommand(msgText)) {
+                if (msgText.startsWith('/start') || isMenuCommand(msgText)) {
                     return next();
                 }
             }
@@ -312,7 +313,7 @@ bot.on('message', async (ctx) => {
         if (!ctx.message) return;
         const userId = ctx.from.id.toString();
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
-        const cleanText = text.replace(/[\u{1F000}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim().toLowerCase();
+        const cleanText = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]/gu, '').trim().toLowerCase();
 
         const now = Date.now();
         if (userLastMsgTime[userId] && (now - userLastMsgTime[userId] < 600) && isMenuCommand(text)) {
@@ -346,8 +347,8 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // --- 1. SHOP NOW / শপ নাও হ্যান্ডলার (ইমোজি সহ ফ্লেক্সিবল ম্যাচিং) ---
-        if (cleanText.includes('shop now') || cleanText.includes('শপ নাও') || text.includes('🛍️')) {
+        // --- 1. SHOP NOW / শপ নাও হ্যান্ডলার ---
+        if (cleanText.includes('shopnow') || cleanText.includes('শপনাও') || text.includes('🛍️')) {
             if (db.sessions && db.sessions[userId]) {
                 delete db.sessions[userId];
                 saveDatabase(db);
@@ -387,7 +388,7 @@ bot.on('message', async (ctx) => {
                     try {
                         await bot.telegram.sendMessage(targetUid, "🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। এখন থেকে আপনি বট ব্যবহার করতে পারবেন। /start লিখে শুরু করুন।", { parse_mode: 'Markdown' });
                     } catch (e) {}
-                    return ctx.reply(`✅ সফলভাবে ইউজার আইডি \`${targetUid}\`-কে বট ব্যবহারের এক্সেস দেওয়া হয়েছে! (রিয়েল-টাইম আপডেট)`, { parse_mode: 'Markdown' });
+                    return ctx.reply(`✅ সফলভাবে ইউজার আইডি \`${targetUid}\`-কে বট ব্যবহারের এক্সেস দেওয়া হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 delete db.adminInputSession[userId];
                 return ctx.reply('❌ সঠিক ইউজার আইডি দিন।');
@@ -404,7 +405,7 @@ bot.on('message', async (ctx) => {
                     try {
                         await bot.telegram.sendMessage(targetUid, "⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন।", { parse_mode: 'Markdown' });
                     } catch (e) {}
-                    return ctx.reply(`❌ সফলভাবে ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে! (রিয়েল-টাইম আপডেট)`, { parse_mode: 'Markdown' });
+                    return ctx.reply(`❌ সফলভাবে ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 delete db.adminInputSession[userId];
                 return ctx.reply('❌ সঠিক ইউজার আইডি দিন।');
@@ -712,7 +713,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- Admin Main Menu Commands ---
-        if (cleanText.includes('total users') || text.includes('📊')) {
+        if (cleanText.includes('totalusers') || text.includes('📊')) {
             if (userId === ADMIN_ID.toString()) {
                 const usersObj = db.users || {};
                 const userKeys = Object.keys(usersObj);
@@ -730,28 +731,28 @@ bot.on('message', async (ctx) => {
                 return;
             }
         }
-        if (cleanText.includes('add bot') || text.includes('➕')) {
+        if (cleanText.includes('addbot') || text.includes('➕')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'add_bot_user' };
                 saveDatabase(db);
                 return ctx.reply('➕ **অ্যাড বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) দিয়ে বট এক্সেস দিতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.includes('remove bot') || text.includes('❌')) {
+        if (cleanText.includes('removebot') || text.includes('❌')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'remove_bot_user' };
                 saveDatabase(db);
                 return ctx.reply('❌ **রিমুভ বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) বট থেকে রিমুভ করতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.includes('add/minus balance') || text.includes('💳')) {
+        if (cleanText.includes('add/minusbalance') || text.includes('💳')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'add_minus_balance' };
                 saveDatabase(db);
                 return ctx.reply('✍️ Format: `USER_ID AMOUNT` (Example: `5932254012 100`)', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.includes('set payment numbers') || text.includes('📱')) {
+        if (cleanText.includes('setpaymentnumbers') || text.includes('📱')) {
             if (userId === ADMIN_ID.toString()) {
                 return ctx.reply('📱 **Payment Number Management**\n\n👇 Select which payment number to update:', {
                     parse_mode: 'Markdown',
@@ -762,14 +763,14 @@ bot.on('message', async (ctx) => {
                 });
             }
         }
-        if (cleanText.includes('send message') || text.includes('📩')) {
+        if (cleanText.includes('sendmessage') || text.includes('📩')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'send_message' };
                 saveDatabase(db);
                 return ctx.reply('✍️ Format: `USER_ID | MESSAGE`', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.includes('all users msg') || text.includes('📢')) {
+        if (cleanText.includes('allusersmsg') || text.includes('📢')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'broadcast_msg' };
                 saveDatabase(db);
@@ -794,7 +795,7 @@ bot.on('message', async (ctx) => {
             return ctx.reply("🧮 **Calculator**\n\nScreen: `0`", { parse_mode: 'Markdown', ...getCalcKeyboard() });
         }
 
-        if (cleanText.includes('world clock') || cleanText.includes('ওয়ার্ল্ড ক্লক') || text.includes('🌍')) {
+        if (cleanText.includes('worldclock') || cleanText.includes('ওয়ার্ল্ডক্লক') || text.includes('🌍')) {
             return ctx.reply("🌍 **World Clock & Date**\n\n👇 Select country:", {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
@@ -809,13 +810,13 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.includes('check ff uid') || cleanText.includes('ইউআইডি চেক') || text.includes('🔍')) {
+        if (cleanText.includes('checkffuid') || cleanText.includes('ইউআইডিচেক') || text.includes('🔍')) {
             db.sessions[userId] = { step: 'awaiting_uid_only' };
             saveDatabase(db);
             return ctx.reply(t(userId, 'checkUidPrompt'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
 
-        if (cleanText.includes('add balance') || cleanText.includes('ব্যালেন্স অ্যাড') || text.includes('💰')) {
+        if (cleanText.includes('addbalance') || cleanText.includes('ব্যালেন্সঅ্যাড') || text.includes('💰')) {
             const lang = getUserLang(userId);
             const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
@@ -828,7 +829,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.includes('my profile') || cleanText.includes('আমার প্রোফাইল') || text.includes('👤')) {
+        if (cleanText.includes('myprofile') || cleanText.includes('আমারপ্রোফাইল') || text.includes('👤')) {
             const lang = getUserLang(userId);
             const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
             const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\``;
@@ -842,7 +843,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.includes('order history') || cleanText.includes('অর্ডার হিস্ট্রি') || text.includes('📜')) {
+        if (cleanText.includes('orderhistory') || cleanText.includes('অর্ডারহিস্ট্রি') || text.includes('📜')) {
             const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId].slice(0, 10) : [];
             let historyText = t(userId, 'historyTitle');
             if (userHistories.length === 0) {
@@ -866,7 +867,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.includes('support desk') || cleanText.includes('সাপোর্ট ডেস্ক') || text.includes('📞')) {
+        if (cleanText.includes('supportdesk') || cleanText.includes('সাপোর্টডেস্ক') || text.includes('📞')) {
             return ctx.reply(t(userId, 'supportText'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
 
@@ -884,7 +885,7 @@ bot.on('message', async (ctx) => {
     } catch (err) {}
 });
 
-// --- Admin Shop Management Actions (Inside Shop Menu) ---
+// --- Admin Shop Management Actions ---
 bot.action('admin_create_cat', async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
@@ -1232,7 +1233,7 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
     } catch (e) {}
 });
 
-// --- Calculator (Super Fast Version) ---
+// --- Calculator ---
 bot.action(/calc_(.+)/, async (ctx) => {
     try {
         ctx.answerCbQuery().catch(() => {});
