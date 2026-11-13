@@ -38,6 +38,7 @@ function syncDataFromFirebase() {
                         cachedDb = parsed;
                         if (!cachedDb.settings) cachedDb.settings = { autoApiEnabled: true };
                         if (!cachedDb.numbers) cachedDb.numbers = { bkash: '01XXXXXXXXX (Personal)', nagad: '01XXXXXXXXX (Personal)' };
+                        if (!cachedDb.allowedUsers) cachedDb.allowedUsers = {};
                     }
                 }
             } catch (e) {}
@@ -155,7 +156,7 @@ function getMainKeyboard(userId) {
 }
 
 const KNOWN_MENU_COMMANDS = [
-    '🛍️ Shop Now', '🛍️ শপ নাও',
+    '🛍️ Shop Now', '🛍️ শপ নাও', 'Shop Now', 'শপ নাও',
     '🔍 Check FF UID', '🔍 ইউআইডি চেক',
     '💰 Add Balance', '💰 ব্যালেন্স অ্যাড',
     '👤 My Profile', '👤 আমার প্রোফাইল',
@@ -315,6 +316,7 @@ bot.on('message', async (ctx) => {
         if (!db.categories) db.categories = {};
         if (!db.customProducts) db.customProducts = {};
         if (!db.users) db.users = {};
+        if (!db.allowedUsers) db.allowedUsers = {};
         if (!db.orderHistories) db.orderHistories = {};
         if (!db.depositRequests) db.depositRequests = {};
         if (!db.adminInputSession) db.adminInputSession = {};
@@ -346,6 +348,41 @@ bot.on('message', async (ctx) => {
 
         if (userId === ADMIN_ID.toString() && db.adminInputSession && db.adminInputSession[userId] && !isMenuCommand(text)) {
             const sessionData = db.adminInputSession[userId];
+
+            // --- Add Bot Logic ( শুধুমাত্র ইউজার আইডি দিলে পারমিশন পেয়ে যাবে ) ---
+            if (sessionData.type === 'add_bot_user') {
+                const targetUid = text.replace(/[^0-9]/g, '');
+                if (targetUid) {
+                    db.allowedUsers[targetUid] = true;
+                    saveDatabase(db);
+                    delete db.adminInputSession[userId];
+                    try {
+                        await bot.telegram.sendMessage(targetUid, "🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। এখন থেকে আপনি বট ব্যবহার করতে পারবেন। /start লিখে শুরু করুন।", { parse_mode: 'Markdown' });
+                    } catch (e) {}
+                    return ctx.reply(`✅ সফলভাবে ইউজার আইডি \`${targetUid}\`-কে বট ব্যবহারের এক্সেস দেওয়া হয়েছে! (রিয়েল-টাইম আপডেট)`, { parse_mode: 'Markdown' });
+                }
+                delete db.adminInputSession[userId];
+                return ctx.reply('❌ সঠিক ইউজার আইডি দিন।');
+            }
+
+            // --- Remove Bot Logic ( শুধুমাত্র ইউজার আইডি দিলে এক্সেস রিমুভ হয়ে যাবে ) ---
+            if (sessionData.type === 'remove_bot_user') {
+                const targetUid = text.replace(/[^0-9]/g, '');
+                if (targetUid) {
+                    if (db.allowedUsers[targetUid]) {
+                        delete db.allowedUsers[targetUid];
+                    }
+                    saveDatabase(db);
+                    delete db.adminInputSession[userId];
+                    try {
+                        await bot.telegram.sendMessage(targetUid, "⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন।", { parse_mode: 'Markdown' });
+                    } catch (e) {}
+                    return ctx.reply(`❌ সফলভাবে ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে! (রিয়েল-টাইম আপডেট)`, { parse_mode: 'Markdown' });
+                }
+                delete db.adminInputSession[userId];
+                return ctx.reply('❌ সঠিক ইউজার আইডি দিন।');
+            }
+
             if (sessionData.uniqueOrderId && db.adminSessions[sessionData.uniqueOrderId]) {
                 const uniqueOrderId = sessionData.uniqueOrderId;
                 const orderInfo = db.adminSessions[uniqueOrderId];
@@ -667,10 +704,18 @@ bot.on('message', async (ctx) => {
             }
         }
         if (text === '➕ Add Bot') {
-            if (userId === ADMIN_ID.toString()) return ctx.reply('✨ Guide to add a new bot instance.');
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'add_bot_user' };
+                saveDatabase(db);
+                return ctx.reply('➕ **অ্যাড বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) দিয়ে বটে এক্সেস দিতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
+            }
         }
         if (text === '❌ Remove Bot') {
-            if (userId === ADMIN_ID.toString()) return ctx.reply('⚠️ Send bot token to remove.');
+            if (userId === ADMIN_ID.toString()) {
+                db.adminInputSession[userId] = { type: 'remove_bot_user' };
+                saveDatabase(db);
+                return ctx.reply('❌ **রিমুভ বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) বট থেকে রিমুভ করতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
+            }
         }
         if (text === '💳 Add/Minus Balance') {
             if (userId === ADMIN_ID.toString()) {
@@ -737,7 +782,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (text === '🛍️ Shop Now' || text === '🛍️ শপ নাও') {
+        if (text === '🛍️ Shop Now' || text === '🛍️ শপ নাও' || text.includes('Shop Now') || text.includes('শপ নাও')) {
             let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
             for (let c of Object.keys(db.categories || {})) {
                 let encodedC = encodeURIComponent(c);
