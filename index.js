@@ -191,12 +191,12 @@ function t(userId, key) {
 function getMainKeyboard(userId) {
     const lang = getUserLang(userId);
     let keyboard = lang === 'en' ? [
-        ['Shop Now', '🔍 Check FF UID'],
+        ['🛍️ Shop Now', '🔍 Check FF UID'],
         ['💰 Add Balance', '👤 My Profile'],
         ['📜 Order History', '📞 Support Desk'],
         ['🧮 Calculator', '🌍 World Clock']
     ] : [
-        ['শপ নাও', '🔍 ইউআইডি চেক'],
+        ['🛍️ শপ নাও', '🔍 ইউআইডি চেক'],
         ['💰 ব্যালেন্স অ্যাড', '👤 আমার প্রোফাইল'],
         ['📜 অর্ডার হিস্ট্রি', '📞 সাপোর্ট ডেস্ক'],
         ['🧮 ক্যালকুলেটর', '🌍 ওয়ার্ল্ড ক্লক']
@@ -222,7 +222,7 @@ function isMenuCommand(text) {
     
     const lowerText = text.trim().toLowerCase();
     
-    if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText === 'shop now' || lowerText === 'শপ নাও' || lowerText.includes('shop') || lowerText.includes('শপ')) return true;
+    if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText.includes('shop') || lowerText.includes('শপ')) return true;
     if (lowerText.includes('check ff uid') || lowerText.includes('ইউআইডি চেক') || lowerText.includes('ইউআইডি')) return true;
     if (lowerText.includes('add balance') || lowerText.includes('ব্যালেন্স অ্যাড') || lowerText.includes('ব্যালেন্স')) return true;
     if (lowerText.includes('my profile') || lowerText.includes('আমার প্রোফাইল') || lowerText.includes('প্রোফাইল')) return true;
@@ -829,7 +829,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- User Main Menu Buttons (Universal Dispatcher) ---
-        if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText === 'shop now' || lowerText === 'শপ নাও' || lowerText.includes('shop') || lowerText.includes('শপ')) {
+        if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText.includes('shop') || lowerText.includes('শপ')) {
             let inlineButtons = [];
             if (db.categories['Free Fire Likes']) {
                 inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
