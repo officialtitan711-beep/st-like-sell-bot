@@ -19,7 +19,6 @@ const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Safe initial structure with robust fallbacks
 let cachedDb = { 
     users: {}, 
     balances: {}, 
@@ -57,7 +56,6 @@ function loadDatabase() {
     if (!cachedDb.categories) cachedDb.categories = {};
     if (!cachedDb.customProducts) cachedDb.customProducts = {};
     
-    // Ensure default fallback if completely empty
     if (Object.keys(cachedDb.categories).length === 0) {
         cachedDb.categories = { 'Free Fire Likes': true, 'Guild Glory Bot': true };
     }
@@ -87,7 +85,6 @@ function syncDataFromFirebase() {
                 if (data && data !== 'null') {
                     const parsed = JSON.parse(data);
                     if (parsed) {
-                        // Merge safely to preserve categories and products from Firebase
                         cachedDb.users = parsed.users || cachedDb.users;
                         cachedDb.balances = parsed.balances || cachedDb.balances;
                         cachedDb.sessions = parsed.sessions || cachedDb.sessions;
@@ -415,7 +412,7 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // --- 1. SHOP NOW / শপ নাও হ্যান্ডলার (Fixed & Fully Integrated) ---
+        // --- 1. SHOP NOW / শপ নাও হ্যান্ডলার (Directly at the top of message handler) ---
         if (cleanText.includes('shopnow') || cleanText.includes('শপনাও') || text.includes('🛍️')) {
             if (db.sessions && db.sessions[userId]) {
                 delete db.sessions[userId];
@@ -424,14 +421,12 @@ bot.on('message', async (ctx) => {
             
             let inlineButtons = [];
             
-            // Check and push Free Fire Likes category if exists
             if (db.categories['Free Fire Likes']) {
                 inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
             }
 
-            // Push all other custom categories dynamically from database / Firebase
             for (let c of Object.keys(db.categories || {})) {
-                if (c === 'Free Fire Likes') continue; // Handled above
+                if (c === 'Free Fire Likes') continue;
                 let encodedC = encodeURIComponent(c);
                 inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
             }
@@ -1401,7 +1396,7 @@ bot.action('back_to_clock', async (ctx) => {
     } catch (e) {}
 });
 
-// --- Shop Navigation & Order Flow (Fully Restored & Fixed) ---
+// --- Shop Navigation & Order Flow ---
 bot.action('shop_now_back', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
