@@ -1,5 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
-const http = http = require('http');
+const http = require('http');
 const https = require('https');
 require('dotenv').config();
 
@@ -327,7 +327,7 @@ function getCalcKeyboard() {
     ]);
 }
 
-// --- ALL INLINE MENU CALLBACKS (Shop Now, Balance, etc.) ---
+// --- ALL INLINE MENU CALLBACKS ---
 bot.action('menu_shop', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -561,7 +561,7 @@ bot.action('admin_broadcast_prompt', async (ctx) => {
     } catch (e) {}
 });
 
-// --- TEXT MESSAGE HANDLER (Inputs, Support, Admin Actions) ---
+// --- TEXT MESSAGE HANDLER ---
 bot.on('message', async (ctx) => {
     try {
         if (!ctx.message) return;
