@@ -160,7 +160,6 @@ function isMenuCommand(text) {
     if (text.startsWith('/')) return true;
     if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) return true;
     
-    // Robust Flexible Matching for Menu Buttons (Ignoring/Handling Emojis seamlessly)
     const clean = text.replace(/[\u{1F000}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim().toLowerCase();
     
     const keywords = [
@@ -305,6 +304,7 @@ bot.on('message', async (ctx) => {
         if (!ctx.message) return;
         const userId = ctx.from.id.toString();
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
+        const cleanText = text.replace(/[\u{1F000}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim().toLowerCase();
 
         const now = Date.now();
         if (userLastMsgTime[userId] && (now - userLastMsgTime[userId] < 600) && isMenuCommand(text)) {
@@ -336,6 +336,24 @@ bot.on('message', async (ctx) => {
                 delete db.adminInputSession[userId];
                 saveDatabase(db);
             }
+        }
+
+        // --- 1. SHOP NOW / শপ নাও হ্যান্ডলার (ইমোজি সহ ফ্লেক্সিবল ম্যাচিং) ---
+        if (cleanText.includes('shop now') || cleanText.includes('শপ নাও') || text.includes('🛍️')) {
+            if (db.sessions && db.sessions[userId]) {
+                delete db.sessions[userId];
+                saveDatabase(db);
+            }
+            let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
+            for (let c of Object.keys(db.categories || {})) {
+                let encodedC = encodeURIComponent(c);
+                inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
+            }
+            if (userId === ADMIN_ID.toString()) {
+                inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
+            }
+            inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
+            return ctx.reply(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
         }
 
         if (userId === ADMIN_ID.toString() && db.adminReplySessions && db.adminReplySessions[userId] && !isMenuCommand(text)) {
@@ -686,9 +704,7 @@ bot.on('message', async (ctx) => {
         }
 
         // --- Admin Main Menu Commands ---
-        const cleanText = text.replace(/[\u{1F000}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim();
-
-        if (cleanText.toLowerCase().includes('total users') || text.includes('📊')) {
+        if (cleanText.includes('total users') || text.includes('📊')) {
             if (userId === ADMIN_ID.toString()) {
                 const usersObj = db.users || {};
                 const userKeys = Object.keys(usersObj);
@@ -706,28 +722,28 @@ bot.on('message', async (ctx) => {
                 return;
             }
         }
-        if (cleanText.toLowerCase().includes('add bot') || text.includes('➕')) {
+        if (cleanText.includes('add bot') || text.includes('➕')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'add_bot_user' };
                 saveDatabase(db);
-                return ctx.reply('➕ **অ্যাড বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) দিয়ে বটে এক্সেস দিতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
+                return ctx.reply('➕ **অ্যাড বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) দিয়ে বট এক্সেস দিতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.toLowerCase().includes('remove bot') || text.includes('❌')) {
+        if (cleanText.includes('remove bot') || text.includes('❌')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'remove_bot_user' };
                 saveDatabase(db);
                 return ctx.reply('❌ **রিমুভ বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) বট থেকে রিমুভ করতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.toLowerCase().includes('add/minus balance') || text.includes('💳')) {
+        if (cleanText.includes('add/minus balance') || text.includes('💳')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'add_minus_balance' };
                 saveDatabase(db);
                 return ctx.reply('✍️ Format: `USER_ID AMOUNT` (Example: `5932254012 100`)', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.toLowerCase().includes('set payment numbers') || text.includes('📱')) {
+        if (cleanText.includes('set payment numbers') || text.includes('📱')) {
             if (userId === ADMIN_ID.toString()) {
                 return ctx.reply('📱 **Payment Number Management**\n\n👇 Select which payment number to update:', {
                     parse_mode: 'Markdown',
@@ -738,14 +754,14 @@ bot.on('message', async (ctx) => {
                 });
             }
         }
-        if (cleanText.toLowerCase().includes('send message') || text.includes('📩')) {
+        if (cleanText.includes('send message') || text.includes('📩')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'send_message' };
                 saveDatabase(db);
                 return ctx.reply('✍️ Format: `USER_ID | MESSAGE`', { parse_mode: 'Markdown' });
             }
         }
-        if (cleanText.toLowerCase().includes('all users msg') || text.includes('📢')) {
+        if (cleanText.includes('all users msg') || text.includes('📢')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'broadcast_msg' };
                 saveDatabase(db);
@@ -764,13 +780,13 @@ bot.on('message', async (ctx) => {
         }
 
         // --- User Main Menu Buttons ---
-        if (cleanText.toLowerCase().includes('calculator') || cleanText.includes('ক্যালকুলেটর')) {
+        if (cleanText.includes('calculator') || cleanText.includes('ক্যালকুলেটর') || text.includes('🧮')) {
             db.calcStates[userId] = '0';
             saveDatabase(db);
             return ctx.reply("🧮 **Calculator**\n\nScreen: `0`", { parse_mode: 'Markdown', ...getCalcKeyboard() });
         }
 
-        if (cleanText.toLowerCase().includes('world clock') || cleanText.includes('ওয়ার্ল্ড ক্লক')) {
+        if (cleanText.includes('world clock') || cleanText.includes('ওয়ার্ল্ড ক্লক') || text.includes('🌍')) {
             return ctx.reply("🌍 **World Clock & Date**\n\n👇 Select country:", {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
@@ -785,26 +801,13 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.toLowerCase().includes('shop now') || cleanText.includes('শপ নাও')) {
-            let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
-            for (let c of Object.keys(db.categories || {})) {
-                let encodedC = encodeURIComponent(c);
-                inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
-            }
-            if (userId === ADMIN_ID.toString()) {
-                inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
-            }
-            inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
-            return ctx.reply(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
-        }
-
-        if (cleanText.toLowerCase().includes('check ff uid') || cleanText.includes('ইউআইডি চেক')) {
+        if (cleanText.includes('check ff uid') || cleanText.includes('ইউআইডি চেক') || text.includes('🔍')) {
             db.sessions[userId] = { step: 'awaiting_uid_only' };
             saveDatabase(db);
             return ctx.reply(t(userId, 'checkUidPrompt'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
 
-        if (cleanText.toLowerCase().includes('add balance') || cleanText.includes('ব্যালেন্স অ্যাড')) {
+        if (cleanText.includes('add balance') || cleanText.includes('ব্যালেন্স অ্যাড') || text.includes('💰')) {
             const lang = getUserLang(userId);
             const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
@@ -817,7 +820,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.toLowerCase().includes('my profile') || cleanText.includes('আমার প্রোফাইল')) {
+        if (cleanText.includes('my profile') || cleanText.includes('আমার প্রোফাইল') || text.includes('👤')) {
             const lang = getUserLang(userId);
             const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
             const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\``;
@@ -831,7 +834,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.toLowerCase().includes('order history') || cleanText.includes('অর্ডার হিস্ট্রি')) {
+        if (cleanText.includes('order history') || cleanText.includes('অর্ডার হিস্ট্রি') || text.includes('📜')) {
             const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId].slice(0, 10) : [];
             let historyText = t(userId, 'historyTitle');
             if (userHistories.length === 0) {
@@ -855,7 +858,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (cleanText.toLowerCase().includes('support desk') || cleanText.includes('সাপোর্ট ডেস্ক')) {
+        if (cleanText.includes('support desk') || cleanText.includes('সাপোর্ট ডেস্ক') || text.includes('📞')) {
             return ctx.reply(t(userId, 'supportText'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
 
