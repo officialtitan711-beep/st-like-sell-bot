@@ -160,7 +160,6 @@ function isMenuCommand(text) {
     if (text.startsWith('/')) return true;
     if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) return true;
     
-    // Future-proof universal emoji & whitespace stripper
     const clean = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]/gu, '').toLowerCase();
     
     const keywords = [
@@ -259,7 +258,7 @@ bot.use(async (ctx, next) => {
             
             if (ctx.message && ctx.message.text) {
                 const msgText = ctx.message.text;
-                if (msgText.startsWith('/start') || isMenuCommand(msgText)) {
+                if (msgText.startsWith('/start') || msgText.includes('Shop Now') || msgText.includes('শপ নাও') || msgText.includes('🛍️') || isMenuCommand(msgText)) {
                     return next();
                 }
             }
