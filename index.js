@@ -18,11 +18,63 @@ const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
 
 const bot = new Telegraf(BOT_TOKEN);
-let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' }, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {}, lastCleanMonth: '', userLang: {}, depositRequests: {}, adminReplySessions: {}, adminInputSession: {}, adminSessions: {}, calcStates: {}, settings: { autoApiEnabled: true } };
+
+// Safe initial structure with robust fallbacks
+let cachedDb = { 
+    users: {}, 
+    balances: {}, 
+    sessions: {}, 
+    numbers: { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' }, 
+    categories: { 'Free Fire Likes': true, 'Guild Glory Bot': true }, 
+    customProducts: { 
+        'Free Fire Likes': [
+            { name: '1000 Likes - 50 BDT' },
+            { name: '5000 Likes - 220 BDT' },
+            { name: '10000 Likes - 400 BDT' }
+        ],
+        'Guild Glory Bot': [
+            { name: 'Squad Bot 3 Days - 120 BDT' }
+        ]
+    }, 
+    allowedUsers: {}, 
+    pendingMsgs: {}, 
+    orderHistories: {}, 
+    historyTimestamps: {}, 
+    lastCleanMonth: '', 
+    userLang: {}, 
+    depositRequests: {}, 
+    adminReplySessions: {}, 
+    adminInputSession: {}, 
+    adminSessions: {}, 
+    calcStates: {}, 
+    settings: { autoApiEnabled: true } 
+};
 
 const userLastMsgTime = {};
 
-function loadDatabase() { return cachedDb; }
+function loadDatabase() { 
+    if (!cachedDb) cachedDb = {};
+    if (!cachedDb.categories) cachedDb.categories = {};
+    if (!cachedDb.customProducts) cachedDb.customProducts = {};
+    
+    // Ensure default fallback if completely empty
+    if (Object.keys(cachedDb.categories).length === 0) {
+        cachedDb.categories = { 'Free Fire Likes': true, 'Guild Glory Bot': true };
+    }
+    if (Object.keys(cachedDb.customProducts).length === 0) {
+        cachedDb.customProducts = {
+            'Free Fire Likes': [
+                { name: '1000 Likes - 50 BDT' },
+                { name: '5000 Likes - 220 BDT' },
+                { name: '10000 Likes - 400 BDT' }
+            ],
+            'Guild Glory Bot': [
+                { name: 'Squad Bot 3 Days - 120 BDT' }
+            ]
+        };
+    }
+    return cachedDb; 
+}
 
 function syncDataFromFirebase() {
     if (!FIREBASE_DB_URL) return;
@@ -35,10 +87,24 @@ function syncDataFromFirebase() {
                 if (data && data !== 'null') {
                     const parsed = JSON.parse(data);
                     if (parsed) {
-                        cachedDb = parsed;
-                        if (!cachedDb.settings) cachedDb.settings = { autoApiEnabled: true };
-                        if (!cachedDb.numbers) cachedDb.numbers = { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' };
-                        if (!cachedDb.allowedUsers) cachedDb.allowedUsers = {};
+                        // Merge safely to preserve categories and products from Firebase
+                        cachedDb.users = parsed.users || cachedDb.users;
+                        cachedDb.balances = parsed.balances || cachedDb.balances;
+                        cachedDb.sessions = parsed.sessions || cachedDb.sessions;
+                        cachedDb.numbers = parsed.numbers || cachedDb.numbers;
+                        
+                        if (parsed.categories && Object.keys(parsed.categories).length > 0) {
+                            cachedDb.categories = parsed.categories;
+                        }
+                        if (parsed.customProducts && Object.keys(parsed.customProducts).length > 0) {
+                            cachedDb.customProducts = parsed.customProducts;
+                        }
+
+                        cachedDb.allowedUsers = parsed.allowedUsers || cachedDb.allowedUsers;
+                        cachedDb.orderHistories = parsed.orderHistories || cachedDb.orderHistories;
+                        cachedDb.userLang = parsed.userLang || cachedDb.userLang;
+                        cachedDb.depositRequests = parsed.depositRequests || cachedDb.depositRequests;
+                        cachedDb.settings = parsed.settings || cachedDb.settings;
                     }
                 }
             } catch (e) {}
@@ -181,7 +247,10 @@ function isMenuCommand(text) {
 
 function translateCategoryName(catName, userId) {
     const lang = getUserLang(userId);
-    const map = { 'Guild Glory Bot': lang === 'bn' ? '🛡️ গিল্ড গ্লোরি বট' : 'Guild Glory Bot', 'Free Fire Likes': lang === 'bn' ? '🔥 ফ্রি ফায়ার লাইকস' : 'Free Fire Likes' };
+    const map = { 
+        'Guild Glory Bot': lang === 'bn' ? '🛡️ গিল্ড গ্লোরি বট' : 'Guild Glory Bot', 
+        'Free Fire Likes': lang === 'bn' ? '🔥 ফ্রি ফায়ার লাইকস' : 'Free Fire Likes' 
+    };
     return map[catName] || catName;
 }
 
@@ -244,7 +313,7 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// --- FUTURE-PROOF BULLETPROOF BOT USE MIDDLEWARE ---
+// --- BOT USE MIDDLEWARE ---
 bot.use(async (ctx, next) => {
     try {
         if (ctx && ctx.from) {
@@ -346,21 +415,32 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // --- 1. SHOP NOW / শপ নাও হ্যান্ডলার ---
+        // --- 1. SHOP NOW / শপ নাও হ্যান্ডলার (Fixed & Fully Integrated) ---
         if (cleanText.includes('shopnow') || cleanText.includes('শপনাও') || text.includes('🛍️')) {
             if (db.sessions && db.sessions[userId]) {
                 delete db.sessions[userId];
                 saveDatabase(db);
             }
-            let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
+            
+            let inlineButtons = [];
+            
+            // Check and push Free Fire Likes category if exists
+            if (db.categories['Free Fire Likes']) {
+                inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
+            }
+
+            // Push all other custom categories dynamically from database / Firebase
             for (let c of Object.keys(db.categories || {})) {
+                if (c === 'Free Fire Likes') continue; // Handled above
                 let encodedC = encodeURIComponent(c);
                 inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
             }
+
             if (userId === ADMIN_ID.toString()) {
                 inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
             }
             inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
+            
             return ctx.reply(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
         }
 
@@ -924,8 +1004,12 @@ bot.action(/admin_rem_cat_(.+)/, async (ctx) => {
         saveDatabase(db);
         await ctx.answerCbQuery('✅ Category removed successfully!');
         
-        let inlineButtons = [[Markup.button.callback(t(ADMIN_ID, 'buyLikes'), 'cat_ff_likes')]];
+        let inlineButtons = [];
+        if (db.categories['Free Fire Likes']) {
+            inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'buyLikes'), 'cat_ff_likes')]);
+        }
         for (let c of Object.keys(db.categories || {})) {
+            if (c === 'Free Fire Likes') continue;
             let encodedC = encodeURIComponent(c);
             inlineButtons.push([Markup.button.callback(translateCategoryName(c, ADMIN_ID), 'custom_cat_' + encodedC)]);
         }
@@ -1317,13 +1401,18 @@ bot.action('back_to_clock', async (ctx) => {
     } catch (e) {}
 });
 
-// --- Shop Navigation & Order Flow ---
+// --- Shop Navigation & Order Flow (Fully Restored & Fixed) ---
 bot.action('shop_now_back', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
-        let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
+        let inlineButtons = [];
+        
+        if (db.categories['Free Fire Likes']) {
+            inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
+        }
         for (let c of Object.keys(db.categories || {})) {
+            if (c === 'Free Fire Likes') continue;
             let encodedC = encodeURIComponent(c);
             inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
         }
