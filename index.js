@@ -155,26 +155,29 @@ function getMainKeyboard(userId) {
     return Markup.keyboard(keyboard).resize();
 }
 
-const KNOWN_MENU_COMMANDS = [
-    '🛍️ Shop Now', '🛍️ শপ নাও', 'Shop Now', 'শপ নাও',
-    '🔍 Check FF UID', '🔍 ইউআইডি চেক',
-    '💰 Add Balance', '💰 ব্যালেন্স অ্যাড',
-    '👤 My Profile', '👤 আমার প্রোফাইল',
-    '📜 Order History', '📜 অর্ডার হিস্ট্রি',
-    '📞 Support Desk', '📞 সাপোর্ট ডেস্ক',
-    '🧮 Calculator', '🧮 ক্যালকুলেটর',
-    '🌍 World Clock', '🌍 ওয়ার্ল্ড ক্লক',
-    '📊 Total Users', '➕ Add Bot', '❌ Remove Bot',
-    '💳 Add/Minus Balance', '📱 Set Payment Numbers',
-    '📩 Send Message', '📢 All Users Msg',
-    '-----------------------------------'
-];
-
 function isMenuCommand(text) {
     if (!text) return false;
     if (text.startsWith('/')) return true;
     if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) return true;
-    return KNOWN_MENU_COMMANDS.includes(text);
+    
+    // Robust Flexible Matching for Menu Buttons (Ignoring/Handling Emojis seamlessly)
+    const clean = text.replace(/[\u{1F000}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim().toLowerCase();
+    
+    const keywords = [
+        'shop now', 'শপ নাও',
+        'check ff uid', 'ইউআইডি চেক',
+        'add balance', 'ব্যালেন্স অ্যাড',
+        'my profile', 'আমার প্রোফাইল',
+        'order history', 'অর্ডার হিস্ট্রি',
+        'support desk', 'সাপোর্ট ডেস্ক',
+        'calculator', 'ক্যালকুলেটর',
+        'world clock', 'ওয়ার্ল্ড ক্লক',
+        'total users', 'add bot', 'remove bot',
+        'add/minus balance', 'set payment numbers',
+        'send message', 'all users msg', '-----------------------------------'
+    ];
+    
+    return keywords.some(k => clean.includes(k) || text.includes(k));
 }
 
 function translateCategoryName(catName, userId) {
@@ -683,7 +686,9 @@ bot.on('message', async (ctx) => {
         }
 
         // --- Admin Main Menu Commands ---
-        if (text === '📊 Total Users') {
+        const cleanText = text.replace(/[\u{1F000}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim();
+
+        if (cleanText.toLowerCase().includes('total users') || text.includes('📊')) {
             if (userId === ADMIN_ID.toString()) {
                 const usersObj = db.users || {};
                 const userKeys = Object.keys(usersObj);
@@ -701,28 +706,28 @@ bot.on('message', async (ctx) => {
                 return;
             }
         }
-        if (text === '➕ Add Bot') {
+        if (cleanText.toLowerCase().includes('add bot') || text.includes('➕')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'add_bot_user' };
                 saveDatabase(db);
                 return ctx.reply('➕ **অ্যাড বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) দিয়ে বটে এক্সেস দিতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
             }
         }
-        if (text === '❌ Remove Bot') {
+        if (cleanText.toLowerCase().includes('remove bot') || text.includes('❌')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'remove_bot_user' };
                 saveDatabase(db);
                 return ctx.reply('❌ **রিমুভ বট মোড চালু হয়েছে**\n\n✍️ যে ইউজারের ইউজার আইডি (User ID) বট থেকে রিমুভ করতে চান, শুধু সেই **ইউজার আইডিটি** লিখে পাঠান:', { parse_mode: 'Markdown' });
             }
         }
-        if (text === '💳 Add/Minus Balance') {
+        if (cleanText.toLowerCase().includes('add/minus balance') || text.includes('💳')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'add_minus_balance' };
                 saveDatabase(db);
                 return ctx.reply('✍️ Format: `USER_ID AMOUNT` (Example: `5932254012 100`)', { parse_mode: 'Markdown' });
             }
         }
-        if (text === '📱 Set Payment Numbers') {
+        if (cleanText.toLowerCase().includes('set payment numbers') || text.includes('📱')) {
             if (userId === ADMIN_ID.toString()) {
                 return ctx.reply('📱 **Payment Number Management**\n\n👇 Select which payment number to update:', {
                     parse_mode: 'Markdown',
@@ -733,14 +738,14 @@ bot.on('message', async (ctx) => {
                 });
             }
         }
-        if (text === '📩 Send Message') {
+        if (cleanText.toLowerCase().includes('send message') || text.includes('📩')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'send_message' };
                 saveDatabase(db);
                 return ctx.reply('✍️ Format: `USER_ID | MESSAGE`', { parse_mode: 'Markdown' });
             }
         }
-        if (text === '📢 All Users Msg') {
+        if (cleanText.toLowerCase().includes('all users msg') || text.includes('📢')) {
             if (userId === ADMIN_ID.toString()) {
                 db.adminInputSession[userId] = { type: 'broadcast_msg' };
                 saveDatabase(db);
@@ -759,13 +764,13 @@ bot.on('message', async (ctx) => {
         }
 
         // --- User Main Menu Buttons ---
-        if (text === '🧮 Calculator' || text === '🧮 ক্যালকুলেটর') {
+        if (cleanText.toLowerCase().includes('calculator') || cleanText.includes('ক্যালকুলেটর')) {
             db.calcStates[userId] = '0';
             saveDatabase(db);
             return ctx.reply("🧮 **Calculator**\n\nScreen: `0`", { parse_mode: 'Markdown', ...getCalcKeyboard() });
         }
 
-        if (text === '🌍 World Clock' || text === '🌍 ওয়ার্ল্ড ক্লক') {
+        if (cleanText.toLowerCase().includes('world clock') || cleanText.includes('ওয়ার্ল্ড ক্লক')) {
             return ctx.reply("🌍 **World Clock & Date**\n\n👇 Select country:", {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
@@ -780,7 +785,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (text === '🛍️ Shop Now' || text === '🛍️ শপ নাও' || text.toLowerCase().includes('shop now') || text.includes('শপ নাও')) {
+        if (cleanText.toLowerCase().includes('shop now') || cleanText.includes('শপ নাও')) {
             let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
             for (let c of Object.keys(db.categories || {})) {
                 let encodedC = encodeURIComponent(c);
@@ -793,13 +798,13 @@ bot.on('message', async (ctx) => {
             return ctx.reply(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
         }
 
-        if (text === '🔍 Check FF UID' || text === '🔍 ইউআইডি চেক') {
+        if (cleanText.toLowerCase().includes('check ff uid') || cleanText.includes('ইউআইডি চেক')) {
             db.sessions[userId] = { step: 'awaiting_uid_only' };
             saveDatabase(db);
             return ctx.reply(t(userId, 'checkUidPrompt'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
 
-        if (text === '💰 Add Balance' || text === '💰 ব্যালেন্স অ্যাড') {
+        if (cleanText.toLowerCase().includes('add balance') || cleanText.includes('ব্যালেন্স অ্যাড')) {
             const lang = getUserLang(userId);
             const cancelBtnText = lang === 'bn' ? "❌ বাতিল করুন" : "❌ Cancel";
 
@@ -812,7 +817,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (text === '👤 My Profile' || text === '👤 আমার প্রোফাইল') {
+        if (cleanText.toLowerCase().includes('my profile') || cleanText.includes('আমার প্রোফাইল')) {
             const lang = getUserLang(userId);
             const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
             const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\``;
@@ -826,7 +831,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (text === '📜 Order History' || text === '📜 অর্ডার হিস্ট্রি') {
+        if (cleanText.toLowerCase().includes('order history') || cleanText.includes('অর্ডার হিস্ট্রি')) {
             const userHistories = db.orderHistories && db.orderHistories[userId] ? db.orderHistories[userId].slice(0, 10) : [];
             let historyText = t(userId, 'historyTitle');
             if (userHistories.length === 0) {
@@ -850,7 +855,7 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        if (text === '📞 Support Desk' || text === '📞 সাপোর্ট ডেস্ক') {
+        if (cleanText.toLowerCase().includes('support desk') || cleanText.includes('সাপোর্ট ডেস্ক')) {
             return ctx.reply(t(userId, 'supportText'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
 
