@@ -1,5 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
-const http = http = require('http');
+const http = require('http');
 const https = require('https');
 require('dotenv').config();
 
