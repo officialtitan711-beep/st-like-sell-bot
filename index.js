@@ -244,6 +244,7 @@ function checkFreeFireUID(uid) {
     });
 }
 
+// --- FIXED BOT USE MIDDLEWARE (इমোজি সহ সব মেনু বাটন বাইপাস করার জন্য) ---
 bot.use(async (ctx, next) => {
     try {
         if (ctx && ctx.from) {
@@ -254,7 +255,14 @@ bot.use(async (ctx, next) => {
             saveDatabase(db);
             if (userId === ADMIN_ID) return next();
             if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_sub') return next();
-            if (ctx.message && ctx.message.text && (ctx.message.text.startsWith('/start') || ctx.message.text.includes('Shop Now') || ctx.message.text.includes('শপ নাও'))) return next();
+            
+            if (ctx.message && ctx.message.text) {
+                const msgText = ctx.message.text;
+                if (msgText.startsWith('/start') || msgText.includes('Shop Now') || msgText.includes('শপ নাও') || msgText.includes('🛍️') || isMenuCommand(msgText)) {
+                    return next();
+                }
+            }
+
             if (!(await checkUserSubscription(userId))) return sendForceSubMessage(ctx, false);
             if (!db.allowedUsers || !db.allowedUsers[userId]) return sendForceSubMessage(ctx, true);
         }
