@@ -20,6 +20,8 @@ const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
 const bot = new Telegraf(BOT_TOKEN);
 let cachedDb = { users: {}, balances: {}, sessions: {}, numbers: { bkash: '01XXXXXXXXX (Personal)', nagad: '01XXXXXXXXX (Personal)' }, categories: {}, customProducts: {}, allowedUsers: {}, pendingMsgs: {}, orderHistories: {}, historyTimestamps: {}, lastCleanMonth: '', userLang: {}, depositRequests: {}, adminReplySessions: {}, adminInputSession: {}, adminSessions: {}, calcStates: {}, settings: { autoApiEnabled: true } };
 
+const userLastMsgTime = {};
+
 function loadDatabase() { return cachedDb; }
 
 function syncDataFromFirebase() {
@@ -298,6 +300,14 @@ bot.on('message', async (ctx) => {
     try {
         if (!ctx.message) return;
         const userId = ctx.from.id.toString();
+        const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
+
+        const now = Date.now();
+        if (userLastMsgTime[userId] && (now - userLastMsgTime[userId] < 600) && isMenuCommand(text)) {
+            return;
+        }
+        userLastMsgTime[userId] = now;
+
         const db = loadDatabase();
         if (!db.balances) db.balances = {};
         if (!db.sessions) db.sessions = {};
@@ -311,8 +321,6 @@ bot.on('message', async (ctx) => {
         if (!db.adminSessions) db.adminSessions = {};
         if (!db.calcStates) db.calcStates = {};
         if (!db.userLang) db.userLang = {};
-
-        const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
 
         if (isMenuCommand(text)) {
             if (db.sessions && db.sessions[userId]) {
@@ -345,11 +353,11 @@ bot.on('message', async (ctx) => {
                 const currentBal = db.balances[targetUid] || 0;
 
                 if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
-                const now = new Date();
+                const orderNow = new Date();
                 db.orderHistories[targetUid].unshift({
-                    timestamp: now.getTime(),
-                    date: now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
-                    time: now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
+                    timestamp: orderNow.getTime(),
+                    date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
+                    time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
                     product: orderInfo.product, uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
                 });
                 if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
@@ -1165,19 +1173,41 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
     } catch (e) {}
 });
 
-// --- Calculator & Clock ---
+// --- Calculator (Super Fast Version) ---
 bot.action(/calc_(.+)/, async (ctx) => {
     try {
-        const userId = ctx.from.id.toString(), val = ctx.match[1].trim();
-        const db = loadDatabase();
-        let current = db.calcStates[userId] || '0';
-        if (val === 'C') current = '0';
-        else if (val === 'DEL') current = current.length > 1 ? current.slice(0, -1) : '0';
-        else if (val === 'EQ') { try { current = String(eval(current.replace(/[^0-9+\-*/().]/g, ''))); } catch (e) { current = 'Error'; } }
-        else { current = (current === '0' || current === 'Error') ? val : current + val; }
-        db.calcStates[userId] = current;
-        saveDatabase(db);
-        await ctx.editMessageText(`🧮 **Calculator**\n\nScreen: \`${current}\``, { parse_mode: 'Markdown', ...getCalcKeyboard() });
+        ctx.answerCbQuery().catch(() => {});
+        const userId = ctx.from.id.toString();
+        const val = ctx.match[1].trim();
+        
+        if (!cachedDb.calcStates) cachedDb.calcStates = {};
+        let current = cachedDb.calcStates[userId] || '0';
+
+        if (val === 'C') {
+            current = '0';
+        } else if (val === 'DEL') {
+            current = current.length > 1 ? current.slice(0, -1) : '0';
+        } else if (val === 'EQ') {
+            try { 
+                const sanitized = current.replace(/[^0-9+\-*/().]/g, '');
+                current = sanitized ? String(Function('"use strict";return (' + sanitized + ')')()) : '0';
+            } catch (e) { 
+                current = 'Error'; 
+            }
+        } else {
+            if (current === '0' || current === 'Error') {
+                current = (val === '.') ? '0.' : val;
+            } else {
+                current += val;
+            }
+        }
+
+        cachedDb.calcStates[userId] = current;
+
+        await ctx.editMessageText(`🧮 **Calculator**\n\nScreen: \`${current}\``, { 
+            parse_mode: 'Markdown', 
+            ...getCalcKeyboard() 
+        });
     } catch (e) {}
 });
 
