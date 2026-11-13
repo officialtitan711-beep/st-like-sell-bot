@@ -351,11 +351,15 @@ bot.on('message', async (ctx) => {
                 const targetUid = orderInfo.targetUserId;
                 const currentBal = db.balances[targetUid] || 0;
 
-                const parts = text.split('|');
-                const pLikes = parts[0] ? parts[0].trim() : 'N/A';
-                const cLikes = parts[1] ? parts[1].trim() : 'N/A';
-                const aLikes = (!isNaN(pLikes) && !isNaN(cLikes)) ? `+${Number(cLikes) - Number(pLikes)} Likes` : 'N/A';
-                const adminNote = parts[2] ? parts[2].trim() : (parts[0] && !parts[1] ? parts[0].trim() : 'Completed by Admin');
+                const cleanText = text.replace(/[^\d\s|.-]/g, ' ').replace(/\s+/g, ' ').trim();
+                const parts = cleanText.includes('|') ? cleanText.split('|').map(s => s.trim()) : cleanText.split(' ').filter(Boolean);
+                
+                const numbers = parts.map(p => Number(p)).filter(n => !isNaN(n));
+                const pLikes = numbers[0] !== undefined ? numbers[0] : 'N/A';
+                const cLikes = numbers[1] !== undefined ? numbers[1] : (numbers[0] !== undefined ? numbers[0] + 50 : 'N/A');
+                const addedNum = numbers[2] !== undefined ? numbers[2] : (typeof cLikes === 'number' && typeof pLikes === 'number' ? cLikes - pLikes : 'N/A');
+                const aLikes = addedNum !== 'N/A' ? `+${addedNum} Likes` : 'N/A';
+                const adminNote = text.split('|').length > 2 ? text.split('|')[2].trim() : 'Completed by Admin';
 
                 if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
                 const now = new Date();
@@ -546,20 +550,22 @@ bot.on('message', async (ctx) => {
                 }).catch(() => {});
             }
 
-            delete db.sessions[userId];
-            saveDatabase(db);
-
             const pendingBoxMsg = isBn
                 ? `╭──────────────────────────────╮\n     ⏳ অ্যাড মানি রিকোয়েস্ট পেন্ডিং\n╰──────────────────────────────╯\n\n💳 মাধ্যম: \`${method}\`\n💵 পেন্ডিং অ্যামাউন্ট: \`${amount} BDT\`\n\n✨ আপনার ট্রানজেকশন বা স্ক্রিনশট সফলভাবে জমা হয়েছে। অ্যাডমিন যাচাই-বাছাই করে খুব শীঘ্রই আপনার ব্যালেন্স অ্যাড করে দেবেন!`
                 : `╭──────────────────────────────╮\n     ⏳ DEPOSIT REQUEST PENDING\n╰──────────────────────────────╯\n\n💳 Method: \`${method}\`\n💵 Pending Amount: \`${amount} BDT\`\n\n✨ Your proof has been submitted successfully. Admin will review and add your balance shortly!`;
 
-            return ctx.reply(pendingBoxMsg, {
+            const userMsg = await ctx.reply(pendingBoxMsg, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
             });
+
+            db.depositRequests[uniqueDepId].userMessageId = userMsg.message_id;
+            delete db.sessions[userId];
+            saveDatabase(db);
+            return;
         }
 
-        // --- Check FF UID Only ---
+        // --- Check FF UID Only (Smooth 1 to 100% Animation & Clean Name/UID) ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid_only' && !isMenuCommand(text)) {
             const uidText = text;
             const lang = getUserLang(userId);
@@ -567,16 +573,16 @@ bot.on('message', async (ctx) => {
             saveDatabase(db);
 
             const loadingMsg = await ctx.reply(`⏳ Checking UID...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
-            await new Promise(r => setTimeout(r, 400));
-            try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▱▱▱▱ 60%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(r => setTimeout(r, 300));
+            try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+            await new Promise(r => setTimeout(r, 300));
+            try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+            await new Promise(r => setTimeout(r, 300));
 
             const resInfo = await checkFreeFireUID(uidText);
-            const levelLine = resInfo.level ? (lang === 'bn' ? `\n⭐ লেভেল: \`${resInfo.level}\`` : `\n⭐ Level: \`${resInfo.level}\``) : '';
-            const likesLine = `\n👍 লাইক: \`${resInfo.likes}\``;
             const resultBox = lang === 'bn'
-                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 ফ্রি ফায়ার প্লেয়ার ইনফো\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 নাম: \`${resInfo.nickname}\`\n🛡 ইউআইডি: \`${uidText}\`${levelLine}${likesLine}`
-                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 FREE FIRE PLAYER INFO\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 Name: \`${resInfo.nickname}\`\n🛡 UID: \`${uidText}\`${levelLine}\n👍 Likes: \`${resInfo.likes}\``;
+                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 ফ্রি ফায়ার প্লেয়ার ইনফো\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 নাম: \`${resInfo.nickname}\`\n🛡 ইউআইডি: \`${uidText}\``
+                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 FREE FIRE PLAYER INFO\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 Name: \`${resInfo.nickname}\`\n🛡 UID: \`${uidText}\``;
 
             try {
                 await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, resultBox, {
@@ -603,9 +609,11 @@ bot.on('message', async (ctx) => {
 
             if (isFFCategory) {
                 const loadingMsg = await ctx.reply(`⏳ Checking UID...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
-                await new Promise(r => setTimeout(r, 400));
-                try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▱▱▱▱ 60%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise(r => setTimeout(r, 300));
+                try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+                await new Promise(r => setTimeout(r, 300));
+                try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+                await new Promise(r => setTimeout(r, 300));
 
                 const resInfo = await checkFreeFireUID(uidText);
                 nickname = resInfo.nickname;
@@ -615,8 +623,7 @@ bot.on('message', async (ctx) => {
                 session.initialLikes = resInfo.likes;
                 saveDatabase(db);
 
-                const levelStr = level ? `\n⭐ Level: \`${level}\`` : '';
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${uidText}\`${levelStr}\n\n⚠️ Please verify your in-game name & UID before confirming.`;
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${uidText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
                 try {
                     await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, reviewBox, {
@@ -1002,10 +1009,22 @@ bot.action(/dep_app_(.+)/, async (ctx) => {
                 ? `💠 ════════════════════════════ 💠\n           ✅ ডিপোজিট সফলভাবে সম্পন্ন\n💠 ════════════════════════════ 💠\n\n💳 পেমেন্ট মাধ্যম: \`${info.method}\`\n💵 অ্যাডকৃত অ্যামাউন্ট: \`+${addAmt} BDT\`\n\n💰 **আগের ব্যালেন্স:** \`${prevBal} BDT\`\n💰 **বর্তমান ব্যালেন্স:** \`${currBal} BDT\`\n\n📊 স্ট্যাটাস: \`অ্যাডমিন কর্তৃক এপ্রুভড\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`
                 : `💠 ════════════════════════════ 💠\n           ✅ DEPOSIT SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n💳 Method: \`${info.method}\`\n💵 Added Amount: \`+${addAmt} BDT\`\n\n💰 **Previous Balance:** \`${prevBal} BDT\`\n💰 **Current Balance:** \`${currBal} BDT\`\n\n📊 Status: \`Approved by Admin\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
-            await bot.telegram.sendMessage(targetUser, depositReceipt, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUser, 'mainMenuBack'), 'back_start_inline')]])
-            }).catch(() => {});
+            if (info.userMessageId) {
+                await bot.telegram.editMessageText(targetUser, info.userMessageId, null, depositReceipt, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUser, 'mainMenuBack'), 'back_start_inline')]])
+                }).catch(() => {
+                    bot.telegram.sendMessage(targetUser, depositReceipt, {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUser, 'mainMenuBack'), 'back_start_inline')]])
+                    }).catch(() => {});
+                });
+            } else {
+                await bot.telegram.sendMessage(targetUser, depositReceipt, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUser, 'mainMenuBack'), 'back_start_inline')]])
+                }).catch(() => {});
+            }
 
             delete db.depositRequests[ctx.match[1]];
             saveDatabase(db);
@@ -1266,9 +1285,10 @@ bot.action('confirm_order', async (ctx) => {
         db.balances[userId] -= Number(session.price);
         saveDatabase(db);
 
-        const procMsg = await ctx.reply(`⏳ Processing Order...\n\`▰▰▰▰▰▱▱▱▱▱ 50%\``, { parse_mode: 'Markdown' });
+        // Smooth 1 to 100% progress animation simulation
+        const procMsg = await ctx.reply(`⏳ Processing Order...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
         await new Promise(r => setTimeout(r, 400));
-        try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+        try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
         await new Promise(r => setTimeout(r, 400));
 
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled;
@@ -1278,6 +1298,9 @@ bot.action('confirm_order', async (ctx) => {
         }
 
         if (isAutoEnabled && apiRes.success) {
+            try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+            await new Promise(r => setTimeout(r, 300));
+
             const postCheck = await checkFreeFireUID(session.uid);
             const prevLikes = session.initialLikes || 0;
             const currLikes = postCheck.likes || prevLikes;
@@ -1304,6 +1327,9 @@ bot.action('confirm_order', async (ctx) => {
             await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Auto Order]**\n\n" + autoReceipt + "\n\n👤 **Customer ID:** `" + userId + "`", { parse_mode: 'Markdown' }).catch(() => {});
 
         } else {
+            // API failed or disabled -> Hold at 95% and notify admin for manual entry
+            try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▱ 95% (Pending Admin Review)\``, { parse_mode: 'Markdown' }); } catch (e) {}
+
             const uniqueOrderId = userId + '_' + Date.now();
             db.adminSessions[uniqueOrderId] = {
                 targetUserId: userId,
@@ -1316,17 +1342,13 @@ bot.action('confirm_order', async (ctx) => {
             };
             saveDatabase(db);
 
-            const modeLabel = isAutoEnabled ? '⚠️ API Fallback Order (Manual Needed)' : '🛠️ Manual Mode Order';
+            const modeLabel = isAutoEnabled ? '⚠️ API Failed / Fallback Order (Manual Needed)' : '🛠️ Manual Mode Order';
             await bot.telegram.sendMessage(ADMIN_ID, `${modeLabel}\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
                     [Markup.button.callback('❌ Cancel & Refund', 'admin_can_' + uniqueOrderId)]
                 ])
-            });
-            await ctx.telegram.editMessageText(userId, procMsg.message_id, null, "⏳ **Order Placed**\n\nYour order has been forwarded to the admin for processing. You will receive your receipt shortly!", {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
             });
         }
 
