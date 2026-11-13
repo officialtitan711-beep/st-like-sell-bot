@@ -403,7 +403,6 @@ bot.on('message', async (ctx) => {
 
                 if (db.customProducts[catName] && db.customProducts[catName][prodIndex]) {
                     let oldName = db.customProducts[catName][prodIndex].name;
-                    // Replace old price with new price
                     if (oldName.includes('-')) {
                         oldName = oldName.replace(/-\s*\d+.*$/, `- ${newPrice} BDT`);
                     } else {
@@ -733,7 +732,8 @@ bot.on('message', async (ctx) => {
         if (text === '🛍️ Shop Now' || text === '🛍️ শপ নাও') {
             let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
             for (let c of Object.keys(db.categories || {})) {
-                inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + c)]);
+                let encodedC = encodeURIComponent(c);
+                inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
             }
             if (userId === ADMIN_ID.toString()) {
                 inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
@@ -835,13 +835,13 @@ bot.action('admin_create_cat', async (ctx) => {
 bot.action(/admin_add_prod_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = ctx.match[1];
+        const catName = decodeURIComponent(ctx.match[1]);
         const db = loadDatabase();
         db.adminInputSession[ADMIN_ID] = { type: 'add_shop_product', category: catName };
         saveDatabase(db);
         await ctx.editMessageText(`✍️ Enter product name and price for **${catName}**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`Squad Bot 3 Days | 120\`)`, {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catName)]])
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + encodeURIComponent(catName))]])
         });
         await ctx.answerCbQuery();
     } catch (e) {}
@@ -850,16 +850,17 @@ bot.action(/admin_add_prod_(.+)/, async (ctx) => {
 bot.action(/admin_rem_cat_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = ctx.match[1];
+        const catName = decodeURIComponent(ctx.match[1]);
         const db = loadDatabase();
         if (db.categories[catName]) delete db.categories[catName];
         if (db.customProducts[catName]) delete db.customProducts[catName];
         saveDatabase(db);
         await ctx.answerCbQuery('✅ Category removed successfully!');
-        // Return to shop menu
+        
         let inlineButtons = [[Markup.button.callback(t(ADMIN_ID, 'buyLikes'), 'cat_ff_likes')]];
         for (let c of Object.keys(db.categories || {})) {
-            inlineButtons.push([Markup.button.callback(translateCategoryName(c, ADMIN_ID), 'custom_cat_' + c)]);
+            let encodedC = encodeURIComponent(c);
+            inlineButtons.push([Markup.button.callback(translateCategoryName(c, ADMIN_ID), 'custom_cat_' + encodedC)]);
         }
         inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
         inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
@@ -870,7 +871,7 @@ bot.action(/admin_rem_cat_(.+)/, async (ctx) => {
 bot.action(/admin_rem_prod_(.+)_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = ctx.match[1];
+        const catName = decodeURIComponent(ctx.match[1]);
         const prodIndex = parseInt(ctx.match[2]);
         const db = loadDatabase();
         if (db.customProducts[catName]) {
@@ -878,18 +879,19 @@ bot.action(/admin_rem_prod_(.+)_(.+)/, async (ctx) => {
             saveDatabase(db);
         }
         await ctx.answerCbQuery('✅ Product removed successfully!');
-        // Refresh category view
+        
         let inlineButtons = [];
         (db.customProducts?.[catName] || []).forEach((p, idx) => {
-            let row = [Markup.button.callback(translateProductName(p.name, ADMIN_ID), 'sub_prod_' + catName + '_' + idx)];
+            let encodedC = encodeURIComponent(catName);
+            let row = [Markup.button.callback(translateProductName(p.name, ADMIN_ID), 'sub_prod_' + encodedC + '_' + idx)];
             if (ADMIN_ID === ADMIN_ID.toString()) {
-                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${catName}_${idx}`));
-                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${catName}_${idx}`));
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${encodedC}_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${encodedC}_${idx}`));
             }
             inlineButtons.push(row);
         });
-        inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_' + catName)]);
-        inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_' + catName)]);
+        inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_' + encodeURIComponent(catName))]);
+        inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_' + encodeURIComponent(catName))]);
         inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText(`📂 **${translateCategoryName(catName, ADMIN_ID)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
@@ -898,14 +900,14 @@ bot.action(/admin_rem_prod_(.+)_(.+)/, async (ctx) => {
 bot.action(/admin_chg_price_(.+)_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = ctx.match[1];
+        const catName = decodeURIComponent(ctx.match[1]);
         const prodIndex = parseInt(ctx.match[2]);
         const db = loadDatabase();
         db.adminInputSession[ADMIN_ID] = { type: 'change_shop_price', category: catName, prodIndex: prodIndex };
         saveDatabase(db);
         await ctx.editMessageText(`✍️ Enter new price for this product (Only number):\n(Example: \`90\`)`, {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catName)]])
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + encodeURIComponent(catName))]])
         });
         await ctx.answerCbQuery();
     } catch (e) {}
@@ -1233,7 +1235,8 @@ bot.action('shop_now_back', async (ctx) => {
         const db = loadDatabase();
         let inlineButtons = [[Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]];
         for (let c of Object.keys(db.categories || {})) {
-            inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + c)]);
+            let encodedC = encodeURIComponent(c);
+            inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
         }
         if (userId === ADMIN_ID.toString()) {
             inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
@@ -1248,16 +1251,17 @@ bot.action('cat_ff_likes', async (ctx) => {
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         let inlineButtons = [];
+        let encodedCat = encodeURIComponent('Free Fire Likes');
         (db.customProducts?.['Free Fire Likes'] || []).forEach((p, idx) => {
-            let row = [Markup.button.callback(translateProductName(p.name, userId), 'sub_prod_Free Fire Likes_' + idx)];
+            let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_${encodedCat}_${idx}`)];
             if (userId === ADMIN_ID.toString()) {
-                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_Free Fire Likes_${idx}`));
-                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_Free Fire Likes_${idx}`));
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${encodedCat}_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${encodedCat}_${idx}`));
             }
             inlineButtons.push(row);
         });
         if (userId === ADMIN_ID.toString()) {
-            inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_Free Fire Likes')]);
+            inlineButtons.push([Markup.button.callback('➕ Add Product', `admin_add_prod_${encodedCat}`)]);
         }
         inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText("🔥 **Select Package:**", { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
@@ -1266,20 +1270,22 @@ bot.action('cat_ff_likes', async (ctx) => {
 
 bot.action(/custom_cat_(.+)/, async (ctx) => {
     try {
-        const catName = ctx.match[1], userId = ctx.from.id.toString();
+        const catName = decodeURIComponent(ctx.match[1]);
+        const userId = ctx.from.id.toString();
         const db = loadDatabase();
         let inlineButtons = [];
+        let encodedCat = encodeURIComponent(catName);
         (db.customProducts?.[catName] || []).forEach((p, idx) => {
-            let row = [Markup.button.callback(translateProductName(p.name, userId), 'sub_prod_' + catName + '_' + idx)];
+            let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_${encodedCat}_${idx}`)];
             if (userId === ADMIN_ID.toString()) {
-                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${catName}_${idx}`));
-                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${catName}_${idx}`));
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${encodedCat}_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${encodedCat}_${idx}`));
             }
             inlineButtons.push(row);
         });
         if (userId === ADMIN_ID.toString()) {
-            inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_' + catName)]);
-            inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_' + catName)]);
+            inlineButtons.push([Markup.button.callback('➕ Add Product', `admin_add_prod_${encodedCat}`)]);
+            inlineButtons.push([Markup.button.callback('❌ Remove Category', `admin_rem_cat_${encodedCat}`)]);
         }
         inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText(`📂 **${translateCategoryName(catName, userId)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
@@ -1288,7 +1294,9 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
 
 bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
     try {
-        const catName = ctx.match[1], index = parseInt(ctx.match[2]), userId = ctx.from.id.toString();
+        const catName = decodeURIComponent(ctx.match[1]);
+        const index = parseInt(ctx.match[2]);
+        const userId = ctx.from.id.toString();
         const db = loadDatabase();
         const prod = db.customProducts[catName]?.[index] || { name: 'Package' };
         const translated = translateProductName(prod.name, userId);
@@ -1308,7 +1316,7 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
         db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index };
         saveDatabase(db);
 
-        const prevCatCallback = catName === 'Free Fire Likes' ? 'cat_ff_likes' : 'custom_cat_' + catName;
+        const prevCatCallback = catName === 'Free Fire Likes' ? 'cat_ff_likes' : 'custom_cat_' + encodeURIComponent(catName);
         await ctx.editMessageText(t(userId, 'serverTitle') + `\`${translated}\`\n💵 Price: \`${price} BDT\`\n\n👇 Select Server:`, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -1329,7 +1337,7 @@ bot.action(/region_(bd|id)/, async (ctx) => {
             session.step = 'awaiting_uid';
             saveDatabase(db);
         }
-        const prevProdCallback = session ? `sub_prod_${session.activeCategory}_${session.prodIndex}` : 'shop_now_back';
+        const prevProdCallback = session ? `sub_prod_${encodeURIComponent(session.activeCategory)}_${session.prodIndex}` : 'shop_now_back';
         await ctx.editMessageText(`🎮 **Enter UID (${region})**\n\n✍️ Please type and send your UID:`, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
