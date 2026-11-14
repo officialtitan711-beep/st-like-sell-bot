@@ -1514,7 +1514,6 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
             price = allNums ? Number(allNums[allNums.length - 1]) : 0;
         }
 
-        // সঠিকভাবে চিহ্নিত করা হচ্ছে এটি ফ্রি ফায়ার লাইক নাকি অন্য কোনো সার্ভিস (যেমন গিল্ড গ্লোরি)
         const isFFLikes = catName === 'Free Fire Likes' || catName.toLowerCase().includes('like');
 
         db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index, catIdx: catIdx, isFFLikes };
@@ -1657,8 +1656,6 @@ bot.action('confirm_order', async (ctx) => {
             const uniqueOrderId = userId + '_' + Date.now();
             
             const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target Guild ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
-
-`;
 
             const userMsg = await ctx.telegram.editMessageText(userId, procMsg.message_id, null, pendingReceipt, {
                 parse_mode: 'Markdown',
