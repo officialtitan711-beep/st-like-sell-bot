@@ -11,7 +11,6 @@ const ADMIN_ID = process.env.ADMIN_ID || '5932254012';
 const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
-// সঠিক এপিআই বেস ইউআরএল (ডকুমেন্টেশন অনুযায়ী)
 const API_BASE = "https://raigen.site/likesff/reseller.php";
 const API_KEY = "likesff-shop-11935-c3rp5src";
 const PORT = process.env.PORT || 3000;
@@ -173,7 +172,6 @@ function extractPackageDays(productName) {
     return 1;
 }
 
-// স্ক্রিনশটের অফিশিয়াল প্রোডাক্ট কোড ম্যাপিং
 function getApiProductCode(productName) {
     const lower = productName.toLowerCase();
     if (lower.includes('6600') || lower.includes('৩০ দিন')) return 'AL-55F71F';
@@ -471,6 +469,13 @@ bot.start(async (ctx) => {
         if (userId.toString() !== ADMIN_ID.toString() && (!db.allowedUsers || !db.allowedUsers[userId])) return sendForceSubMessage(ctx, true);
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     } catch (e) {}
+});
+
+bot.action(/.*/, async (ctx, next) => {
+    try {
+        await ctx.answerCbQuery().catch(() => {});
+    } catch (e) {}
+    if (next) return next();
 });
 
 bot.action('verify_sub', async (ctx) => {
@@ -1152,7 +1157,6 @@ bot.on('message', async (ctx) => {
 
 bot.action('admin_create_cat', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const db = loadDatabase();
         db.adminInputSession[ADMIN_ID] = { type: 'add_category' };
@@ -1166,7 +1170,6 @@ bot.action('admin_create_cat', async (ctx) => {
 
 bot.action(/admin_add_prod_idx_(.+)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const catIdx = parseInt(ctx.match[1]);
         const db = loadDatabase();
@@ -1250,7 +1253,6 @@ bot.action(/admin_rem_prod_idx_(.+)_(.+)/, async (ctx) => {
 
 bot.action(/admin_chg_price_idx_(.+)_(.+)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const catIdx = parseInt(ctx.match[1]);
         const prodIndex = parseInt(ctx.match[2]);
@@ -1269,7 +1271,6 @@ bot.action(/admin_chg_price_idx_(.+)_(.+)/, async (ctx) => {
 
 bot.action('open_lang_menu', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         await ctx.editMessageText("🌐 **Select Your Language / ভাষা নির্বাচন করুন:**", {
             parse_mode: 'Markdown',
@@ -1283,7 +1284,6 @@ bot.action('open_lang_menu', async (ctx) => {
 
 bot.action('back_to_profile', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         const lang = getUserLang(userId);
@@ -1326,7 +1326,6 @@ bot.action(/set_lang_(bn|en)/, async (ctx) => {
 
 bot.action('admin_set_bkash', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const db = loadDatabase();
         db.adminInputSession[ADMIN_ID] = { type: 'set_bkash_number' };
@@ -1337,7 +1336,6 @@ bot.action('admin_set_bkash', async (ctx) => {
 
 bot.action('admin_set_nagad', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const db = loadDatabase();
         db.adminInputSession[ADMIN_ID] = { type: 'set_nagad_number' };
@@ -1348,7 +1346,6 @@ bot.action('admin_set_nagad', async (ctx) => {
 
 bot.action('deposit_portal_back', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
@@ -1367,7 +1364,6 @@ bot.action('deposit_portal_back', async (ctx) => {
 
 bot.action('dep_bkash', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         db.sessions[userId] = { step: 'awaiting_deposit_amount', method: 'bKash' };
@@ -1391,7 +1387,6 @@ bot.action('dep_bkash', async (ctx) => {
 
 bot.action('dep_nagad', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         db.sessions[userId] = { step: 'awaiting_deposit_amount', method: 'Nagad' };
@@ -1475,7 +1470,6 @@ bot.action(/dep_can_(.+)/, async (ctx) => {
 
 bot.action(/admin_reply_(.+)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const db = loadDatabase();
         db.adminReplySessions[ADMIN_ID] = ctx.match[1];
@@ -1486,7 +1480,6 @@ bot.action(/admin_reply_(.+)/, async (ctx) => {
 
 bot.action(/admin_input_(.+)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const uniqueOrderId = ctx.match[1];
         const db = loadDatabase();
@@ -1539,7 +1532,6 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
 
 bot.action(/calc_(.+)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         const val = ctx.match[1].trim();
         
@@ -1576,7 +1568,6 @@ bot.action(/calc_(.+)/, async (ctx) => {
 
 bot.action(/clock_(bd|np|in|pk|sa|ae|my|sg|us|gb|ca|au)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         const tzMap = { 
             bd: 'Asia/Dhaka', 
@@ -1606,7 +1597,6 @@ bot.action(/clock_(bd|np|in|pk|sa|ae|my|sg|us|gb|ca|au)/, async (ctx) => {
 
 bot.action('back_to_clock', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         await ctx.editMessageText("🌍 **World Clock & Date**\n\n👇 Select country:", {
             parse_mode: 'Markdown',
@@ -1625,7 +1615,6 @@ bot.action('back_to_clock', async (ctx) => {
 
 bot.action('shop_now_back', async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         let inlineButtons = [];
@@ -1646,7 +1635,6 @@ bot.action('shop_now_back', async (ctx) => {
 
 bot.action(/custom_cat_(.+)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const catIdx = parseInt(ctx.match[1]);
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
@@ -1674,7 +1662,6 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
 
 bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const catIdx = parseInt(ctx.match[1]);
         const index = parseInt(ctx.match[2]);
         const userId = ctx.from.id.toString();
@@ -1725,7 +1712,6 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
 
 bot.action(/region_(bd|id)/, async (ctx) => {
     try {
-        await ctx.answerCbQuery().catch(() => {});
         const userId = ctx.from.id.toString(), region = ctx.match[1].toUpperCase();
         const db = loadDatabase();
         const session = db.sessions?.[userId];
@@ -1758,7 +1744,6 @@ bot.action('cancel_order_review', async (ctx) => {
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
-        await ctx.answerCbQuery('❌ Order cancelled.');
         await ctx.editMessageText("❌ **Order Cancelled**\n\nYou have cancelled this order. No balance was deducted.", {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
@@ -1931,18 +1916,16 @@ bot.action('back_start_inline', async (ctx) => {
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
-        await ctx.answerCbQuery();
         try { await ctx.deleteMessage(); } catch (e) {}
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     } catch (e) {}
 });
 
-// --- ওয়েব হুক এবং ক্রন জব পিং হ্যান্ডলার (১% ক্র্যাশ-প্রুফ ও ফিক্সড) ---
 const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
 
 bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true })
     .then(() => console.log("Webhook set successfully!"))
-    .catch((err) => console.log("Webhook set warning:", err.message));
+    .catch((err) => console.log("Webhook set warning:", err.middleware));
 
 http.createServer((req, res) => {
     try {
