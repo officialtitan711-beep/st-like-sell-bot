@@ -1933,11 +1933,29 @@ bot.action('back_start_inline', async (ctx) => {
     } catch (e) {}
 });
 
+// --- ওয়েব হুক এবং ক্রন জব পিং হ্যান্ডলার (সম্পূর্ণ সেফ ও ফিক্সড) ---
 const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
-bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true }).catch(() => {});
+
+bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true })
+    .then(() => console.log("Webhook set successfully!"))
+    .catch((err) => console.log("Webhook set warning:", err.message));
 
 http.createServer((req, res) => {
-    if (req.url === webhookPath && req.method === 'POST') bot.webhookCallback(webhookPath)(req, res);
-    else if (req.url === '/ping') { res.writeHead(200); res.end('OK'); }
-    else { res.writeHead(200); res.end('Running'); }
-}).listen(PORT);
+    try {
+        if (req.url === webhookPath && req.method === 'POST') {
+            return bot.webhookCallback(webhookPath)(req, res);
+        } else if (req.url === '/ping') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            return res.end('OK');
+        } else {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            return res.end('ST Like Bot is running live via Webhook! 🚀');
+        }
+    } catch (e) {
+        console.error("Server Request Error:", e);
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Internal Server Error');
+    }
+}).listen(PORT, () => {
+    console.log(`Webhook HTTP Server listening on port ${PORT}`);
+});
