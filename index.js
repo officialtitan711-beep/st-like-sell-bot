@@ -135,7 +135,7 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
     });
 }
 
-// নতুন রিয়েল-টাইম চেকার এপিআই ইন্টিগ্রেশন (AuraFFX)
+// রিয়েল-টাইম চেকার এপিআই ইন্টিগ্রেশন (AuraFFX)
 function checkFreeFireUID(uid) {
     return new Promise((resolve) => {
         const url = 'https://auraffxserverinfocheckerapi.onrender.com/api/player?uid=' + uid;
@@ -159,6 +159,7 @@ function checkFreeFireUID(uid) {
     });
 }
 
+// স্মার্ট অটো ডিটেকশন: প্রোডাক্টের নাম যাই হোক না কেন, দিন সংখ্যা খুঁজে বের করবে
 function extractPackageDays(productName) {
     const match = productName.match(/(\d+)\s*(days?|দিন)/i);
     if (match && match[1]) {
@@ -168,7 +169,7 @@ function extractPackageDays(productName) {
     return 1;
 }
 
-// প্যাকেজ অনুযায়ী সঠিক প্রোডাক্ট কোড ম্যাপিং (অটো সাবস্ক্রিপশনের জন্য)
+// স্মার্ট অটো ডিটেকশন: প্যাকেজের নাম বা লাইক সংখ্যা দেখে সঠিক API Product Code সিলেক্ট করবে
 function getApiProductCode(productName) {
     const lower = productName.toLowerCase();
     if (lower.includes('30') || lower.includes('৬৬০০') || lower.includes('6600')) return 'AL-55F71F';
@@ -221,7 +222,6 @@ async function processDailySubscriptions() {
             const preCheck = await checkFreeFireUID(sub.uid);
             const prevLikes = preCheck.likes || 0;
 
-            // সাবস্ক্রিপশনের ক্ষেত্রে সঠিক প্রোডাক্ট কোড সহ অটো রিকোয়েস্ট পাঠানো হচ্ছে
             const prodCode = getApiProductCode(sub.product);
             const apiParams = prodCode ? { action: 'auto', product: prodCode, uid: sub.uid, server: sub.region } : { action: 'like', uid: sub.uid, server: sub.region };
 
@@ -602,7 +602,7 @@ bot.on('message', async (ctx) => {
                         const remainingDays = totalDays - 1;
 
                         let subNote = '';
-                        if (remainingDays > 0) {
+                        if (totalDays > 1) {
                             const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
                             db.subscriptions[subId] = {
                                 userId: targetUid,
@@ -1782,10 +1782,10 @@ bot.action('confirm_order', async (ctx) => {
         
         let apiRes = { success: false };
         if (isAutoEnabled) {
-            // যদি মাল্টি-ডে প্যাকেজ হয় (যেমন: ৫, ১৫, ৩০ দিন), তবে action=auto এবং product কোড পাঠানো হবে।
-            // আর ইনস্ট্যান্ট প্যাকেজ হলে (যেমন: 220 Likes) action=like পাঠানো হবে।
+            // স্মার্ট লজিক: যদি প্যাকেজটি ১ দিনের বেশি হয় (যেমন: ৫, ১৫, ৩০ দিন), তবে action=auto এবং সঠিক product কোড পাঠানো হবে।
+            // আর যদি ইনস্ট্যান্ট প্যাকেজ হয় (যেমন: 220 Likes), তবে সরাসরি action=like পাঠানো হবে।
             const prodCode = getApiProductCode(session.product);
-            const apiParams = prodCode 
+            const apiParams = (prodCode && totalDays > 1) 
                 ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
                 : { action: 'like', uid: session.uid, server: session.region };
 
@@ -1795,7 +1795,6 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             
-            // লাইক সার্ভারে আপডেট হওয়ার জন্য ৩ সেকেন্ড বিরতি দিয়ে রিয়েল কারেন্ট লাইক চেক করা হচ্ছে
             await new Promise(r => setTimeout(r, 3000));
 
             const postCheck = await checkFreeFireUID(session.uid);
