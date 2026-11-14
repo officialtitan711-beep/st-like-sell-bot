@@ -404,34 +404,6 @@ function translateProductName(prodName, userId) {
     }
 }
 
-async function checkUserSubscription(userId) {
-    if (userId.toString() === ADMIN_ID.toString()) return true;
-    try {
-        const chatMember = await bot.telegram.getChatMember(CHANNEL_ID, userId);
-        return !(chatMember.status === 'left' || chatMember.status === 'kicked');
-    } catch (e) { return true; }
-}
-
-async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
-    let text, keyboard;
-    if (isPendingAdminAccess) {
-        text = "⏳ **50% ACCESS PENDING**\n\n🎉 অভিনন্দন! আপনি **ST Like Bot**-এর ৫০% এক্সেস সফলভাবে পেয়েছেন। বাকী এক্সেস পেতে নিচের বাটনে ক্লিক করে অ্যাডমিনকে মেসেজ দিন।\n👑 **Admin:** `@sonu1813`";
-        keyboard = Markup.inlineKeyboard([[Markup.button.url('💬 Message Admin 🚀', 'https://t.me/sonu1813')]]);
-    } else {
-        text = "🚨 **SECURITY LOCK & FORCE**\n\n⚠️ প্রিমিয়াম বট ব্যবহার করতে হলে আমাদের অফিশিয়াল চ্যানেলে যুক্ত থাকতে হবে!\n\n🔥 **ধাপসমূহ:**\n1️⃣ টেলিগ্রাম চ্যানেলে জয়েন করুন।\n2️⃣ ইউটিউব চ্যানেল সাবস্ক্রাইব করুন।\n3️⃣ ভেরিফাই বাটনে ক্লিক করুন।";
-        keyboard = Markup.inlineKeyboard([
-            [Markup.button.url('📢 Join Telegram Channel 🚀', 'https://t.me/shohan2004')],
-            [Markup.button.url('🔴 Subscribe YouTube 🎬', YOUTUBE_URL)],
-            [Markup.button.callback('🔄 Verify Membership ✨', 'verify_sub')]
-        ]);
-    }
-    try {
-        if (ctx.callbackQuery) { await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard }); }
-        else { await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard }); }
-    } catch (e) {}
-}
-
-// ফিক্সড স্টার্ট কমান্ড হ্যান্ডলার (যাতে কোনো ব্লক বা হ্যান্ডশেক ইস্যু না হয়)
 bot.start(async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -456,7 +428,6 @@ bot.action(/.*/, async (ctx, next) => {
 bot.action('verify_sub', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
-        const db = loadDatabase();
         await ctx.answerCbQuery('🎉 ভেরিফিকেশন সফল!');
         try { await ctx.deleteMessage(); } catch (e) {}
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
@@ -1892,9 +1863,10 @@ bot.action('back_start_inline', async (ctx) => {
 
 const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
 
+// ফিক্সড ওয়েবহুক সেটআপ ও প্রপার এরর হ্যান্ডলিং
 bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true })
     .then(() => console.log("Webhook set successfully!"))
-    .catch((err) => console.log("Webhook set warning:", err.middleware));
+    .catch((err) => console.log("Webhook set warning:", err ? (err.message || err) : 'Unknown error'));
 
 http.createServer((req, res) => {
     try {
