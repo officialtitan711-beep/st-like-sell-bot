@@ -1582,7 +1582,7 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
         const catName = cats[catIdx];
         if (!catName) return;
 
-        let inlineButtons = [];
+    let inlineButtons = [];
         (db.customProducts?.[catName] || []).forEach((p, idx) => {
             let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_idx_${catIdx}_${idx}`)];
             if (userId === ADMIN_ID.toString()) {
@@ -1861,14 +1861,12 @@ bot.action('back_start_inline', async (ctx) => {
     } catch (e) {}
 });
 
+// ==========================================
+// 🛠️ ফিক্সড ওয়েবহুক ও সার্ভার হ্যান্ডলিং (ফাইনাল)
+// ==========================================
 const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
 
-// ফিক্সড ওয়েবহুক সেটআপ ও প্রপার এরর হ্যান্ডলিং
-bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true })
-    .then(() => console.log("Webhook set successfully!"))
-    .catch((err) => console.log("Webhook set warning:", err ? (err.message || err) : 'Unknown error'));
-
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
     try {
         if (req.url === webhookPath && req.method === 'POST') {
             return bot.webhookCallback(webhookPath)(req, res, (err) => {
@@ -1888,6 +1886,16 @@ http.createServer((req, res) => {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('Internal Server Error');
     }
-}).listen(PORT, () => {
+});
+
+// সার্ভার লাইভ হওয়ার পরে ওয়েবহুক সেট হবে যাতে 502 বা রিকোয়েস্ট ড্রপ না হয়
+server.listen(PORT, async () => {
     console.log(`Webhook HTTP Server listening on port ${PORT}`);
+    
+    try {
+        await bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true });
+        console.log("Webhook set successfully after server start!");
+    } catch (err) {
+        console.log("Webhook set warning:", err ? (err.message || err) : 'Unknown error');
+    }
 });
