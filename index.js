@@ -314,21 +314,25 @@ bot.use(async (ctx, next) => {
         if (ctx && ctx.from) {
             const userId = ctx.from.id.toString();
             const db = loadDatabase();
+            
+            if (userId === ADMIN_ID.toString()) return next();
+            if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_sub') return next();
+            
+            if (!db.allowedUsers || !db.allowedUsers[userId]) {
+                if (ctx.message && ctx.message.text) {
+                    const msgText = ctx.message.text;
+                    if (msgText.startsWith('/start') || isMenuCommand(msgText)) {
+                        return sendForceSubMessage(ctx, true);
+                    }
+                }
+                return sendForceSubMessage(ctx, true);
+            }
+
             if (!db.users) db.users = {};
             db.users[userId] = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
             saveDatabase(db);
-            if (userId === ADMIN_ID) return next();
-            if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_sub') return next();
-            
-            if (ctx.message && ctx.message.text) {
-                const msgText = ctx.message.text;
-                if (msgText.startsWith('/start') || isMenuCommand(msgText)) {
-                    return next();
-                }
-            }
 
             if (!(await checkUserSubscription(userId))) return sendForceSubMessage(ctx, false);
-            if (!db.allowedUsers || !db.allowedUsers[userId]) return sendForceSubMessage(ctx, true);
         }
         await next();
     } catch (err) {}
@@ -454,33 +458,50 @@ bot.on('message', async (ctx) => {
             if (sessionData.uniqueOrderId && db.adminSessions[sessionData.uniqueOrderId]) {
                 const uniqueOrderId = sessionData.uniqueOrderId;
                 const orderInfo = db.adminSessions[uniqueOrderId];
-                const targetUid = orderInfo.targetUserId;
-                const currentBal = db.balances[targetUid] || 0;
 
-                if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
-                const orderNow = new Date();
-                db.orderHistories[targetUid].unshift({
-                    timestamp: orderNow.getTime(),
-                    date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
-                    time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
-                    product: orderInfo.product, uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
-                });
-                if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
-                saveDatabase(db);
+                if (orderInfo.step === 'awaiting_prev_likes') {
+                    orderInfo.prevLikes = text;
+                    orderInfo.step = 'awaiting_curr_likes';
+                    saveDatabase(db);
+                    return ctx.reply('✍️ এখন **কারেন্ট লাইক (Current Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
+                }
+                else if (orderInfo.step === 'awaiting_curr_likes') {
+                    orderInfo.currLikes = text;
+                    orderInfo.step = 'awaiting_added_likes';
+                    saveDatabase(db);
+                    return ctx.reply('✍️ এখন **এডেড লাইক (Added Likes)** কত (কত যোগ হলো) সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
+                }
+                else if (orderInfo.step === 'awaiting_added_likes') {
+                    orderInfo.addedLikes = text;
+                    
+                    const targetUid = orderInfo.targetUserId;
+                    const currentBal = db.balances[targetUid] || 0;
 
-                const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`\n📝 Note/Details: \`${text}\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                    if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
+                    const orderNow = new Date();
+                    db.orderHistories[targetUid].unshift({
+                        timestamp: orderNow.getTime(),
+                        date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
+                        time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
+                        product: orderInfo.product, uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
+                    });
+                    if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
+                    saveDatabase(db);
 
-                await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
-                    parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
-                }).catch(() => {});
+                    const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
-                await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
-                await ctx.reply('✅ Order successfully completed & receipt updated to customer!');
-                delete db.adminInputSession[userId];
-                delete db.adminSessions[uniqueOrderId];
-                saveDatabase(db);
-                return;
+                    await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
+                    }).catch(() => {});
+
+                    await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Manual Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
+                    await ctx.reply('✅ Order successfully completed & receipt updated with Previous, Current, Added Likes to customer!');
+                    delete db.adminInputSession[userId];
+                    delete db.adminSessions[uniqueOrderId];
+                    saveDatabase(db);
+                    return;
+                }
             }
 
             const actionType = sessionData.type;
@@ -500,8 +521,7 @@ bot.on('message', async (ctx) => {
                 const catName = sessionData.category;
                 const parts = text.split('|');
                 const prodName = parts[0] ? parts[0].trim() : text;
-                const priceVal = parts[1] ? parts[1].trim() : '100';
-                const formattedProd = `${prodName} - ${priceVal} BDT`;
+                const formattedProd = parts[1] ? `${prodName} - ${parts[1].trim()} BDT` : prodName;
 
                 if (!db.customProducts[catName]) db.customProducts[catName] = [];
                 db.customProducts[catName].push({ name: formattedProd });
@@ -755,11 +775,12 @@ bot.on('message', async (ctx) => {
         // --- Admin Main Menu Commands ---
         if (cleanText.includes('totalusers') || text.includes('📊')) {
             if (userId === ADMIN_ID.toString()) {
-                const usersObj = db.users || {};
-                const userKeys = Object.keys(usersObj);
-                let listText = `📊 **TOTAL USERS: ${userKeys.length}**\n\n`;
+                const allowedObj = db.allowedUsers || {};
+                const userKeys = Object.keys(allowedObj);
+                let listText = `📊 **TOTAL AUTHORIZED USERS: ${userKeys.length}**\n\n`;
+                
                 userKeys.forEach((uId, idx) => {
-                    const uInfo = usersObj[uId];
+                    const uInfo = (db.users && db.users[uId]) ? db.users[uId] : { first_name: 'Approved User', username: 'N/A' };
                     const bal = db.balances[uId] || 0;
                     listText += `${idx + 1}. 👤 Name: \`${uInfo.first_name}\`\n   🔗 Username: \`${uInfo.username}\`\n   🆔 ID: \`${uId}\`\n   💰 Balance: \`${bal} BDT\`\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n`;
                     if (listText.length > 3700) {
@@ -1337,10 +1358,16 @@ bot.action(/admin_reply_(.+)/, async (ctx) => {
 bot.action(/admin_input_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const uniqueOrderId = ctx.match[1];
         const db = loadDatabase();
-        db.adminInputSession[ADMIN_ID] = { uniqueOrderId: ctx.match[1] };
+        
+        if (db.adminSessions[uniqueOrderId]) {
+            db.adminSessions[uniqueOrderId].step = 'awaiting_prev_likes';
+        }
+        db.adminInputSession[ADMIN_ID] = { uniqueOrderId: uniqueOrderId };
         saveDatabase(db);
-        await ctx.reply('✍️ Enter completion note/details for customer:\n(Example: `Successfully completed!`)', { parse_mode: 'Markdown' });
+        
+        await ctx.reply('✍️ অর্ডার কমপ্লিট করার জন্য স্টেপ বাই স্টেপ লাইক সংখ্যা দিন:\n\nপ্রথমে **প্রিভিয়াস লাইক (Previous Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
         await ctx.answerCbQuery();
     } catch (e) {}
 });
