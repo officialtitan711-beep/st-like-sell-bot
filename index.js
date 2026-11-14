@@ -160,7 +160,7 @@ function checkFreeFireUID(uid) {
 
 function extractPackageDays(productName) {
     const lower = productName.toLowerCase();
-    if (lower.includes('100')) return 1; 
+    if (lower.includes('100') || lower.includes('220')) return 1; 
 
     if (lower.includes('5 days') || lower.includes('৫ দিন') || lower.includes('15 days') || lower.includes('১৫ দিন') || lower.includes('30 days') || lower.includes('৩০ দিন')) {
         const match = productName.match(/(\d+)\s*(days?|দিন)/i);
@@ -472,7 +472,6 @@ bot.on('message', async (ctx) => {
         if (!db.calcStates) db.calcStates = {};
         if (!db.userLang) db.userLang = {};
 
-        // প্রতিটা মেসেজ আসার সাথে সাথে ইউজারের রিয়েল টেলিগ্রাম নাম ও ইউজারনেম আপডেট করে রাখব যেন লিস্টে রিয়েল ডাটা দেখায়
         if (!db.users) db.users = {};
         db.users[userId] = {
             id: userId,
@@ -918,7 +917,6 @@ bot.on('message', async (ctx) => {
                 let listText = `📊 **TOTAL AUTHORIZED USERS: ${userKeys.length}**\n🔄 **ACTIVE SUBSCRIPTIONS: ${activeSubsCount}**\n\n`;
                 
                 userKeys.forEach((uId, idx) => {
-                    // সরাসরি db.users থেকে ইউজারের রিয়েল নাম ও ইউজারনেম ফেচ করা হচ্ছে
                     const uInfo = (db.users && db.users[uId]) ? db.users[uId] : { first_name: 'Telegram User', username: 'N/A' };
                     const bal = db.balances[uId] || 0;
                     listText += `${idx + 1}. 👤 Name: \`${uInfo.first_name}\`\n   🔗 Username: \`${uInfo.username}\`\n   🆔 ID: \`${uId}\`\n   💰 Balance: \`${bal} BDT\`\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n`;
@@ -1728,6 +1726,7 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
+        // ফিক্সড লজিক: শুধুমাত্র ১০০ লাইক ম্যানুয়াল থাকবে, বাকি ২২০ লাইক ও সাবস্ক্রিপশন অটো এপিআইতে হিট করবে
         const isManualPackage = lowerProd.includes('100');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
@@ -1735,6 +1734,7 @@ bot.action('confirm_order', async (ctx) => {
         let apiRes = { success: false };
         if (isAutoEnabled) {
             const prodCode = getApiProductCode(session.product);
+            // ২২০ লাইক বা ইনস্ট্যান্ট লাইকের জন্য product কোড ফাঁকা থাকলে action=like কাজ করবে
             const apiParams = prodCode 
                 ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
                 : { action: 'like', uid: session.uid, server: session.region };
@@ -1875,9 +1875,6 @@ bot.action('back_start_inline', async (ctx) => {
     } catch (e) {}
 });
 
-// ==========================================
-// 🛠️ ফিক্সড ওয়েবহুক ও সার্ভার হ্যান্ডলিং (ফাইনাল)
-// ==========================================
 const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
 
 const server = http.createServer((req, res) => {
@@ -1902,7 +1899,6 @@ const server = http.createServer((req, res) => {
     }
 });
 
-// সার্ভার লাইভ হওয়ার পরে ওয়েবহুক সেট হবে যাতে 502 বা রিকোয়েস্ট ড্রপ না হয়
 server.listen(PORT, async () => {
     console.log(`Webhook HTTP Server listening on port ${PORT}`);
     
