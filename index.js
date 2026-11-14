@@ -24,9 +24,9 @@ let cachedDb = {
     balances: {}, 
     sessions: {}, 
     numbers: { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' }, 
-    categories: { 'Free Fire Likes': true }, 
+    categories: { '🔥 Free Fire Likes': true }, 
     customProducts: { 
-        'Free Fire Likes': [
+        '🔥 Free Fire Likes': [
             { name: '1000 Likes - 50 BDT' },
             { name: '5000 Likes - 220 BDT' },
             { name: '10000 Likes - 400 BDT' }
@@ -222,12 +222,7 @@ function isMenuCommand(text) {
 }
 
 function translateCategoryName(catName, userId) {
-    const lang = getUserLang(userId);
-    const map = { 
-        'Guild Glory Bot': lang === 'bn' ? '🛡️ গিল্ড গ্লোরি বট' : 'Guild Glory Bot', 
-        'Free Fire Likes': lang === 'bn' ? '🔥 ফ্রি ফায়ার লাইকস' : 'Free Fire Likes' 
-    };
-    return map[catName] || catName;
+    return catName;
 }
 
 function translateProductName(prodName, userId) {
@@ -728,7 +723,7 @@ bot.on('message', async (ctx) => {
             saveDatabase(db);
             const session = db.sessions[userId];
 
-            const isFFCategory = session.activeCategory === 'Free Fire Likes';
+            const isFFCategory = session.isFFLikes;
             let nickname = 'N/A';
             let level = '';
 
@@ -1514,7 +1509,9 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
             price = allNums ? Number(allNums[allNums.length - 1]) : 0;
         }
 
-        const isFFLikes = catName === 'Free Fire Likes' || catName.toLowerCase().includes('like');
+        // ক্যাটাগরির নামের ভেতর 'like', 'লাইক' অথবা '🔥' থাকলে সেটি ফ্রি ফায়ার লাইক হিসেবে গণ্য হবে
+        const lowerCatName = catName.toLowerCase();
+        const isFFLikes = lowerCatName.includes('like') || lowerCatName.includes('লাইক') || catName.includes('🔥');
 
         db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index, catIdx: catIdx, isFFLikes };
         saveDatabase(db);
