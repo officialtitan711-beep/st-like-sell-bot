@@ -24,9 +24,9 @@ let cachedDb = {
     balances: {}, 
     sessions: {}, 
     numbers: { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' }, 
-    categories: ['🔥 Free Fire Likes'], 
+    categories: ['🔥 Free Fire Likes ❤️‍🔥'], 
     customProducts: { 
-        '🔥 Free Fire Likes': [
+        '🔥 Free Fire Likes ❤️‍🔥': [
             { name: '100 LIKE - 5৳ [ DAILY ]' },
             { name: '220 LIKE - 7৳ [ DAILY ]' },
             { name: '1100 LIKE - 50৳ [ 5 DAYS ] ( AUTO ) 🚀⚡' },
@@ -52,7 +52,7 @@ let cachedDb = {
 function loadDatabase() { 
     if (!cachedDb) cachedDb = {};
     if (!cachedDb.categories || !Array.isArray(cachedDb.categories)) {
-        cachedDb.categories = cachedDb.categories ? Object.keys(cachedDb.categories) : ['🔥 Free Fire Likes'];
+        cachedDb.categories = cachedDb.categories ? Object.keys(cachedDb.categories) : ['🔥 Free Fire Likes ❤️‍🔥'];
     }
     if (!cachedDb.customProducts) cachedDb.customProducts = {};
     if (!cachedDb.subscriptions) cachedDb.subscriptions = {};
@@ -309,7 +309,7 @@ function t(userId, key) {
             supportText: "📞 **সাপোর্ট ডেস্ক**\n\n💡 আপনার যেকোনো সমস্যা, TrxID বা স্ক্রিনশট সরাসরি এই চ্যাটেই পাঠিয়ে দিন। অ্যাডমিন খুব দ্রুত রিপ্লাই দেবেন।",
             mainMenuBack: "🔙 মূল মেনু 🏠",
             backBtn: "🔙 পেছনের মেনু ↩️",
-            buyLikes: "🔥 ফ্রি ফায়ার লাইক কিনুন ⚡",
+            buyLikes: "🔥 ফ্রি ফায়ার লাইক কিনুন ❤️‍🔥⚡",
             serverTitle: "🌍 **সার্ভার নির্বাচন**\n\nপ্যাকেজ: ",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             cancelBtn: "❌ বাতিল করুন",
@@ -326,7 +326,7 @@ function t(userId, key) {
             supportText: "📞 **SUPPORT DESK**\n\n💡 Send any issue, TrxID or screenshot directly in this chat. Admin will reply soon.",
             mainMenuBack: "🔙 Main Menu 🏠",
             backBtn: "🔙 Back ↩️",
-            buyLikes: "🔥 Buy Fire Fire Likes ⚡",
+            buyLikes: "🔥 Buy Fire Fire Likes ❤️‍🔥⚡",
             serverTitle: "🌍 **SERVER SELECTION**\n\nPackage: ",
             confirmOrderBtn: "✅ Confirm Order 🚀",
             cancelBtn: "❌ Cancel",
@@ -411,7 +411,11 @@ bot.start(async (ctx) => {
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
         
         if (!db.users) db.users = {};
-        db.users[userId] = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
+        db.users[userId] = { 
+            id: userId, 
+            first_name: ctx.from.first_name || 'N/A', 
+            username: ctx.from.username ? '@' + ctx.from.username : 'N/A' 
+        };
         saveDatabase(db);
 
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
@@ -456,7 +460,7 @@ bot.on('message', async (ctx) => {
         if (!db.balances) db.balances = {};
         if (!db.sessions) db.sessions = {};
         if (!db.numbers) db.numbers = { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' };
-        if (!db.categories) db.categories = ['🔥 Free Fire Likes'];
+        if (!db.categories) db.categories = ['🔥 Free Fire Likes ❤️‍🔥'];
         if (!db.customProducts) db.customProducts = {};
         if (!db.subscriptions) db.subscriptions = {};
         if (!db.users) db.users = {};
@@ -467,6 +471,15 @@ bot.on('message', async (ctx) => {
         if (!db.adminSessions) db.adminSessions = {};
         if (!db.calcStates) db.calcStates = {};
         if (!db.userLang) db.userLang = {};
+
+        // প্রতিটা মেসেজ আসার সাথে সাথে ইউজারের রিয়েল টেলিগ্রাম নাম ও ইউজারনেম আপডেট করে রাখব যেন লিস্টে রিয়েল ডাটা দেখায়
+        if (!db.users) db.users = {};
+        db.users[userId] = {
+            id: userId,
+            first_name: ctx.from.first_name || 'N/A',
+            username: ctx.from.username ? '@' + ctx.from.username : 'N/A'
+        };
+        saveDatabase(db);
 
         if (isMenuCommand(text)) {
             if (db.sessions && db.sessions[userId]) {
@@ -905,7 +918,8 @@ bot.on('message', async (ctx) => {
                 let listText = `📊 **TOTAL AUTHORIZED USERS: ${userKeys.length}**\n🔄 **ACTIVE SUBSCRIPTIONS: ${activeSubsCount}**\n\n`;
                 
                 userKeys.forEach((uId, idx) => {
-                    const uInfo = (db.users && db.users[uId]) ? db.users[uId] : { first_name: 'Approved User', username: 'N/A' };
+                    // সরাসরি db.users থেকে ইউজারের রিয়েল নাম ও ইউজারনেম ফেচ করা হচ্ছে
+                    const uInfo = (db.users && db.users[uId]) ? db.users[uId] : { first_name: 'Telegram User', username: 'N/A' };
                     const bal = db.balances[uId] || 0;
                     listText += `${idx + 1}. 👤 Name: \`${uInfo.first_name}\`\n   🔗 Username: \`${uInfo.username}\`\n   🆔 ID: \`${uId}\`\n   💰 Balance: \`${bal} BDT\`\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n`;
                     if (listText.length > 3700) {
