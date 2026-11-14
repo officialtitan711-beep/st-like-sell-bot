@@ -11,7 +11,6 @@ const ADMIN_ID = process.env.ADMIN_ID || '5932254012';
 const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
-// সঠিক নতুন এপিআই ডোমেইন
 const API_BASE = "https://likesff.shop/reseller.php";
 const API_KEY = "likesff-shop-11935-c3rp5src";
 const PORT = process.env.PORT || 3000;
@@ -28,10 +27,11 @@ let cachedDb = {
     categories: ['🔥 Free Fire Likes'], 
     customProducts: { 
         '🔥 Free Fire Likes': [
-            { name: '220 Likes - 10 BDT' },
-            { name: '5 Days 1100 Likes - 50 BDT' },
-            { name: '15 Days 3300 Likes - 100 BDT' },
-            { name: '30 Days 6600 Likes - 180 BDT' }
+            { name: '100 LIKE - 5৳ [ DAILY ]' },
+            { name: '220 LIKE - 7৳ [ DAILY ]' },
+            { name: '1100 LIKE - 50৳ [ 5 DAYS ] ( AUTO ) 🚀⚡' },
+            { name: '3300 LIKE - 150৳ [ 15 DAYS ] ( AUTO ) 🚀⚡' },
+            { name: '6600 LIKE - 300৳ [ 30 DAYS ] ( AUTO ) 🚀⚡' }
         ]
     }, 
     subscriptions: {}, 
@@ -135,7 +135,6 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
     });
 }
 
-// রিয়েল-টাইম চেকার এপিআই ইন্টিগ্রেশন (AuraFFX)
 function checkFreeFireUID(uid) {
     return new Promise((resolve) => {
         const url = 'https://auraffxserverinfocheckerapi.onrender.com/api/player?uid=' + uid;
@@ -159,25 +158,30 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// ফিক্সড: শুধুমাত্র মাল্টি-ডে প্যাকেজ (যেমন: ৫, ১৫, ৩০ দিন) হলে দিন সংখ্যা বের করবে, ইনস্ট্যান্ট প্যাকেজে দিন আসবে না
+// চেক করবে প্যাকেজটি অটো এপিআই নাকি ম্যানুয়াল, এবং সাবস্ক্রিপশন দিন কতগুলো
 function extractPackageDays(productName) {
     const lower = productName.toLowerCase();
-    // যদি প্যাকেজের নামের ভেতরে 'days' বা 'দিন' শব্দ স্পষ্টভাবে থাকে তবেই দিন কাউন্ট ধরবে, অন্যথায় ১ (ইনস্ট্যান্ট)
-    const match = productName.match(/(\d+)\s*(days?|দিন)/i);
-    if (match && match[1]) {
-        const days = parseInt(match[1], 10);
-        return days > 1 ? days : 1;
+    // যদি প্যাকেজে ম্যানুয়াল বা 100 Likes থাকে তবে এটি অটো এপিআই নয়
+    if (lower.includes('100')) return 1; 
+
+    // ৫, ১৫ বা ৩০ দিনের সাবস্ক্রিপশন প্যাকেজ ডিটেক্ট করার জন্য
+    if (lower.includes('5 days') || lower.includes('৫ দিন') || lower.includes('15 days') || lower.includes('১৫ দিন') || lower.includes('30 days') || lower.includes('৩০ দিন')) {
+        const match = productName.match(/(\d+)\s*(days?|দিন)/i);
+        if (match && match[1]) {
+            const days = parseInt(match[1], 10);
+            return days > 1 ? days : 1;
+        }
     }
-    return 1;
+    return 1; // 220 Likes এর মতো ইনস্ট্যান্ট অটো প্যাকেজ
 }
 
-// স্মার্ট অটো ডিটেকশন: প্যাকেজের নাম বা লাইক সংখ্যা দেখে সঠিক API Product Code সিলেক্ট করবে
+// নাম বা লাইক সংখ্যা দেখে সঠিক API Product Code সিলেক্ট করবে
 function getApiProductCode(productName) {
     const lower = productName.toLowerCase();
-    if (lower.includes('30') || lower.includes('৬৬০০') || lower.includes('6600')) return 'AL-55F71F';
-    if (lower.includes('15') || lower.includes('৩৩০০') || lower.includes('3300')) return 'AL-3300';
-    if (lower.includes('5') || lower.includes('১১০০') || lower.includes('1100')) return 'AL-1100';
-    return '';
+    if (lower.includes('6600') || lower.includes('৩০ দিন')) return 'AL-55F71F';
+    if (lower.includes('3300') || lower.includes('১৫ দিন')) return 'AL-3300';
+    if (lower.includes('1100') || lower.includes('৫ দিন')) return 'AL-1100';
+    return ''; // 220 Like বা অন্যান্য ইনস্ট্যান্ট অটো প্যাকেজ হলে ফাঁকা রিটার্ন করবে (তখন action=like যাবে)
 }
 
 function getTodayDateBD() {
@@ -1173,7 +1177,7 @@ bot.action(/admin_add_prod_idx_(.+)/, async (ctx) => {
 
         db.adminInputSession[ADMIN_ID] = { type: 'add_shop_product', category: catName };
         saveDatabase(db);
-        await ctx.editMessageText(`✍️ Enter product name and price for **${catName}**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`5 Days 1100 Likes | 50\` or \`30 Days 6600 Likes | 180\`)`, {
+        await ctx.editMessageText(`✍️ Enter product name and price for **${catName}**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`100 LIKE - 5৳ | 5\` or \`1100 LIKE - 50৳ [ 5 DAYS ] | 50\`)`, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catIdx)]])
         });
@@ -1678,7 +1682,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         const translated = translateProductName(prod.name, userId);
 
         let price = 0;
-        const takaMatch = prod.name.match(/(\d+)\s*৳/);
+        const takaMatch = prod.name.match(/(\d+)\s*[৳tk]/i);
         const dashMatch = prod.name.match(/-\s*(\d+)/);
         const currMatch = prod.name.match(/(\d+)\s*(tk|BDT)/i);
 
@@ -1779,14 +1783,16 @@ bot.action('confirm_order', async (ctx) => {
         await new Promise(r => setTimeout(r, 200));
 
         const isFFLikeCategory = session.isFFLikes;
-        const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory;
+        const lowerProd = session.product.toLowerCase();
+        
+        // চেক করা হচ্ছে এটি কি ম্যানুয়াল প্যাকেজ (যেমন: 100 LIKE) কি না
+        const isManualPackage = lowerProd.includes('100');
+        
+        const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
         
         let apiRes = { success: false };
         if (isAutoEnabled) {
-            // ফিক্সড এপিআই প্যারামিটার লজিক: 
-            // যদি প্যাকেজটি মাল্টি-ডে (৫, ১৫, ৩০ দিন) হয় তবে action=auto এবং product কোড যাবে।
-            // আর যদি ইনস্ট্যান্ট প্যাকেজ (যেমন: 220 Likes) হয় তবে সরাসরি action=like যাবে।
             const prodCode = getApiProductCode(session.product);
             const apiParams = (prodCode && totalDays > 1) 
                 ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
@@ -1867,7 +1873,11 @@ bot.action('confirm_order', async (ctx) => {
             };
             saveDatabase(db);
 
-            await bot.telegram.sendMessage(ADMIN_ID, `⚠️ API Failed / Fallback Order (Manual Needed)\n\n📦 Package: \`${session.product}\` (${totalDays} Days)\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
+            const adminNoticeText = isManualPackage 
+                ? `🛠️ **New Manual Package Order (Pending)**\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``
+                : `⚠️ API Failed / Fallback Order (Manual Needed)\n\n📦 Package: \`${session.product}\` (${totalDays} Days)\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``;
+
+            await bot.telegram.sendMessage(ADMIN_ID, adminNoticeText, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
