@@ -747,7 +747,7 @@ bot.on('message', async (ctx) => {
             saveDatabase(db);
             const session = db.sessions[userId];
 
-            const isFFCategory = session.activeCategory === 'Free Fire Likes' || (session.product && session.product.toLowerCase().includes('like'));
+            const isFFCategory = session.activeCategory === 'Free Fire Likes';
             let nickname = 'N/A';
             let level = '';
 
@@ -1698,7 +1698,7 @@ bot.action(/region_(bd|id)/, async (ctx) => {
             else if (session.catIdx !== undefined) prevProdCallback = 'custom_cat_' + session.catIdx;
         }
 
-        const isFFCategory = session && (session.activeCategory === 'Free Fire Likes' || (session.product && session.product.toLowerCase().includes('like')));
+        const isFFCategory = session && session.activeCategory === 'Free Fire Likes';
         const promptText = isFFCategory 
             ? `🎮 **Enter UID (${region})**\n\n✍️ Please type and send your UID:`
             : `🛡️ **Enter Guild ID (${region})**\n\n✍️ Please type and send your Guild ID:`;
@@ -1741,7 +1741,7 @@ bot.action('confirm_order', async (ctx) => {
         try { await ctx.telegram.editMessageText(userId, procMsg.message_id, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▱▱▱▱ 70%\``, { parse_mode: 'Markdown' }); } catch (e) {}
         await new Promise(r => setTimeout(r, 200));
 
-        const isFFLikeCategory = session.activeCategory === 'Free Fire Likes' || (session.product && session.product.toLowerCase().includes('like'));
+        const isFFLikeCategory = session.activeCategory === 'Free Fire Likes';
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory;
         
         let apiRes = { success: false };
