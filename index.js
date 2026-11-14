@@ -159,8 +159,10 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// স্মার্ট অটো ডিটেকশন: প্রোডাক্টের নাম যাই হোক না কেন, দিন সংখ্যা খুঁজে বের করবে
+// ফিক্সড: শুধুমাত্র মাল্টি-ডে প্যাকেজ (যেমন: ৫, ১৫, ৩০ দিন) হলে দিন সংখ্যা বের করবে, ইনস্ট্যান্ট প্যাকেজে দিন আসবে না
 function extractPackageDays(productName) {
+    const lower = productName.toLowerCase();
+    // যদি প্যাকেজের নামের ভেতরে 'days' বা 'দিন' শব্দ স্পষ্টভাবে থাকে তবেই দিন কাউন্ট ধরবে, অন্যথায় ১ (ইনস্ট্যান্ট)
     const match = productName.match(/(\d+)\s*(days?|দিন)/i);
     if (match && match[1]) {
         const days = parseInt(match[1], 10);
@@ -1782,8 +1784,9 @@ bot.action('confirm_order', async (ctx) => {
         
         let apiRes = { success: false };
         if (isAutoEnabled) {
-            // স্মার্ট লজিক: যদি প্যাকেজটি ১ দিনের বেশি হয় (যেমন: ৫, ১৫, ৩০ দিন), তবে action=auto এবং সঠিক product কোড পাঠানো হবে।
-            // আর যদি ইনস্ট্যান্ট প্যাকেজ হয় (যেমন: 220 Likes), তবে সরাসরি action=like পাঠানো হবে।
+            // ফিক্সড এপিআই প্যারামিটার লজিক: 
+            // যদি প্যাকেজটি মাল্টি-ডে (৫, ১৫, ৩০ দিন) হয় তবে action=auto এবং product কোড যাবে।
+            // আর যদি ইনস্ট্যান্ট প্যাকেজ (যেমন: 220 Likes) হয় তবে সরাসরি action=like যাবে।
             const prodCode = getApiProductCode(session.product);
             const apiParams = (prodCode && totalDays > 1) 
                 ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
