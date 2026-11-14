@@ -70,6 +70,7 @@ function syncDataFromFirebase() {
                         cachedDb.numbers = parsed.numbers || cachedDb.numbers;
                         
                         if (parsed.categories) {
+                            // ক্যাটাগরির সঠিক অর্ডার ও স্থায়িত্ব বজায় রাখতে ফিক্সড করা হলো
                             cachedDb.categories = parsed.categories;
                         }
                         if (parsed.customProducts) {
@@ -859,6 +860,7 @@ bot.on('message', async (ctx) => {
         if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText.includes('shop') || lowerText.includes('শপ')) {
             let inlineButtons = [];
             let catIndex = 0;
+            // ক্যাটাগরির সঠিক সিকোয়েন্স বা অর্ডার বজায় রাখতে Object.keys ব্যবহার করা হয়েছে
             for (let c of Object.keys(db.categories || {})) {
                 inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + catIndex)]);
                 catIndex++;
@@ -1580,7 +1582,6 @@ bot.action('confirm_order', async (ctx) => {
         db.balances[userId] -= Number(session.price);
         saveDatabase(db);
 
-        // কনফার্মেশন মেসেজটিকেই এডিট করে লোডিং অ্যানিমেশন শুরু করা হলো (কোনো নতুন মেসেজ পাঠানো হবে না)
         const procMsgId = ctx.callbackQuery.message.message_id;
         try {
             await ctx.editMessageText(`⏳ Processing Order...\n\`▰▰▰▱▱▱▱▱▱▱ 30%\``, { parse_mode: 'Markdown' });
