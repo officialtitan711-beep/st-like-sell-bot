@@ -436,7 +436,7 @@ bot.on('message', async (ctx) => {
                 const orderInfo = db.adminSessions[uniqueOrderId];
 
                 if (orderInfo.isFFLikeCategory) {
-                    if (orderInfo.step === 'awaiting_prev_likes') {
+                    if (!orderInfo.step || orderInfo.step === 'awaiting_prev_likes') {
                         orderInfo.prevLikes = text;
                         orderInfo.step = 'awaiting_curr_likes';
                         saveDatabase(db);
@@ -1303,6 +1303,7 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         if (orderInfo) {
             if (orderInfo.isFFLikeCategory) {
                 orderInfo.step = 'awaiting_prev_likes';
+                db.adminInputSession[ADMIN_ID] = { uniqueOrderId: uniqueOrderId };
                 saveDatabase(db);
                 await ctx.reply('✍️ অর্ডার কমপ্লিট করার জন্য স্টেপ বাই স্টেপ লাইক সংখ্যা দিন:\n\nপ্রথমে **প্রিভিয়াস লাইক (Previous Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
             } else {
@@ -1509,7 +1510,6 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
             price = allNums ? Number(allNums[allNums.length - 1]) : 0;
         }
 
-        // ক্যাটাগরির নামের ভেতর 'like', 'লাইক' অথবা '🔥' থাকলে সেটি ফ্রি ফায়ার লাইক হিসেবে গণ্য হবে
         const lowerCatName = catName.toLowerCase();
         const isFFLikes = lowerCatName.includes('like') || lowerCatName.includes('লাইক') || catName.includes('🔥');
 
@@ -1634,7 +1634,8 @@ bot.action('confirm_order', async (ctx) => {
                 nickname: session.nickname || 'Unknown',
                 region: session.region,
                 price: session.price,
-                isFFLikeCategory: true
+                isFFLikeCategory: true,
+                step: 'awaiting_prev_likes'
             };
             saveDatabase(db);
 
