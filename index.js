@@ -459,21 +459,51 @@ bot.on('message', async (ctx) => {
                 const uniqueOrderId = sessionData.uniqueOrderId;
                 const orderInfo = db.adminSessions[uniqueOrderId];
 
-                if (orderInfo.step === 'awaiting_prev_likes') {
-                    orderInfo.prevLikes = text;
-                    orderInfo.step = 'awaiting_curr_likes';
-                    saveDatabase(db);
-                    return ctx.reply('✍️ এখন **কারেন্ট লাইক (Current Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
-                }
-                else if (orderInfo.step === 'awaiting_curr_likes') {
-                    orderInfo.currLikes = text;
-                    orderInfo.step = 'awaiting_added_likes';
-                    saveDatabase(db);
-                    return ctx.reply('✍️ এখন **এডেড লাইক (Added Likes)** কত (কত যোগ হলো) সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
-                }
-                else if (orderInfo.step === 'awaiting_added_likes') {
-                    orderInfo.addedLikes = text;
-                    
+                if (orderInfo.isFFLikeCategory) {
+                    if (orderInfo.step === 'awaiting_prev_likes') {
+                        orderInfo.prevLikes = text;
+                        orderInfo.step = 'awaiting_curr_likes';
+                        saveDatabase(db);
+                        return ctx.reply('✍️ এখন **কারেন্ট লাইক (Current Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
+                    }
+                    else if (orderInfo.step === 'awaiting_curr_likes') {
+                        orderInfo.currLikes = text;
+                        orderInfo.step = 'awaiting_added_likes';
+                        saveDatabase(db);
+                        return ctx.reply('✍️ এখন **এডেড লাইক (Added Likes)** কত (কত যোগ হলো) সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
+                    }
+                    else if (orderInfo.step === 'awaiting_added_likes') {
+                        orderInfo.addedLikes = text;
+                        
+                        const targetUid = orderInfo.targetUserId;
+                        const currentBal = db.balances[targetUid] || 0;
+
+                        if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
+                        const orderNow = new Date();
+                        db.orderHistories[targetUid].unshift({
+                            timestamp: orderNow.getTime(),
+                            date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
+                            time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
+                            product: orderInfo.product, uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
+                        });
+                        if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
+                        saveDatabase(db);
+
+                        const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+
+                        await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
+                            parse_mode: 'Markdown',
+                            ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
+                        }).catch(() => {});
+
+                        await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Manual Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
+                        await ctx.reply('✅ Order successfully completed & receipt updated with Previous, Current, Added Likes to customer!');
+                        delete db.adminInputSession[userId];
+                        delete db.adminSessions[uniqueOrderId];
+                        saveDatabase(db);
+                        return;
+                    }
+                } else {
                     const targetUid = orderInfo.targetUserId;
                     const currentBal = db.balances[targetUid] || 0;
 
@@ -483,20 +513,20 @@ bot.on('message', async (ctx) => {
                         timestamp: orderNow.getTime(),
                         date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
                         time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
-                        product: orderInfo.product, uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
+                        product: orderInfo.product, uid: orderInfo.uid, nickname: orderInfo.nickname || 'Guild ID Service', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
                     });
                     if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
                     saveDatabase(db);
 
-                    const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                    const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target Guild ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`\n📝 Note/Details: \`${text}\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                     await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
                         parse_mode: 'Markdown',
                         ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
                     }).catch(() => {});
 
-                    await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Manual Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
-                    await ctx.reply('✅ Order successfully completed & receipt updated with Previous, Current, Added Likes to customer!');
+                    await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
+                    await ctx.reply('✅ Order successfully completed & receipt updated to customer!');
                     delete db.adminInputSession[userId];
                     delete db.adminSessions[uniqueOrderId];
                     saveDatabase(db);
@@ -709,10 +739,10 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // --- Order Flow: Awaiting UID ---
+        // --- Order Flow: Awaiting UID / Guild ID ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid' && !isMenuCommand(text)) {
-            const uidText = text;
-            db.sessions[userId].uid = uidText;
+            const idText = text;
+            db.sessions[userId].uid = idText;
             db.sessions[userId].step = 'confirming';
             saveDatabase(db);
             const session = db.sessions[userId];
@@ -729,7 +759,7 @@ bot.on('message', async (ctx) => {
                 try { await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, `⏳ Checking UID...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
                 await new Promise(r => setTimeout(r, 200));
 
-                const resInfo = await checkFreeFireUID(uidText);
+                const resInfo = await checkFreeFireUID(idText);
                 nickname = resInfo.nickname;
                 level = resInfo.level;
                 session.nickname = nickname;
@@ -737,7 +767,7 @@ bot.on('message', async (ctx) => {
                 session.initialLikes = resInfo.likes;
                 saveDatabase(db);
 
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${uidText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
                 try {
                     await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, reviewBox, {
@@ -757,9 +787,9 @@ bot.on('message', async (ctx) => {
                     });
                 }
             } else {
-                session.nickname = 'Guild/Service ID';
+                session.nickname = 'Guild ID Service';
                 saveDatabase(db);
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n🛡️ **Target ID:** \`${uidText}\``;
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n🛡️ **Guild ID:** \`${idText}\`\n\n⚠️ Please verify your Guild ID before confirming.`;
 
                 await ctx.reply(reviewBox, {
                     parse_mode: 'Markdown',
@@ -1360,14 +1390,19 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const uniqueOrderId = ctx.match[1];
         const db = loadDatabase();
+        const orderInfo = db.adminSessions[uniqueOrderId];
         
-        if (db.adminSessions[uniqueOrderId]) {
-            db.adminSessions[uniqueOrderId].step = 'awaiting_prev_likes';
+        if (orderInfo) {
+            if (orderInfo.isFFLikeCategory) {
+                orderInfo.step = 'awaiting_prev_likes';
+                saveDatabase(db);
+                await ctx.reply('✍️ অর্ডার কমপ্লিট করার জন্য স্টেপ বাই স্টেপ লাইক সংখ্যা দিন:\n\nপ্রথমে **প্রিভিয়াস লাইক (Previous Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
+            } else {
+                db.adminInputSession[ADMIN_ID] = { uniqueOrderId: uniqueOrderId };
+                saveDatabase(db);
+                await ctx.reply('✍️ Enter completion note/details for customer:\n(Example: `Guild bot successfully activated!`)', { parse_mode: 'Markdown' });
+            }
         }
-        db.adminInputSession[ADMIN_ID] = { uniqueOrderId: uniqueOrderId };
-        saveDatabase(db);
-        
-        await ctx.reply('✍️ অর্ডার কমপ্লিট করার জন্য স্টেপ বাই স্টেপ লাইক সংখ্যা দিন:\n\nপ্রথমে **প্রিভিয়াস লাইক (Previous Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
         await ctx.answerCbQuery();
     } catch (e) {}
 });
@@ -1663,7 +1698,12 @@ bot.action(/region_(bd|id)/, async (ctx) => {
             else if (session.catIdx !== undefined) prevProdCallback = 'custom_cat_' + session.catIdx;
         }
 
-        await ctx.editMessageText(`🎮 **Enter UID (${region})**\n\n✍️ Please type and send your UID:`, {
+        const isFFCategory = session && (session.activeCategory === 'Free Fire Likes' || (session.product && session.product.toLowerCase().includes('like')));
+        const promptText = isFFCategory 
+            ? `🎮 **Enter UID (${region})**\n\n✍️ Please type and send your UID:`
+            : `🛡️ **Enter Guild ID (${region})**\n\n✍️ Please type and send your Guild ID:`;
+
+        await ctx.editMessageText(promptText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback(t(userId, 'backBtn'), prevProdCallback), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
@@ -1749,7 +1789,8 @@ bot.action('confirm_order', async (ctx) => {
                 uid: session.uid,
                 nickname: session.nickname || 'Unknown',
                 region: session.region,
-                price: session.price
+                price: session.price,
+                isFFLikeCategory: true
             };
             saveDatabase(db);
 
@@ -1767,7 +1808,7 @@ bot.action('confirm_order', async (ctx) => {
 
             const uniqueOrderId = userId + '_' + Date.now();
             
-            const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+            const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target Guild ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
             const userMsg = await ctx.telegram.editMessageText(userId, procMsg.message_id, null, pendingReceipt, {
                 parse_mode: 'Markdown',
@@ -1779,13 +1820,14 @@ bot.action('confirm_order', async (ctx) => {
                 loadingMessageId: userMsg.message_id,
                 product: session.product,
                 uid: session.uid,
-                nickname: session.nickname || 'Guild/Service ID',
+                nickname: session.nickname || 'Guild ID Service',
                 region: session.region,
-                price: session.price
+                price: session.price,
+                isFFLikeCategory: false
             };
             saveDatabase(db);
 
-            await bot.telegram.sendMessage(ADMIN_ID, `🛠️ **New Guild/Service Order (Pending)**\n\n📦 Package: \`${session.product}\`\n🛡️ Target ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
+            await bot.telegram.sendMessage(ADMIN_ID, `🛠️ **New Guild/Service Order (Pending)**\n\n📦 Package: \`${session.product}\`\n🛡️ Target Guild ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('✅ Complete Order', 'admin_input_' + uniqueOrderId)],
