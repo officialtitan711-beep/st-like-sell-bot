@@ -227,7 +227,6 @@ async function processDailySubscriptions() {
             const prevLikes = preCheck.likes || 0;
 
             const prodCode = getApiProductCode(sub.product);
-            // ডকুমেন্টেশন অনুযায়ী server ও uid পাঠানো হচ্ছে
             const apiParams = prodCode ? { action: 'auto', product: prodCode, uid: sub.uid, server: sub.region } : { action: 'like', uid: sub.uid, server: sub.region };
 
             const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
@@ -1791,7 +1790,6 @@ bot.action('confirm_order', async (ctx) => {
         let apiRes = { success: false };
         if (isAutoEnabled) {
             const prodCode = getApiProductCode(session.product);
-            // ডকুমেন্টেশন অনুযায়ী সঠিক প্যারামিটার: action, product, uid, server
             const apiParams = prodCode 
                 ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
                 : { action: 'like', uid: session.uid, server: session.region };
@@ -1933,7 +1931,7 @@ bot.action('back_start_inline', async (ctx) => {
     } catch (e) {}
 });
 
-// --- ওয়েব হুক এবং ক্রন জব পিং হ্যান্ডলার (সম্পূর্ণ সেফ ও ফিক্সড) ---
+// --- ওয়েব হুক এবং ক্রন জব পিং হ্যান্ডলার (১% ক্র্যাশ-প্রুফ ও ফিক্সড) ---
 const webhookPath = `/secret-path-${BOT_TOKEN.split(':')[0]}`;
 
 bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true })
@@ -1943,7 +1941,11 @@ bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: t
 http.createServer((req, res) => {
     try {
         if (req.url === webhookPath && req.method === 'POST') {
-            return bot.webhookCallback(webhookPath)(req, res);
+            return bot.webhookCallback(webhookPath)(req, res, (err) => {
+                if (err) {
+                    console.error("Webhook Handling Error:", err.message);
+                }
+            });
         } else if (req.url === '/ping') {
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             return res.end('OK');
