@@ -224,7 +224,12 @@ async function processDailySubscriptions() {
                     ? `⏳ Remaining Days: \`${sub.remainingDays} Days Left\``
                     : `🏁 Package Status: \`Completed (All ${sub.totalDays} Days Delivered)\``;
 
-                const dailyReceipt = `💠 ════════════════════════════ 💠\n           ✅ DAILY AUTO-LIKE COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${sub.product}\`\n📅 Progress: \`Day ${sub.deliveredDays} of ${sub.totalDays}\`\n🆔 Sub ID: \`${subId}\`\n\n👤 Name: \`${sub.nickname || 'Unknown'}\`\n🛡️ UID: \`${sub.uid}\`\n🌍 Server: \`${sub.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n${statusLine}\n💰 Daily Charge: \`0 BDT (Pre-Paid)\`\n💳 Current Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                const userLangChoice = getUserLang(userId);
+                const warningText = userLangChoice === 'bn' 
+                    ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
+                    : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
+
+                const dailyReceipt = `💠 ════════════════════════════ 💠\n           ✅ DAILY AUTO-LIKE COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${sub.product}\`\n📅 Progress: \`Day ${sub.deliveredDays} of ${sub.totalDays}\`\n🆔 Sub ID: \`${subId}\`\n\n👤 Name: \`${sub.nickname || 'Unknown'}\`\n🛡️ UID: \`${sub.uid}\`\n🌍 Server: \`${sub.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n${statusLine}\n💰 Daily Charge: \`0 BDT (Pre-Paid)\`\n💳 Current Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                 await bot.telegram.sendMessage(userId, dailyReceipt, {
                     parse_mode: 'Markdown',
@@ -610,7 +615,12 @@ bot.on('message', async (ctx) => {
                         if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
                         saveDatabase(db);
 
-                        const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`${subNote}\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                        const userLangChoice = getUserLang(targetUid);
+                        const warningText = userLangChoice === 'bn' 
+                            ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
+                            : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
+
+                        const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`${subNote}\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                         await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
                             parse_mode: 'Markdown',
@@ -1799,7 +1809,12 @@ bot.action('confirm_order', async (ctx) => {
             if (db.orderHistories[userId].length > 10) db.orderHistories[userId].pop();
             saveDatabase(db);
 
-            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+            const userLangChoice = getUserLang(userId);
+            const warningText = userLangChoice === 'bn' 
+                ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
+                : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
+
+            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
             await ctx.telegram.editMessageText(userId, procMsgId, null, autoReceipt, {
                 parse_mode: 'Markdown',
