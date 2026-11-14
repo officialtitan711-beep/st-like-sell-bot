@@ -834,10 +834,11 @@ bot.on('message', async (ctx) => {
             if (db.categories['Free Fire Likes']) {
                 inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
             }
+            let catIndex = 0;
             for (let c of Object.keys(db.categories || {})) {
                 if (c === 'Free Fire Likes') continue;
-                let encodedC = encodeURIComponent(c);
-                inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
+                inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + catIndex)]);
+                catIndex++;
             }
             if (userId === ADMIN_ID.toString()) {
                 inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
@@ -957,39 +958,48 @@ bot.action('admin_create_cat', async (ctx) => {
     } catch (e) {}
 });
 
-bot.action(/admin_add_prod_(.+)/, async (ctx) => {
+bot.action(/admin_add_prod_idx_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = decodeURIComponent(ctx.match[1]);
+        const catIdx = parseInt(ctx.match[1]);
         const db = loadDatabase();
+        const catKeys = Object.keys(db.categories || {});
+        const catName = catKeys[catIdx];
+        if (!catName) return ctx.answerCbQuery('Category not found.');
+
         db.adminInputSession[ADMIN_ID] = { type: 'add_shop_product', category: catName };
         saveDatabase(db);
         await ctx.editMessageText(`✍️ Enter product name and price for **${catName}**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`Squad Bot 3 Days | 120\`)`, {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + encodeURIComponent(catName))]])
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catIdx)]])
         });
         await ctx.answerCbQuery();
     } catch (e) {}
 });
 
-bot.action(/admin_rem_cat_(.+)/, async (ctx) => {
+bot.action(/admin_rem_cat_idx_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = decodeURIComponent(ctx.match[1]);
+        const catIdx = parseInt(ctx.match[1]);
         const db = loadDatabase();
-        if (db.categories[catName]) delete db.categories[catName];
-        if (db.customProducts[catName]) delete db.customProducts[catName];
-        saveDatabase(db);
+        const catKeys = Object.keys(db.categories || {});
+        const catName = catKeys[catIdx];
+        if (catName) {
+            delete db.categories[catName];
+            if (db.customProducts[catName]) delete db.customProducts[catName];
+            saveDatabase(db);
+        }
         await ctx.answerCbQuery('✅ Category removed successfully!');
         
         let inlineButtons = [];
         if (db.categories['Free Fire Likes']) {
             inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'buyLikes'), 'cat_ff_likes')]);
         }
+        let idxCounter = 0;
         for (let c of Object.keys(db.categories || {})) {
             if (c === 'Free Fire Likes') continue;
-            let encodedC = encodeURIComponent(c);
-            inlineButtons.push([Markup.button.callback(translateCategoryName(c, ADMIN_ID), 'custom_cat_' + encodedC)]);
+            inlineButtons.push([Markup.button.callback(translateCategoryName(c, ADMIN_ID), 'custom_cat_' + idxCounter)]);
+            idxCounter++;
         }
         inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
         inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
@@ -997,46 +1007,117 @@ bot.action(/admin_rem_cat_(.+)/, async (ctx) => {
     } catch (e) {}
 });
 
-bot.action(/admin_rem_prod_(.+)_(.+)/, async (ctx) => {
+bot.action(/admin_rem_prod_idx_(.+)_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = decodeURIComponent(ctx.match[1]);
+        const catIdx = parseInt(ctx.match[1]);
         const prodIndex = parseInt(ctx.match[2]);
         const db = loadDatabase();
-        if (db.customProducts[catName]) {
+        const catKeys = Object.keys(db.categories || {});
+        const catName = catKeys[catIdx];
+
+        if (catName && db.customProducts[catName]) {
             db.customProducts[catName].splice(prodIndex, 1);
             saveDatabase(db);
         }
         await ctx.answerCbQuery('✅ Product removed successfully!');
         
         let inlineButtons = [];
-        (db.customProducts?.[catName] || []).forEach((p, idx) => {
-            let encodedC = encodeURIComponent(catName);
-            let row = [Markup.button.callback(translateProductName(p.name, ADMIN_ID), 'sub_prod_' + encodedC + '_' + idx)];
+        const productsList = (catName === 'Free Fire Likes') ? (db.customProducts?.['Free Fire Likes'] || []) : (db.customProducts?.[catName] || []);
+        
+        productsList.forEach((p, idx) => {
+            let row = [Markup.button.callback(translateProductName(p.name, ADMIN_ID), (catName === 'Free Fire Likes' ? 'sub_prod_ff_' : `sub_prod_idx_${catIdx}_`) + idx)];
             if (ADMIN_ID === ADMIN_ID.toString()) {
-                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${encodedC}_${idx}`));
-                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${encodedC}_${idx}`));
+                row.push(Markup.button.callback('❌ Rem', (catName === 'Free Fire Likes' ? `admin_rem_prod_ff_` : `admin_rem_prod_idx_${catIdx}_`) + idx));
+                row.push(Markup.button.callback('✏️ Price', (catName === 'Free Fire Likes' ? `admin_chg_price_ff_` : `admin_chg_price_idx_${catIdx}_`) + idx));
             }
             inlineButtons.push(row);
         });
-        inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_' + encodeURIComponent(catName))]);
-        inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_' + encodeURIComponent(catName))]);
+
+        if (ADMIN_ID === ADMIN_ID.toString()) {
+            if (catName === 'Free Fire Likes') {
+                inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_ff')]);
+            } else {
+                inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_idx_' + catIdx)]);
+                inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_idx_' + catIdx)]);
+            }
+        }
         inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
-        await ctx.editMessageText(`📂 **${translateCategoryName(catName, ADMIN_ID)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
+        
+        const titleText = catName === 'Free Fire Likes' ? "🔥 **Select Package:**" : `📂 **${translateCategoryName(catName, ADMIN_ID)}**`;
+        await ctx.editMessageText(titleText, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
 });
 
-bot.action(/admin_chg_price_(.+)_(.+)/, async (ctx) => {
+bot.action(/admin_chg_price_idx_(.+)_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-        const catName = decodeURIComponent(ctx.match[1]);
+        const catIdx = parseInt(ctx.match[1]);
         const prodIndex = parseInt(ctx.match[2]);
         const db = loadDatabase();
+        const catKeys = Object.keys(db.categories || {});
+        const catName = catKeys[catIdx];
+
         db.adminInputSession[ADMIN_ID] = { type: 'change_shop_price', category: catName, prodIndex: prodIndex };
         saveDatabase(db);
         await ctx.editMessageText(`✍️ Enter new price for this product (Only number):\n(Example: \`90\`)`, {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + encodeURIComponent(catName))]])
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catIdx)]])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action('admin_add_prod_ff', async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'add_shop_product', category: 'Free Fire Likes' };
+        saveDatabase(db);
+        await ctx.editMessageText(`✍️ Enter product name and price for **Free Fire Likes**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`1000 Likes | 50\`)`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'cat_ff_likes')]])
+        });
+        await ctx.answerCbQuery();
+    } catch (e) {}
+});
+
+bot.action(/admin_rem_prod_ff_(.+)/, async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const prodIndex = parseInt(ctx.match[1]);
+        const db = loadDatabase();
+        if (db.customProducts['Free Fire Likes']) {
+            db.customProducts['Free Fire Likes'].splice(prodIndex, 1);
+            saveDatabase(db);
+        }
+        await ctx.answerCbQuery('✅ Product removed successfully!');
+        
+        let inlineButtons = [];
+        (db.customProducts?.['Free Fire Likes'] || []).forEach((p, idx) => {
+            let row = [Markup.button.callback(translateProductName(p.name, ADMIN_ID), 'sub_prod_ff_' + idx)];
+            if (ADMIN_ID === ADMIN_ID.toString()) {
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_ff_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_ff_${idx}`));
+            }
+            inlineButtons.push(row);
+        });
+        inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_ff')]);
+        inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
+        await ctx.editMessageText("🔥 **Select Package:**", { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
+    } catch (e) {}
+});
+
+bot.action(/admin_chg_price_ff_(.+)/, async (ctx) => {
+    try {
+        if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
+        const prodIndex = parseInt(ctx.match[1]);
+        const db = loadDatabase();
+        db.adminInputSession[ADMIN_ID] = { type: 'change_shop_price', category: 'Free Fire Likes', prodIndex: prodIndex };
+        saveDatabase(db);
+        await ctx.editMessageText(`✍️ Enter new price for this product (Only number):\n(Example: \`50\`)`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'cat_ff_likes')]])
         });
         await ctx.answerCbQuery();
     } catch (e) {}
@@ -1389,10 +1470,11 @@ bot.action('shop_now_back', async (ctx) => {
         if (db.categories['Free Fire Likes']) {
             inlineButtons.push([Markup.button.callback(t(userId, 'buyLikes'), 'cat_ff_likes')]);
         }
+        let catIndex = 0;
         for (let c of Object.keys(db.categories || {})) {
             if (c === 'Free Fire Likes') continue;
-            let encodedC = encodeURIComponent(c);
-            inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + encodedC)]);
+            inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + catIndex)]);
+            catIndex++;
         }
         if (userId === ADMIN_ID.toString()) {
             inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
@@ -1407,17 +1489,16 @@ bot.action('cat_ff_likes', async (ctx) => {
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
         let inlineButtons = [];
-        let encodedCat = encodeURIComponent('Free Fire Likes');
         (db.customProducts?.['Free Fire Likes'] || []).forEach((p, idx) => {
-            let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_${encodedCat}_${idx}`)];
+            let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_ff_${idx}`)];
             if (userId === ADMIN_ID.toString()) {
-                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${encodedCat}_${idx}`));
-                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${encodedCat}_${idx}`));
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_ff_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_ff_${idx}`));
             }
             inlineButtons.push(row);
         });
         if (userId === ADMIN_ID.toString()) {
-            inlineButtons.push([Markup.button.callback('➕ Add Product', `admin_add_prod_${encodedCat}`)]);
+            inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_ff')]);
         }
         inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText("🔥 **Select Package:**", { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
@@ -1426,35 +1507,37 @@ bot.action('cat_ff_likes', async (ctx) => {
 
 bot.action(/custom_cat_(.+)/, async (ctx) => {
     try {
-        const catName = decodeURIComponent(ctx.match[1]);
+        const catIdx = parseInt(ctx.match[1]);
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
+        const catKeys = Object.keys(db.categories || {});
+        const catName = catKeys[catIdx];
+        if (!catName) return ctx.answerCbQuery('Category not found.');
+
         let inlineButtons = [];
-        let encodedCat = encodeURIComponent(catName);
         (db.customProducts?.[catName] || []).forEach((p, idx) => {
-            let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_${encodedCat}_${idx}`)];
+            let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_idx_${catIdx}_${idx}`)];
             if (userId === ADMIN_ID.toString()) {
-                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_${encodedCat}_${idx}`));
-                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_${encodedCat}_${idx}`));
+                row.push(Markup.button.callback('❌ Rem', `admin_rem_prod_idx_${catIdx}_${idx}`));
+                row.push(Markup.button.callback('✏️ Price', `admin_chg_price_idx_${catIdx}_${idx}`));
             }
             inlineButtons.push(row);
         });
         if (userId === ADMIN_ID.toString()) {
-            inlineButtons.push([Markup.button.callback('➕ Add Product', `admin_add_prod_${encodedCat}`)]);
-            inlineButtons.push([Markup.button.callback('❌ Remove Category', `admin_rem_cat_${encodedCat}`)]);
+            inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_idx_' + catIdx)]);
+            inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_idx_' + catIdx)]);
         }
         inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText(`📂 **${translateCategoryName(catName, userId)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
 });
 
-bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
+bot.action(/sub_prod_ff_(.+)/, async (ctx) => {
     try {
-        const catName = decodeURIComponent(ctx.match[1]);
-        const index = parseInt(ctx.match[2]);
+        const index = parseInt(ctx.match[1]);
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
-        const prod = db.customProducts[catName]?.[index] || { name: 'Package' };
+        const prod = db.customProducts['Free Fire Likes']?.[index] || { name: 'Package' };
         const translated = translateProductName(prod.name, userId);
 
         let price = 0;
@@ -1465,7 +1548,6 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
         if (takaMatch) {
             price = Number(takaMatch[1]);
         } else if (dashMatch) {
-            // যদি হাইফেনের পরে সংখ্যা থাকে, সেটিকে প্রাইস ধরবে (যদি একাধিক থাকে তবে শেষেরটি বা সঠিকটি)
             const allMatches = [...prod.name.matchAll(/-\s*(\d+)/g)];
             if (allMatches.length > 0) {
                 price = Number(allMatches[allMatches.length - 1][1]);
@@ -1479,10 +1561,55 @@ bot.action(/sub_prod_(.+)_(.+)/, async (ctx) => {
             price = allNums ? Number(allNums[allNums.length - 1]) : 0;
         }
 
-        db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index };
+        db.sessions[userId] = { product: translated, price, activeCategory: 'Free Fire Likes', prodIndex: index, isFFLikes: true };
         saveDatabase(db);
 
-        const prevCatCallback = catName === 'Free Fire Likes' ? 'cat_ff_likes' : 'custom_cat_' + encodeURIComponent(catName);
+        await ctx.editMessageText(t(userId, 'serverTitle') + `\`${translated}\`\n💵 Price: \`${price} BDT\`\n\n👇 Select Server:`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🇧🇩 BD', 'region_bd'), Markup.button.callback('🇮🇩 ID', 'region_id')],
+                [Markup.button.callback(t(userId, 'backBtn'), 'cat_ff_likes'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
+            ])
+        });
+    } catch (e) {}
+});
+
+bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
+    try {
+        const catIdx = parseInt(ctx.match[1]);
+        const index = parseInt(ctx.match[2]);
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        const catKeys = Object.keys(db.categories || {});
+        const catName = catKeys[catIdx];
+        const prod = db.customProducts[catName]?.[index] || { name: 'Package' };
+        const translated = translateProductName(prod.name, userId);
+
+        let price = 0;
+        const takaMatch = prod.name.match(/(\d+)\s*৳/);
+        const dashMatch = prod.name.match(/-\s*(\d+)/);
+        const currMatch = prod.name.match(/(\d+)\s*(tk|BDT)/i);
+
+        if (takaMatch) {
+            price = Number(takaMatch[1]);
+        } else if (dashMatch) {
+            const allMatches = [...prod.name.matchAll(/-\s*(\d+)/g)];
+            if (allMatches.length > 0) {
+                price = Number(allMatches[allMatches.length - 1][1]);
+            } else {
+                price = Number(dashMatch[1]);
+            }
+        } else if (currMatch) {
+            price = Number(currMatch[1]);
+        } else {
+            const allNums = prod.name.match(/\d+/g);
+            price = allNums ? Number(allNums[allNums.length - 1]) : 0;
+        }
+
+        db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index, catIdx: catIdx };
+        saveDatabase(db);
+
+        const prevCatCallback = 'custom_cat_' + catIdx;
         await ctx.editMessageText(t(userId, 'serverTitle') + `\`${translated}\`\n💵 Price: \`${price} BDT\`\n\n👇 Select Server:`, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
@@ -1503,7 +1630,12 @@ bot.action(/region_(bd|id)/, async (ctx) => {
             session.step = 'awaiting_uid';
             saveDatabase(db);
         }
-        const prevProdCallback = session ? `sub_prod_${encodeURIComponent(session.activeCategory)}_${session.prodIndex}` : 'shop_now_back';
+        let prevProdCallback = 'shop_now_back';
+        if (session) {
+            if (session.isFFLikes) prevProdCallback = 'cat_ff_likes';
+            else if (session.catIdx !== undefined) prevProdCallback = 'custom_cat_' + session.catIdx;
+        }
+
         await ctx.editMessageText(`🎮 **Enter UID (${region})**\n\n✍️ Please type and send your UID:`, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
