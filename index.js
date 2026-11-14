@@ -24,14 +24,16 @@ let cachedDb = {
     balances: {}, 
     sessions: {}, 
     numbers: { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' }, 
-    categories: { '🔥 Free Fire Likes': true }, 
+    categories: ['🔥 Free Fire Likes'], 
     customProducts: { 
         '🔥 Free Fire Likes': [
-            { name: '1000 Likes - 50 BDT' },
-            { name: '5000 Likes - 220 BDT' },
-            { name: '10000 Likes - 400 BDT' }
+            { name: '220 Likes - 10 BDT' },
+            { name: '5 Days 1100 Likes - 50 BDT' },
+            { name: '15 Days 3300 Likes - 100 BDT' },
+            { name: '30 Days 6600 Likes - 180 BDT' }
         ]
     }, 
+    subscriptions: {}, 
     allowedUsers: {}, 
     pendingMsgs: {}, 
     orderHistories: {}, 
@@ -48,8 +50,11 @@ let cachedDb = {
 
 function loadDatabase() { 
     if (!cachedDb) cachedDb = {};
-    if (!cachedDb.categories) cachedDb.categories = {};
+    if (!cachedDb.categories || !Array.isArray(cachedDb.categories)) {
+        cachedDb.categories = cachedDb.categories ? Object.keys(cachedDb.categories) : ['🔥 Free Fire Likes'];
+    }
     if (!cachedDb.customProducts) cachedDb.customProducts = {};
+    if (!cachedDb.subscriptions) cachedDb.subscriptions = {};
     return cachedDb; 
 }
 
@@ -70,11 +75,17 @@ function syncDataFromFirebase() {
                         cachedDb.numbers = parsed.numbers || cachedDb.numbers;
                         
                         if (parsed.categories) {
-                            // ক্যাটাগরির সঠিক অর্ডার ও স্থায়িত্ব বজায় রাখতে ফিক্সড করা হলো
-                            cachedDb.categories = parsed.categories;
+                            if (Array.isArray(parsed.categories)) {
+                                cachedDb.categories = parsed.categories;
+                            } else {
+                                cachedDb.categories = Object.keys(parsed.categories);
+                            }
                         }
                         if (parsed.customProducts) {
                             cachedDb.customProducts = parsed.customProducts;
+                        }
+                        if (parsed.subscriptions) {
+                            cachedDb.subscriptions = parsed.subscriptions;
                         }
 
                         cachedDb.allowedUsers = parsed.allowedUsers || cachedDb.allowedUsers;
@@ -123,6 +134,119 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
     });
 }
 
+function extractPackageDays(productName) {
+    const match = productName.match(/(\d+)\s*(days?|দিন)/i);
+    if (match && match[1]) {
+        const days = parseInt(match[1], 10);
+        return days > 1 ? days : 1;
+    }
+    return 1;
+}
+
+function getTodayDateBD() {
+    const now = new Date();
+    const bdTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
+    const year = bdTime.getFullYear();
+    const month = String(bdTime.getMonth() + 1).padStart(2, '0');
+    const day = String(bdTime.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getCurrentHourBD() {
+    const now = new Date();
+    const bdTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
+    return bdTime.getHours();
+}
+
+async function processDailySubscriptions() {
+    const db = loadDatabase();
+    if (!db.subscriptions) return;
+
+    const currentHour = getCurrentHourBD();
+    if (currentHour < 4) return; 
+
+    const todayStr = getTodayDateBD();
+    const subKeys = Object.keys(db.subscriptions);
+    let isDbModified = false;
+
+    for (const subId of subKeys) {
+        const sub = db.subscriptions[subId];
+        if (!sub) continue;
+
+        if (sub.remainingDays <= 0) {
+            delete db.subscriptions[subId];
+            isDbModified = true;
+            continue;
+        }
+
+        if (sub.lastDeliveredDate === todayStr) {
+            continue;
+        }
+
+        if (db.settings && db.settings.autoApiEnabled) {
+            const preCheck = await checkFreeFireUID(sub.uid);
+            const prevLikes = preCheck.likes || 0;
+
+            const apiRes = await callLikesFFApiWithTimeout({ action: 'like', uid: sub.uid, server: sub.region }, 30000);
+
+            if (apiRes.success) {
+                await new Promise(r => setTimeout(r, 2000));
+                const postCheck = await checkFreeFireUID(sub.uid);
+                const currLikes = postCheck.likes || prevLikes;
+                const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : '220';
+
+                const isLastDay = sub.remainingDays === 1;
+
+                sub.remainingDays -= 1;
+                sub.deliveredDays += 1;
+                sub.lastDeliveredDate = todayStr;
+                isDbModified = true;
+
+                const userId = sub.userId;
+                const currentBal = db.balances[userId] || 0;
+
+                if (!db.orderHistories[userId]) db.orderHistories[userId] = [];
+                const now = new Date();
+                db.orderHistories[userId].unshift({
+                    timestamp: now.getTime(),
+                    date: now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
+                    time: now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
+                    product: `${sub.product} (Day ${sub.deliveredDays}/${sub.totalDays})`,
+                    uid: sub.uid,
+                    nickname: sub.nickname || 'Unknown',
+                    region: sub.region,
+                    price: 0,
+                    status: 'Complete'
+                });
+                if (db.orderHistories[userId].length > 10) db.orderHistories[userId].pop();
+
+                const statusLine = !isLastDay 
+                    ? `⏳ Remaining Days: \`${sub.remainingDays} Days Left\``
+                    : `🏁 Package Status: \`Completed (All ${sub.totalDays} Days Delivered)\``;
+
+                const dailyReceipt = `💠 ════════════════════════════ 💠\n           ✅ DAILY AUTO-LIKE COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${sub.product}\`\n📅 Progress: \`Day ${sub.deliveredDays} of ${sub.totalDays}\`\n🆔 Sub ID: \`${subId}\`\n\n👤 Name: \`${sub.nickname || 'Unknown'}\`\n🛡️ UID: \`${sub.uid}\`\n🌍 Server: \`${sub.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n${statusLine}\n💰 Daily Charge: \`0 BDT (Pre-Paid)\`\n💳 Current Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+
+                await bot.telegram.sendMessage(userId, dailyReceipt, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+                }).catch(() => {});
+
+                await bot.telegram.sendMessage(ADMIN_ID, `📋 **[Daily Auto-Delivery Log - Day ${sub.deliveredDays}/${sub.totalDays}]**\n\n` + dailyReceipt + `\n\n👤 **Customer ID:** \`${userId}\``, { parse_mode: 'Markdown' }).catch(() => {});
+
+                if (isLastDay || sub.remainingDays <= 0) {
+                    delete db.subscriptions[subId];
+                }
+            }
+        }
+    }
+
+    if (isDbModified) {
+        saveDatabase(db);
+    }
+}
+
+setInterval(processDailySubscriptions, 15 * 60 * 1000);
+
 function getUserLang(userId) {
     const db = loadDatabase();
     if (!db.userLang) db.userLang = {};
@@ -157,7 +281,7 @@ function t(userId, key) {
             supportText: "📞 **SUPPORT DESK**\n\n💡 Send any issue, TrxID or screenshot directly in this chat. Admin will reply soon.",
             mainMenuBack: "🔙 Main Menu 🏠",
             backBtn: "🔙 Back ↩️",
-            buyLikes: "🔥 Buy Free Fire Likes ⚡",
+            buyLikes: "🔥 Buy Fire Fire Likes ⚡",
             serverTitle: "🌍 **SERVER SELECTION**\n\nPackage: ",
             confirmOrderBtn: "✅ Confirm Order 🚀",
             cancelBtn: "❌ Cancel",
@@ -285,7 +409,6 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// --- BOT USE MIDDLEWARE ---
 bot.use(async (ctx, next) => {
     try {
         if (ctx && ctx.from) {
@@ -364,8 +487,9 @@ bot.on('message', async (ctx) => {
         if (!db.balances) db.balances = {};
         if (!db.sessions) db.sessions = {};
         if (!db.numbers) db.numbers = { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' };
-        if (!db.categories) db.categories = {};
+        if (!db.categories) db.categories = ['🔥 Free Fire Likes'];
         if (!db.customProducts) db.customProducts = {};
+        if (!db.subscriptions) db.subscriptions = {};
         if (!db.users) db.users = {};
         if (!db.allowedUsers) db.allowedUsers = {};
         if (!db.orderHistories) db.orderHistories = {};
@@ -454,6 +578,25 @@ bot.on('message', async (ctx) => {
                         
                         const targetUid = orderInfo.targetUserId;
                         const currentBal = db.balances[targetUid] || 0;
+                        const totalDays = orderInfo.totalDays || 1;
+                        const remainingDays = totalDays - 1;
+
+                        let subNote = '';
+                        if (remainingDays > 0) {
+                            const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+                            db.subscriptions[subId] = {
+                                userId: targetUid,
+                                uid: orderInfo.uid,
+                                nickname: orderInfo.nickname || 'Unknown',
+                                region: orderInfo.region,
+                                product: orderInfo.product,
+                                totalDays: totalDays,
+                                deliveredDays: 1,
+                                remainingDays: remainingDays,
+                                lastDeliveredDate: getTodayDateBD()
+                            };
+                            subNote = `\n📅 **Subscription:** \`Day 1 of ${totalDays} (${remainingDays} Days Left)\``;
+                        }
 
                         if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
                         const orderNow = new Date();
@@ -461,12 +604,13 @@ bot.on('message', async (ctx) => {
                             timestamp: orderNow.getTime(),
                             date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
                             time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
-                            product: orderInfo.product, uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
+                            product: totalDays > 1 ? `${orderInfo.product} (Day 1/${totalDays})` : orderInfo.product,
+                            uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
                         });
                         if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
                         saveDatabase(db);
 
-                        const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                        const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`${subNote}\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                         await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
                             parse_mode: 'Markdown',
@@ -474,7 +618,7 @@ bot.on('message', async (ctx) => {
                         }).catch(() => {});
 
                         await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Manual Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
-                        await ctx.reply('✅ Order successfully completed & receipt updated with Previous, Current, Added Likes to customer!');
+                        await ctx.reply('✅ Order successfully completed & receipt updated to customer!');
                         delete db.adminInputSession[userId];
                         delete db.adminSessions[uniqueOrderId];
                         saveDatabase(db);
@@ -515,7 +659,10 @@ bot.on('message', async (ctx) => {
             if (actionType === 'add_category') {
                 const catName = text;
                 if (catName) {
-                    db.categories[catName] = true;
+                    if (!db.categories || !Array.isArray(db.categories)) db.categories = [];
+                    if (!db.categories.includes(catName)) {
+                        db.categories.push(catName);
+                    }
                     if (!db.customProducts[catName]) db.customProducts[catName] = [];
                     saveDatabase(db);
                     delete db.adminInputSession[userId];
@@ -600,7 +747,6 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // --- Deposit Step 1: Awaiting Amount ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_amount' && !isMenuCommand(text)) {
             const amountNum = Number(text);
             const lang = getUserLang(userId);
@@ -638,7 +784,6 @@ bot.on('message', async (ctx) => {
             });
         }
 
-        // --- Deposit Step 2: Awaiting Proof ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_deposit_proof' && !isMenuCommand(text)) {
             const method = db.sessions[userId].method;
             const amount = db.sessions[userId].depositAmount || 100;
@@ -686,7 +831,6 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // --- Check FF UID Only ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid_only' && !isMenuCommand(text)) {
             const uidText = text;
             const lang = getUserLang(userId);
@@ -716,7 +860,6 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // --- Order Flow: Awaiting UID / Guild ID ---
         if (db.sessions && db.sessions[userId] && db.sessions[userId].step === 'awaiting_uid' && !isMenuCommand(text)) {
             const idText = text;
             db.sessions[userId].uid = idText;
@@ -744,7 +887,8 @@ bot.on('message', async (ctx) => {
                 session.initialLikes = resInfo.likes;
                 saveDatabase(db);
 
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
+                const daysInfo = session.totalDays > 1 ? `\n📅 **Duration:** \`${session.totalDays} Days Auto-Delivery\`` : '';
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`${daysInfo}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
                 try {
                     await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, reviewBox, {
@@ -779,12 +923,12 @@ bot.on('message', async (ctx) => {
             return;
         }
 
-        // --- Admin Main Menu Commands ---
         if (cleanText.includes('totalusers') || text.includes('📊')) {
             if (userId === ADMIN_ID.toString()) {
                 const allowedObj = db.allowedUsers || {};
                 const userKeys = Object.keys(allowedObj);
-                let listText = `📊 **TOTAL AUTHORIZED USERS: ${userKeys.length}**\n\n`;
+                const activeSubsCount = Object.keys(db.subscriptions || {}).length;
+                let listText = `📊 **TOTAL AUTHORIZED USERS: ${userKeys.length}**\n🔄 **ACTIVE SUBSCRIPTIONS: ${activeSubsCount}**\n\n`;
                 
                 userKeys.forEach((uId, idx) => {
                     const uInfo = (db.users && db.users[uId]) ? db.users[uId] : { first_name: 'Approved User', username: 'N/A' };
@@ -856,15 +1000,14 @@ bot.on('message', async (ctx) => {
             }
         }
 
-        // --- User Main Menu Buttons (Universal Dispatcher) ---
         if (lowerText.includes('shop now') || lowerText.includes('শপ নাও') || lowerText.includes('shop') || lowerText.includes('শপ')) {
             let inlineButtons = [];
             let catIndex = 0;
-            // ক্যাটাগরির সঠিক সিকোয়েন্স বা অর্ডার বজায় রাখতে Object.keys ব্যবহার করা হয়েছে
-            for (let c of Object.keys(db.categories || {})) {
+            const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+            cats.forEach(c => {
                 inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + catIndex)]);
                 catIndex++;
-            }
+            });
             if (userId === ADMIN_ID.toString()) {
                 inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
             }
@@ -915,7 +1058,17 @@ bot.on('message', async (ctx) => {
         if (cleanText.includes('myprofile') || cleanText.includes('আমারপ্রোফাইল') || cleanText.includes('প্রোফাইল') || text.includes('👤')) {
             const lang = getUserLang(userId);
             const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
-            const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\``;
+            
+            const userSubs = Object.values(db.subscriptions || {}).filter(s => s.userId === userId && s.remainingDays > 0);
+            let activeSubsText = '';
+            if (userSubs.length > 0) {
+                activeSubsText = `\n🔄 **Active Packages:** \`${userSubs.length} Running\``;
+                userSubs.forEach((s, idx) => {
+                    activeSubsText += `\n   ${idx + 1}. UID \`${s.uid}\` — \`${s.remainingDays} Days Left\``;
+                });
+            }
+
+            const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\`${activeSubsText}`;
 
             return ctx.reply(profileBox, {
                 parse_mode: 'Markdown',
@@ -968,7 +1121,6 @@ bot.on('message', async (ctx) => {
     } catch (err) {}
 });
 
-// --- Admin Shop Management Actions ---
 bot.action('admin_create_cat', async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
@@ -988,13 +1140,13 @@ bot.action(/admin_add_prod_idx_(.+)/, async (ctx) => {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const catIdx = parseInt(ctx.match[1]);
         const db = loadDatabase();
-        const catKeys = Object.keys(db.categories || {});
-        const catName = catKeys[catIdx];
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
         if (!catName) return ctx.answerCbQuery('Category not found.');
 
         db.adminInputSession[ADMIN_ID] = { type: 'add_shop_product', category: catName };
         saveDatabase(db);
-        await ctx.editMessageText(`✍️ Enter product name and price for **${catName}**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`Squad Bot 3 Days | 120\`)`, {
+        await ctx.editMessageText(`✍️ Enter product name and price for **${catName}**:\nFormat: \`Product Name | Price BDT\`\n(Example: \`5 Days 1100 Likes | 50\` or \`30 Days 6600 Likes | 180\`)`, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'custom_cat_' + catIdx)]])
         });
@@ -1007,10 +1159,11 @@ bot.action(/admin_rem_cat_idx_(.+)/, async (ctx) => {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
         const catIdx = parseInt(ctx.match[1]);
         const db = loadDatabase();
-        const catKeys = Object.keys(db.categories || {});
-        const catName = catKeys[catIdx];
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
         if (catName) {
-            delete db.categories[catName];
+            cats.splice(catIdx, 1);
+            db.categories = cats;
             if (db.customProducts[catName]) delete db.customProducts[catName];
             saveDatabase(db);
         }
@@ -1018,10 +1171,11 @@ bot.action(/admin_rem_cat_idx_(.+)/, async (ctx) => {
         
         let inlineButtons = [];
         let idxCounter = 0;
-        for (let c of Object.keys(db.categories || {})) {
+        const updatedCats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        updatedCats.forEach(c => {
             inlineButtons.push([Markup.button.callback(translateCategoryName(c, ADMIN_ID), 'custom_cat_' + idxCounter)]);
             idxCounter++;
-        }
+        });
         inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
         inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
         await ctx.editMessageText(t(ADMIN_ID, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
@@ -1034,8 +1188,8 @@ bot.action(/admin_rem_prod_idx_(.+)_(.+)/, async (ctx) => {
         const catIdx = parseInt(ctx.match[1]);
         const prodIndex = parseInt(ctx.match[2]);
         const db = loadDatabase();
-        const catKeys = Object.keys(db.categories || {});
-        const catName = catKeys[catIdx];
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
 
         if (catName && db.customProducts[catName]) {
             db.customProducts[catName].splice(prodIndex, 1);
@@ -1071,8 +1225,8 @@ bot.action(/admin_chg_price_idx_(.+)_(.+)/, async (ctx) => {
         const catIdx = parseInt(ctx.match[1]);
         const prodIndex = parseInt(ctx.match[2]);
         const db = loadDatabase();
-        const catKeys = Object.keys(db.categories || {});
-        const catName = catKeys[catIdx];
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
 
         db.adminInputSession[ADMIN_ID] = { type: 'change_shop_price', category: catName, prodIndex: prodIndex };
         saveDatabase(db);
@@ -1084,7 +1238,6 @@ bot.action(/admin_chg_price_idx_(.+)_(.+)/, async (ctx) => {
     } catch (e) {}
 });
 
-// --- Language Menu & Switching ---
 bot.action('open_lang_menu', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1105,7 +1258,17 @@ bot.action('back_to_profile', async (ctx) => {
         const db = loadDatabase();
         const lang = getUserLang(userId);
         const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
-        const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\``;
+        
+        const userSubs = Object.values(db.subscriptions || {}).filter(s => s.userId === userId && s.remainingDays > 0);
+        let activeSubsText = '';
+        if (userSubs.length > 0) {
+            activeSubsText = `\n🔄 **Active Packages:** \`${userSubs.length} Running\``;
+            userSubs.forEach((s, idx) => {
+                activeSubsText += `\n   ${idx + 1}. UID \`${s.uid}\` — \`${s.remainingDays} Days Left\``;
+            });
+        }
+
+        const profileBox = `╔══════════════════════════════╗\n        👤 USER PROFILE\n╚══════════════════════════════╝\n\n🆔 **User ID:** \`${userId}\`\n👤 **Name:** \`${ctx.from.first_name}\`\n💰 **Balance:** \`৳${db.balances[userId] || 0}\`${activeSubsText}`;
 
         await ctx.editMessageText(profileBox, {
             parse_mode: 'Markdown',
@@ -1132,7 +1295,6 @@ bot.action(/set_lang_(bn|en)/, async (ctx) => {
     } catch (e) {}
 });
 
-// --- Admin Payment Numbers ---
 bot.action('admin_set_bkash', async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
@@ -1155,7 +1317,6 @@ bot.action('admin_set_nagad', async (ctx) => {
     } catch (e) {}
 });
 
-// --- Deposit Portals & Back Navigation ---
 bot.action('deposit_portal_back', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1283,7 +1444,6 @@ bot.action(/dep_can_(.+)/, async (ctx) => {
     } catch (e) {}
 });
 
-// --- Admin Order & Reply Actions ---
 bot.action(/admin_reply_(.+)/, async (ctx) => {
     try {
         if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
@@ -1348,7 +1508,6 @@ bot.action(/admin_can_(.+)/, async (ctx) => {
     } catch (e) {}
 });
 
-// --- Calculator ---
 bot.action(/calc_(.+)/, async (ctx) => {
     try {
         ctx.answerCbQuery().catch(() => {});
@@ -1433,7 +1592,6 @@ bot.action('back_to_clock', async (ctx) => {
     } catch (e) {}
 });
 
-// --- Shop Navigation & Order Flow ---
 bot.action('shop_now_back', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1441,10 +1599,11 @@ bot.action('shop_now_back', async (ctx) => {
         let inlineButtons = [];
         
         let catIndex = 0;
-        for (let c of Object.keys(db.categories || {})) {
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        cats.forEach(c => {
             inlineButtons.push([Markup.button.callback(translateCategoryName(c, userId), 'custom_cat_' + catIndex)]);
             catIndex++;
-        }
+        });
         if (userId === ADMIN_ID.toString()) {
             inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
         }
@@ -1458,8 +1617,8 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
         const catIdx = parseInt(ctx.match[1]);
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
-        const catKeys = Object.keys(db.categories || {});
-        const catName = catKeys[catIdx];
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
         if (!catName) return ctx.answerCbQuery('Category not found.');
 
         let inlineButtons = [];
@@ -1486,8 +1645,8 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         const index = parseInt(ctx.match[2]);
         const userId = ctx.from.id.toString();
         const db = loadDatabase();
-        const catKeys = Object.keys(db.categories || {});
-        const catName = catKeys[catIdx];
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
         const prod = db.customProducts[catName]?.[index] || { name: 'Package' };
         const translated = translateProductName(prod.name, userId);
 
@@ -1514,8 +1673,9 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
 
         const lowerCatName = catName.toLowerCase();
         const isFFLikes = lowerCatName.includes('like') || lowerCatName.includes('লাইক') || catName.includes('🔥');
+        const totalDays = extractPackageDays(prod.name);
 
-        db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index, catIdx: catIdx, isFFLikes };
+        db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index, catIdx: catIdx, isFFLikes, totalDays };
         saveDatabase(db);
 
         const prevCatCallback = 'custom_cat_' + catIdx;
@@ -1593,6 +1753,7 @@ bot.action('confirm_order', async (ctx) => {
 
         const isFFLikeCategory = session.isFFLikes;
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory;
+        const totalDays = session.totalDays || 1;
         
         let apiRes = { success: false };
         if (isAutoEnabled) {
@@ -1606,7 +1767,25 @@ bot.action('confirm_order', async (ctx) => {
             const postCheck = await checkFreeFireUID(session.uid);
             const prevLikes = session.initialLikes || 0;
             const currLikes = postCheck.likes || prevLikes;
-            const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : 'N/A';
+            const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : '220';
+
+            let subStatusText = '';
+            if (totalDays > 1) {
+                const remainingDays = totalDays - 1;
+                const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+                db.subscriptions[subId] = {
+                    userId: userId,
+                    uid: session.uid,
+                    nickname: session.nickname || 'Unknown',
+                    region: session.region,
+                    product: session.product,
+                    totalDays: totalDays,
+                    deliveredDays: 1,
+                    remainingDays: remainingDays,
+                    lastDeliveredDate: getTodayDateBD()
+                };
+                subStatusText = `\n📅 **Subscription:** \`Day 1 of ${totalDays} (${remainingDays} Days Auto-Remaining)\`\n🆔 **Sub Tracking ID:** \`${subId}\``;
+            }
 
             if (!db.orderHistories[userId]) db.orderHistories[userId] = [];
             const now = new Date();
@@ -1614,12 +1793,13 @@ bot.action('confirm_order', async (ctx) => {
                 timestamp: now.getTime(),
                 date: now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
                 time: now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
-                product: session.product, uid: session.uid, nickname: session.nickname || 'Unknown', region: session.region, price: session.price, status: 'Complete'
+                product: totalDays > 1 ? `${session.product} (Day 1/${totalDays})` : session.product,
+                uid: session.uid, nickname: session.nickname || 'Unknown', region: session.region, price: session.price, status: 'Complete'
             });
             if (db.orderHistories[userId].length > 10) db.orderHistories[userId].pop();
             saveDatabase(db);
 
-            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
             await ctx.telegram.editMessageText(userId, procMsgId, null, autoReceipt, {
                 parse_mode: 'Markdown',
@@ -1640,12 +1820,13 @@ bot.action('confirm_order', async (ctx) => {
                 nickname: session.nickname || 'Unknown',
                 region: session.region,
                 price: session.price,
+                totalDays: totalDays,
                 isFFLikeCategory: true,
                 step: 'awaiting_prev_likes'
             };
             saveDatabase(db);
 
-            await bot.telegram.sendMessage(ADMIN_ID, `⚠️ API Failed / Fallback Order (Manual Needed)\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
+            await bot.telegram.sendMessage(ADMIN_ID, `⚠️ API Failed / Fallback Order (Manual Needed)\n\n📦 Package: \`${session.product}\` (${totalDays} Days)\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
@@ -1661,7 +1842,7 @@ bot.action('confirm_order', async (ctx) => {
             
             const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target Guild ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
-            await ctx.telegram.editMessageText(userId, procMsgId, null, pendingReceipt, {
+            await ctx.editMessageText(userId, procMsgId, null, pendingReceipt, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
             });
