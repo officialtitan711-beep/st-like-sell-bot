@@ -134,6 +134,30 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
     });
 }
 
+// নতুন রিয়েল-টাইম চেকার এপিআই ইন্টিগ্রেশন (AuraFFX)
+function checkFreeFireUID(uid) {
+    return new Promise((resolve) => {
+        const url = 'https://auraffxserverinfocheckerapi.onrender.com/api/player?uid=' + uid;
+        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    let nickname = parsed.nickname || parsed.name || parsed.username || parsed.AccountName;
+                    let level = parsed.level || parsed.AccountLevel || parsed.lvl || '';
+                    let likes = parsed.likes || parsed.AccountLikes || parsed.Like || parsed.like || 0;
+                    resolve({ 
+                        nickname: (nickname && nickname.trim() !== '') ? nickname : 'Unknown Player', 
+                        level: level ? String(level) : '',
+                        likes: Number(likes) || 0
+                    });
+                } catch (err) { resolve({ nickname: 'Unknown Player', level: '', likes: 0 }); }
+            });
+        }).on('error', () => { resolve({ nickname: 'Unknown Player', level: '', likes: 0 }); });
+    });
+}
+
 function extractPackageDays(productName) {
     const match = productName.match(/(\d+)\s*(days?|দিন)/i);
     if (match && match[1]) {
@@ -190,10 +214,10 @@ async function processDailySubscriptions() {
             const apiRes = await callLikesFFApiWithTimeout({ action: 'like', uid: sub.uid, server: sub.region }, 30000);
 
             if (apiRes.success) {
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise(r => setTimeout(r, 3000));
                 const postCheck = await checkFreeFireUID(sub.uid);
                 const currLikes = postCheck.likes || prevLikes;
-                const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : '220';
+                const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : 0;
 
                 const isLastDay = sub.remainingDays === 1;
 
@@ -389,29 +413,6 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
         if (ctx.callbackQuery) { await ctx.editMessageText(text, { parse_mode: 'Markdown', ...keyboard }); }
         else { await ctx.reply(text, { parse_mode: 'Markdown', ...keyboard }); }
     } catch (e) {}
-}
-
-function checkFreeFireUID(uid) {
-    return new Promise((resolve) => {
-        const url = 'https://akmtopup.com/api/checkuid?uid=' + uid;
-        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }, (res) => {
-            let data = '';
-            res.on('data', (chunk) => { data += chunk; });
-            res.on('end', () => {
-                try {
-                    const parsed = JSON.parse(data);
-                    let nickname = parsed.nickname || parsed.message || parsed.name || parsed.username || parsed.AccountName;
-                    let level = parsed.level || parsed.AccountLevel || parsed.lvl || '';
-                    let likes = parsed.likes || parsed.AccountLikes || parsed.Like || parsed.like || 0;
-                    resolve({ 
-                        nickname: (nickname && nickname.trim() !== '') ? nickname : 'Unknown Player', 
-                        level: level ? String(level) : '',
-                        likes: Number(likes) || 0
-                    });
-                } catch (err) { resolve({ nickname: 'Unknown Player', level: '', likes: 0 }); }
-            });
-        }).on('error', () => { resolve({ nickname: 'Unknown Player', level: '', likes: 0 }); });
-    });
 }
 
 bot.use(async (ctx, next) => {
@@ -856,8 +857,8 @@ bot.on('message', async (ctx) => {
 
             const resInfo = await checkFreeFireUID(uidText);
             const resultBox = lang === 'bn'
-                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 ফ্রি ফায়ার প্লেয়ার ইনফো\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 নাম: \`${resInfo.nickname}\`\n🛡 ইউআইডি: \`${uidText}\``
-                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 FREE FIRE PLAYER INFO\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 Name: \`${resInfo.nickname}\`\n🛡 UID: \`${uidText}\``;
+                ? `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 ফ্রি ফায়ার প্লেয়ার ইনফো\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 নাম: \`${resInfo.nickname}\`\n🛡 ইউআইডি: \`${uidText}\`\n❤️ লাইক: \`${resInfo.likes}\`\n⭐ লেভেল: \`${resInfo.level}\``
+                : `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n   🎮 FREE FIRE PLAYER INFO\n┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n👤 Name: \`${resInfo.nickname}\`\n🛡 UID: \`${uidText}\`\n❤️ Likes: \`${resInfo.likes}\`\n⭐ Level: \`${resInfo.level}\``;
 
             try {
                 await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, resultBox, {
@@ -898,7 +899,7 @@ bot.on('message', async (ctx) => {
                 saveDatabase(db);
 
                 const daysInfo = session.totalDays > 1 ? `\n📅 **Duration:** \`${session.totalDays} Days Auto-Delivery\`` : '';
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`${daysInfo}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`${daysInfo}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n❤️ **Current Likes:** \`${resInfo.likes}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
                 try {
                     await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, reviewBox, {
@@ -1772,12 +1773,14 @@ bot.action('confirm_order', async (ctx) => {
 
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-            await new Promise(r => setTimeout(r, 200));
+            
+            // লাইক সার্ভারে আপডেট হওয়ার জন্য ৩ সেকেন্ড বিরতি দিয়ে রিয়েল কারেন্ট লাইক চেক করা হচ্ছে
+            await new Promise(r => setTimeout(r, 3000));
 
             const postCheck = await checkFreeFireUID(session.uid);
             const prevLikes = session.initialLikes || 0;
             const currLikes = postCheck.likes || prevLikes;
-            const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : '220';
+            const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : 0;
 
             let subStatusText = '';
             if (totalDays > 1) {
