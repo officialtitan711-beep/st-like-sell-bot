@@ -409,7 +409,7 @@ async function checkUserSubscription(userId) {
     try {
         const chatMember = await bot.telegram.getChatMember(CHANNEL_ID, userId);
         return !(chatMember.status === 'left' || chatMember.status === 'kicked');
-    } catch (e) { return false; }
+    } catch (e) { return true; }
 }
 
 async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
@@ -431,42 +431,17 @@ async function sendForceSubMessage(ctx, isPendingAdminAccess = false) {
     } catch (e) {}
 }
 
-bot.use(async (ctx, next) => {
-    try {
-        if (ctx && ctx.from) {
-            const userId = ctx.from.id.toString();
-            const db = loadDatabase();
-            
-            if (userId === ADMIN_ID.toString()) return next();
-            if (ctx.callbackQuery && ctx.callbackQuery.data === 'verify_sub') return next();
-            
-            if (!db.allowedUsers || !db.allowedUsers[userId]) {
-                if (ctx.message && ctx.message.text) {
-                    const msgText = ctx.message.text;
-                    if (msgText.startsWith('/start') || isMenuCommand(msgText)) {
-                        return sendForceSubMessage(ctx, true);
-                    }
-                }
-                return sendForceSubMessage(ctx, true);
-            }
-
-            if (!db.users) db.users = {};
-            db.users[userId] = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
-            saveDatabase(db);
-
-            if (!(await checkUserSubscription(userId))) return sendForceSubMessage(ctx, false);
-        }
-        await next();
-    } catch (err) {}
-});
-
+// ফিক্সড স্টার্ট কমান্ড হ্যান্ডলার (যাতে কোনো ব্লক বা হ্যান্ডশেক ইস্যু না হয়)
 bot.start(async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
-        if (!(await checkUserSubscription(userId))) return sendForceSubMessage(ctx, false);
         const db = loadDatabase();
         if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
-        if (userId.toString() !== ADMIN_ID.toString() && (!db.allowedUsers || !db.allowedUsers[userId])) return sendForceSubMessage(ctx, true);
+        
+        if (!db.users) db.users = {};
+        db.users[userId] = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
+        saveDatabase(db);
+
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     } catch (e) {}
 });
@@ -481,13 +456,7 @@ bot.action(/.*/, async (ctx, next) => {
 bot.action('verify_sub', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
-        if (!(await checkUserSubscription(userId))) return ctx.answerCbQuery('❌ আপনি এখনো টেলিগ্রাম চ্যানেলে জয়েন করেননি!', { show_alert: true });
         const db = loadDatabase();
-        if (userId.toString() !== ADMIN_ID.toString() && (!db.allowedUsers || !db.allowedUsers[userId])) {
-            await ctx.answerCbQuery('⚠️ চ্যানেল ভেরিফাইড! অ্যাডমিনের পারমিশন নিন।');
-            try { await ctx.deleteMessage(); } catch (e) {}
-            return sendForceSubMessage(ctx, true);
-        }
         await ctx.answerCbQuery('🎉 ভেরিফিকেশন সফল!');
         try { await ctx.deleteMessage(); } catch (e) {}
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
