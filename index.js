@@ -11,7 +11,8 @@ const ADMIN_ID = process.env.ADMIN_ID || '5932254012';
 const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
-const API_BASE = "https://likesff.shop/reseller.php";
+// সঠিক এপিআই বেস ইউআরএল (ডকুমেন্টেশন অনুযায়ী)
+const API_BASE = "https://raigen.site/likesff/reseller.php";
 const API_KEY = "likesff-shop-11935-c3rp5src";
 const PORT = process.env.PORT || 3000;
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com';
@@ -158,13 +159,10 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// চেক করবে প্যাকেজটি অটো এপিআই নাকি ম্যানুয়াল, এবং সাবস্ক্রিপশন দিন কতগুলো
 function extractPackageDays(productName) {
     const lower = productName.toLowerCase();
-    // যদি প্যাকেজে ম্যানুয়াল বা 100 Likes থাকে তবে এটি অটো এপিআই নয়
     if (lower.includes('100')) return 1; 
 
-    // ৫, ১৫ বা ৩০ দিনের সাবস্ক্রিপশন প্যাকেজ ডিটেক্ট করার জন্য
     if (lower.includes('5 days') || lower.includes('৫ দিন') || lower.includes('15 days') || lower.includes('১৫ দিন') || lower.includes('30 days') || lower.includes('৩০ দিন')) {
         const match = productName.match(/(\d+)\s*(days?|দিন)/i);
         if (match && match[1]) {
@@ -172,16 +170,16 @@ function extractPackageDays(productName) {
             return days > 1 ? days : 1;
         }
     }
-    return 1; // 220 Likes এর মতো ইনস্ট্যান্ট অটো প্যাকেজ
+    return 1;
 }
 
-// নাম বা লাইক সংখ্যা দেখে সঠিক API Product Code সিলেক্ট করবে
+// স্ক্রিনশটের অফিশিয়াল প্রোডাক্ট কোড ম্যাপিং
 function getApiProductCode(productName) {
     const lower = productName.toLowerCase();
     if (lower.includes('6600') || lower.includes('৩০ দিন')) return 'AL-55F71F';
     if (lower.includes('3300') || lower.includes('১৫ দিন')) return 'AL-3300';
     if (lower.includes('1100') || lower.includes('৫ দিন')) return 'AL-1100';
-    return ''; // 220 Like বা অন্যান্য ইনস্ট্যান্ট অটো প্যাকেজ হলে ফাঁকা রিটার্ন করবে (তখন action=like যাবে)
+    return ''; 
 }
 
 function getTodayDateBD() {
@@ -229,6 +227,7 @@ async function processDailySubscriptions() {
             const prevLikes = preCheck.likes || 0;
 
             const prodCode = getApiProductCode(sub.product);
+            // ডকুমেন্টেশন অনুযায়ী server ও uid পাঠানো হচ্ছে
             const apiParams = prodCode ? { action: 'auto', product: prodCode, uid: sub.uid, server: sub.region } : { action: 'like', uid: sub.uid, server: sub.region };
 
             const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
@@ -1785,16 +1784,15 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        // চেক করা হচ্ছে এটি কি ম্যানুয়াল প্যাকেজ (যেমন: 100 LIKE) কি না
         const isManualPackage = lowerProd.includes('100');
-        
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
         
         let apiRes = { success: false };
         if (isAutoEnabled) {
             const prodCode = getApiProductCode(session.product);
-            const apiParams = (prodCode && totalDays > 1) 
+            // ডকুমেন্টেশন অনুযায়ী সঠিক প্যারামিটার: action, product, uid, server
+            const apiParams = prodCode 
                 ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
                 : { action: 'like', uid: session.uid, server: session.region };
 
