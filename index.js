@@ -11,7 +11,8 @@ const ADMIN_ID = process.env.ADMIN_ID || '5932254012';
 const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
-const API_BASE = "https://raigen.site/likesff/reseller.php";
+// সঠিক নতুন এপিআই ডোমেইন
+const API_BASE = "https://likesff.shop/reseller.php";
 const API_KEY = "likesff-shop-11935-c3rp5src";
 const PORT = process.env.PORT || 3000;
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com';
@@ -167,6 +168,15 @@ function extractPackageDays(productName) {
     return 1;
 }
 
+// প্যাকেজ অনুযায়ী সঠিক প্রোডাক্ট কোড ম্যাপিং (অটো সাবস্ক্রিপশনের জন্য)
+function getApiProductCode(productName) {
+    const lower = productName.toLowerCase();
+    if (lower.includes('30') || lower.includes('৬৬০০') || lower.includes('6600')) return 'AL-55F71F';
+    if (lower.includes('15') || lower.includes('৩৩০০') || lower.includes('3300')) return 'AL-3300';
+    if (lower.includes('5') || lower.includes('১১০০') || lower.includes('1100')) return 'AL-1100';
+    return '';
+}
+
 function getTodayDateBD() {
     const now = new Date();
     const bdTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
@@ -211,7 +221,11 @@ async function processDailySubscriptions() {
             const preCheck = await checkFreeFireUID(sub.uid);
             const prevLikes = preCheck.likes || 0;
 
-            const apiRes = await callLikesFFApiWithTimeout({ action: 'like', uid: sub.uid, server: sub.region }, 30000);
+            // সাবস্ক্রিপশনের ক্ষেত্রে সঠিক প্রোডাক্ট কোড সহ অটো রিকোয়েস্ট পাঠানো হচ্ছে
+            const prodCode = getApiProductCode(sub.product);
+            const apiParams = prodCode ? { action: 'auto', product: prodCode, uid: sub.uid, server: sub.region } : { action: 'like', uid: sub.uid, server: sub.region };
+
+            const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
 
             if (apiRes.success) {
                 await new Promise(r => setTimeout(r, 3000));
@@ -1768,7 +1782,14 @@ bot.action('confirm_order', async (ctx) => {
         
         let apiRes = { success: false };
         if (isAutoEnabled) {
-            apiRes = await callLikesFFApiWithTimeout({ action: 'like', uid: session.uid, server: session.region }, 30000);
+            // যদি মাল্টি-ডে প্যাকেজ হয় (যেমন: ৫, ১৫, ৩০ দিন), তবে action=auto এবং product কোড পাঠানো হবে।
+            // আর ইনস্ট্যান্ট প্যাকেজ হলে (যেমন: 220 Likes) action=like পাঠানো হবে।
+            const prodCode = getApiProductCode(session.product);
+            const apiParams = prodCode 
+                ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
+                : { action: 'like', uid: session.uid, server: session.region };
+
+            apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
         }
 
         if (isAutoEnabled && apiRes.success) {
