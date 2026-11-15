@@ -360,9 +360,8 @@ bot.on('message', async (ctx) => {
         const userId = ctx.from.id.toString();
         const text = ctx.message.text ? ctx.message.text.trim() : (ctx.message.caption ? ctx.message.caption.trim() : '');
         const lowerText = text.toLowerCase();
-        const cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{2B50}\u{2728}\u{1F4F1}\u{1F4B0}\u{1F464}\u{1F4DC}\u{1F4DE}\u{1F9EE}\u{1F30D}\u{1F4CA}\u{2795}\u{274C}\u{1F4B3}\u{1F4E9}\u{1F4E2}\u{1F4F7}\u{1F50D}\u{1F3AE}\u{1F4C1}\u{1F4CC}\u{2328}\u{1F310}\s]/gu, '').trim().toLowerCase();
-
         const db = loadDatabase();
+
         if (!db.balances) db.balances = {};
         if (!db.sessions) db.sessions = {};
         if (!db.numbers) db.numbers = { bkash: '01XXXXXXXXX', nagad: '01XXXXXXXXX' };
@@ -382,18 +381,6 @@ bot.on('message', async (ctx) => {
 
         if (isMenuCommand(text)) {
             if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
-            if (userId === ADMIN_ID.toString() && db.adminInputSession?.[userId]) { delete db.adminInputSession[userId]; saveDatabase(db); }
-        }
-
-        if (userId === ADMIN_ID.toString() && db.adminReplySessions?.[userId] && !isMenuCommand(text)) {
-            const targetUser = db.adminReplySessions[userId];
-            try {
-                await bot.telegram.sendMessage(targetUser, "💬 **Admin Reply:**\n\n" + text, { parse_mode: 'Markdown' });
-                await ctx.reply('✅ Reply sent successfully!');
-            } catch (err) { await ctx.reply('❌ Failed to send.'); }
-            delete db.adminReplySessions[userId];
-            saveDatabase(db);
-            return;
         }
 
         if (userId === ADMIN_ID.toString() && db.adminInputSession?.[userId] && !isMenuCommand(text)) {
@@ -404,86 +391,11 @@ bot.on('message', async (ctx) => {
                     db.allowedUsers[targetUid] = true;
                     saveDatabase(db);
                     delete db.adminInputSession[userId];
-                    try { await bot.telegram.sendMessage(targetUid, "🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন।", { parse_mode: 'Markdown' }); } catch (e) {}
                     return ctx.reply(`✅ ইউজার আইডি \`${targetUid}\`-কে এক্সেস দেওয়া হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 delete db.adminInputSession[userId];
                 return ctx.reply('❌ সঠিক ইউজার আইডি দিন।');
             }
-            if (sessionData.type === 'remove_bot_user') {
-                const targetUid = text.replace(/[^0-9]/g, '');
-                if (targetUid) {
-                    if (db.allowedUsers[targetUid]) delete db.allowedUsers[targetUid];
-                    saveDatabase(db);
-                    delete db.adminInputSession[userId];
-                    return ctx.reply(`❌ ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে!`, { parse_mode: 'Markdown' });
-                }
-                delete db.adminInputSession[userId];
-                return ctx.reply('❌ সঠিক ইউজার আইডি দিন।');
-            }
-            if (sessionData.type === 'add_minus_balance') {
-                const parts = text.split(' ');
-                const targetUser = parts[0], amount = Number(parts[1]);
-                if (targetUser && !isNaN(amount)) {
-                    db.balances[targetUser] = (db.balances[targetUser] || 0) + amount;
-                    saveDatabase(db);
-                    delete db.adminInputSession[userId];
-                    return ctx.reply(`✅ Balance updated! New Balance: ৳${db.balances[targetUser]}`);
-                }
-                delete db.adminInputSession[userId];
-                return ctx.reply('❌ Correct format: `USER_ID AMOUNT`');
-            }
-        }
-
-        if (db.sessions?.[userId]?.step === 'awaiting_deposit_amount' && !isMenuCommand(text)) {
-            const amountNum = Number(text);
-            const lang = getUserLang(userId);
-            if (isNaN(amountNum) || amountNum < 100) {
-                const errBox = lang === 'bn' ? "⚠️ ১০০ টাকার নিচে অ্যামাউন্ট অ্যাড হবে না। সর্বনিম্ন ১০০ বা তার বেশি দিতে হবে:" : "⚠️ Minimum deposit is 100 BDT:";
-                return ctx.reply(errBox, { parse_mode: 'Markdown' });
-            }
-            db.sessions[userId].depositAmount = amountNum;
-            db.sessions[userId].step = 'awaiting_deposit_proof';
-            saveDatabase(db);
-            const method = db.sessions[userId].method;
-            const targetNum = method === 'bKash' ? (db.numbers?.bkash || '01XXXXXXXXX') : (db.numbers?.nagad || '01XXXXXXXXX');
-            return ctx.reply(`📌 **${method} Official Number:** \`${targetNum}\`\n💵 **Amount:** \`${amountNum} BDT\`\n\n✍️ Send your TrxID or screenshot:`, { parse_mode: 'Markdown' });
-        }
-
-        if (db.sessions?.[userId]?.step === 'awaiting_deposit_proof' && !isMenuCommand(text)) {
-            const method = db.sessions[userId].method;
-            const amount = db.sessions[userId].depositAmount || 100;
-            const uniqueDepId = userId + '_' + Date.now();
-            const proofText = text || (ctx.message.photo ? '[Photo Attached]' : 'N/A');
-
-            if (!db.depositRequests) db.depositRequests = {};
-            db.depositRequests[uniqueDepId] = { userId, method, amount, proof: proofText };
-            saveDatabase(db);
-
-            const adminDepBox = `💰 **NEW DEPOSIT REQUEST**\n\n🆔 User ID: \`${userId}\`\n💳 Method: \`${method}\`\n💵 Amount: \`${amount} BDT\`\n📝 Proof: \`${proofText}\``;
-            if (ctx.message.photo) {
-                await bot.telegram.sendPhoto(ADMIN_ID, ctx.message.photo[ctx.message.photo.length - 1].file_id, {
-                    caption: adminDepBox, parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([[Markup.button.callback(`✅ Approve (+${amount} BDT)`, 'dep_app_' + uniqueDepId), Markup.button.callback('❌ Reject', 'dep_can_' + uniqueDepId)]])
-                }).catch(() => {});
-            } else {
-                await bot.telegram.sendMessage(ADMIN_ID, adminDepBox, {
-                    parse_mode: 'Markdown',
-                    ...Markup.inlineKeyboard([[Markup.button.callback(`✅ Approve (+${amount} BDT)`, 'dep_app_' + uniqueDepId), Markup.button.callback('❌ Reject', 'dep_can_' + uniqueDepId)]])
-                }).catch(() => {});
-            }
-
-            delete db.sessions[userId];
-            saveDatabase(db);
-            return ctx.reply("✨ Your deposit proof has been submitted to admin!", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
-        }
-
-        if (db.sessions?.[userId]?.step === 'awaiting_uid_only' && !isMenuCommand(text)) {
-            const uidText = text;
-            delete db.sessions[userId];
-            saveDatabase(db);
-            const resInfo = await checkFreeFireUID(uidText);
-            return ctx.reply(`🎮 **Player Info**\n\n👤 Name: \`${resInfo.nickname}\`\n🛡 UID: \`${uidText}\`\n❤️ Likes: \`${resInfo.likes}\`\n⭐ Level: \`${resInfo.level}\``, { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
 
         if (db.sessions?.[userId]?.step === 'awaiting_uid' && !isMenuCommand(text)) {
@@ -527,9 +439,6 @@ bot.on('message', async (ctx) => {
             cats.forEach((c, index) => {
                 inlineButtons.push([Markup.button.callback(c, 'custom_cat_' + index)]);
             });
-            if (userId === ADMIN_ID.toString()) {
-                inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
-            }
             inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
             return ctx.reply(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
         }
@@ -539,288 +448,129 @@ bot.on('message', async (ctx) => {
             saveDatabase(db);
             return ctx.reply(t(userId, 'checkUidPrompt'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
         }
-
-        if (lowerText.includes('add balance') || lowerText.includes('ব্যালেন্স অ্যাড') || lowerText.includes('ব্যালেন্স')) {
-            return ctx.reply(t(userId, 'depositPortal'), {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('💖 বিকাশ [bKash]', 'dep_bkash'), Markup.button.callback('🧡 নগদ [Nagad]', 'dep_nagad')],
-                    [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
-                ])
-            });
-        }
-
-        if (lowerText.includes('my profile') || lowerText.includes('আমার প্রোফাইল') || lowerText.includes('প্রোফাইল')) {
-            const lang = getUserLang(userId);
-            const langBtn = lang === 'en' ? '🌍 Change Language (EN)' : '🌍 Change Language (বাংলা)';
-            const userSubs = Object.values(db.subscriptions || {}).filter(s => s.userId === userId && s.remainingDays > 0);
-            let activeSubsText = userSubs.length > 0 ? `\n🔄 **Active Packages:** \`${userSubs.length} Running\`` : '';
-            return ctx.reply(`👤 **USER PROFILE**\n\n🆔 ID: \`${userId}\`\n👤 Name: \`${ctx.from.first_name}\`\n💰 Balance: \`৳${db.balances[userId] || 0}\`${activeSubsText}`, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback(langBtn, 'open_lang_menu')],
-                    [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
-                ])
-            });
-        }
-
-        if (lowerText.includes('order history') || lowerText.includes('অর্ডার হিস্ট্রি') || lowerText.includes('হিস্ট্রি')) {
-            const userHistories = db.orderHistories?.[userId]?.slice(0, 10) || [];
-            let historyText = t(userId, 'historyTitle');
-            if (userHistories.length === 0) {
-                historyText += t(userId, 'noHistory');
-            } else {
-                userHistories.forEach((h, i) => {
-                    historyText += `${i + 1}. 📦 **${h.product}** — \`${h.price} BDT\`\n   🛡️ UID: \`${h.uid}\` | 🕒 \`${h.time}\`\n\n`;
-                });
-            }
-            return ctx.reply(historyText + t(userId, 'historyDisclaimer'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
-        }
-
-        if (lowerText.includes('support desk') || lowerText.includes('সাপোর্ট ডেস্ক') || lowerText.includes('সাপোর্ট')) {
-            return ctx.reply(t(userId, 'supportText'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
-        }
-
-        if (lowerText.includes('calculator') || lowerText.includes('ক্যালকুলেটর')) {
-            db.calcStates[userId] = '0';
-            saveDatabase(db);
-            return ctx.reply("🧮 **Calculator**\n\nScreen: `0`", { parse_mode: 'Markdown', ...getCalcKeyboard() });
-        }
-
-        if (lowerText.includes('world clock') || lowerText.includes('ওয়ার্ল্ড ক্লক')) {
-            return ctx.reply("🌍 **World Clock & Date**\n\n👇 Select country:", {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('🇧🇩 Bangladesh', 'clock_bd'), Markup.button.callback('🇳🇵 Nepal', 'clock_np')],
-                    [Markup.button.callback('🇮🇳 India', 'clock_in'), Markup.button.callback('🇵🇰 Pakistan', 'clock_pk')],
-                    [Markup.button.callback('🇸🇦 Saudi Arabia', 'clock_sa'), Markup.button.callback('🇦🇪 Dubai (UAE)', 'clock_ae')],
-                    [Markup.button.callback('🇲🇾 Malaysia', 'clock_my'), Markup.button.callback('🇸🇬 Singapore', 'clock_sg')],
-                    [Markup.button.callback('🇺🇸 USA (NY)', 'clock_us'), Markup.button.callback('🇬🇧 UK (London)', 'clock_gb')],
-                    [Markup.button.callback('🇨🇦 Canada', 'clock_ca'), Markup.button.callback('🇦🇺 Australia', 'clock_au')],
-                    [Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
-                ])
-            });
-        }
     } catch (err) {}
 });
 
-bot.action('dep_bkash', async (ctx) => {
-    const userId = ctx.from.id.toString();
-    const db = loadDatabase();
-    db.sessions[userId] = { step: 'awaiting_deposit_amount', method: 'bKash' };
-    saveDatabase(db);
-    return ctx.editMessageText("💖 **bKash Deposit**\n\n💎 Minimum deposit is **100 BDT**.\n\n✍️ Enter your amount:", { parse_mode: 'Markdown' });
-});
-
-bot.action('dep_nagad', async (ctx) => {
-    const userId = ctx.from.id.toString();
-    const db = loadDatabase();
-    db.sessions[userId] = { step: 'awaiting_deposit_amount', method: 'Nagad' };
-    saveDatabase(db);
-    return ctx.editMessageText("🧡 **Nagad Deposit**\n\n💎 Minimum deposit is **100 BDT**.\n\n✍️ Enter your amount:", { parse_mode: 'Markdown' });
-});
-
-bot.action(/dep_app_(.+)/, async (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-    const db = loadDatabase(), info = db.depositRequests?.[ctx.match[1]];
-    if (info) {
-        const addAmt = Number(info.amount) || 100;
-        db.balances[info.userId] = (db.balances[info.userId] || 0) + addAmt;
-        saveDatabase(db);
-        await bot.telegram.sendMessage(info.userId, `✅ **Deposit Approved (+${addAmt} BDT)**`, { parse_mode: 'Markdown' }).catch(() => {});
-        delete db.depositRequests[ctx.match[1]];
-        saveDatabase(db);
-        await ctx.editMessageText('✅ **[DEPOSIT APPROVED]**');
-    }
-});
-
-bot.action(/dep_can_(.+)/, async (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-    const db = loadDatabase(), info = db.depositRequests?.[ctx.match[1]];
-    if (info) {
-        await bot.telegram.sendMessage(info.userId, "❌ Deposit request cancelled.", { parse_mode: 'Markdown' }).catch(() => {});
-        delete db.depositRequests[ctx.match[1]];
-        saveDatabase(db);
-        await ctx.editMessageText('❌ **[DEPOSIT REJECTED]**');
-    }
-});
-
-bot.action('open_lang_menu', async (ctx) => {
-    await ctx.editMessageText("🌐 **Select Language:**", {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🇧🇩 বাংলা', 'set_lang_bn'), Markup.button.callback('🇬🇧 English', 'set_lang_en')],
-            [Markup.button.callback('🔙 Back', 'back_to_profile')]
-        ])
-    });
-});
-
-bot.action(/set_lang_(bn|en)/, async (ctx) => {
-    const userId = ctx.from.id.toString();
-    const lang = ctx.match[1];
-    const db = loadDatabase();
-    if (!db.userLang) db.userLang = {};
-    db.userLang[userId] = lang;
-    saveDatabase(db);
-    await ctx.answerCbQuery(lang === 'bn' ? 'বাংলা সেট করা হয়েছে!' : 'English selected!');
-    try { await ctx.deleteMessage(); } catch (e) {}
-    return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
-});
-
-bot.action(/calc_(.+)/, async (ctx) => {
+bot.action('shop_now_back', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
-        const val = ctx.match[1].trim();
-        if (!cachedDb.calcStates) cachedDb.calcStates = {};
-        let current = cachedDb.calcStates[userId] || '0';
-
-        if (val === 'C') { current = '0'; } 
-        else if (val === 'DEL') { current = current.length > 1 ? current.slice(0, -1) : '0'; } 
-        else if (val === 'EQ') {
-            try { 
-                const sanitized = current.replace(/[^0-9+\-*/().]/g, '');
-                current = sanitized ? String(Function('"use strict";return (' + sanitized + ')')()) : '0';
-            } catch (e) { current = 'Error'; }
-        } else {
-            current = (current === '0' || current === 'Error') ? ((val === '.') ? '0.' : val) : (current + val);
-        }
-        cachedDb.calcStates[userId] = current;
-        await ctx.editMessageText(`🧮 **Calculator**\n\nScreen: \`${current}\``, { parse_mode: 'Markdown', ...getCalcKeyboard() });
+        const db = loadDatabase();
+        let inlineButtons = [];
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        cats.forEach((c, index) => {
+            inlineButtons.push([Markup.button.callback(c, 'custom_cat_' + index)]);
+        });
+        inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
+        await ctx.editMessageText(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
 });
 
-bot.action(/clock_(bd|np|in|pk|sa|ae|my|sg|us|gb|ca|au)/, async (ctx) => {
+bot.action(/custom_cat_(.+)/, async (ctx) => {
     try {
+        const catIdx = parseInt(ctx.match[1]);
         const userId = ctx.from.id.toString();
-        const tzMap = { bd: 'Asia/Dhaka', np: 'Asia/Kathmandu', in: 'Asia/Kolkata', pk: 'Asia/Karachi', sa: 'Asia/Riyadh', ae: 'Asia/Dubai', my: 'Asia/Kuala_Lumpur', sg: 'Asia/Singapore', us: 'America/New_York', gb: 'Europe/London', ca: 'America/Toronto', au: 'Australia/Sydney' };
-        const now = new Date();
-        const selectedKey = ctx.match[1];
-        const timeStr = now.toLocaleTimeString('en-US', { timeZone: tzMap[selectedKey] });
-        const dateStr = now.toLocaleDateString('en-GB', { timeZone: tzMap[selectedKey], weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+        const db = loadDatabase();
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
+        if (!catName) return;
 
-        await ctx.editMessageText(`🌍 **World Clock & Date**\n\n📅 Date: \`${dateStr}\`\n🕒 Time: \`${timeStr}\``, {
+        let inlineButtons = [];
+        (db.customProducts?.[catName] || []).forEach((p, index) => {
+            inlineButtons.push([Markup.button.callback(p.name, `sub_prod_idx_${catIdx}_${index}`)]);
+        });
+        inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
+        await ctx.editMessageText(`📂 **${catName}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
+    } catch (e) {}
+});
+
+bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
+    try {
+        const catIdx = parseInt(ctx.match[1]);
+        const index = parseInt(ctx.match[2]);
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
+        const catName = cats[catIdx];
+        const prod = db.customProducts[catName]?.[index] || { name: 'Package' };
+
+        let price = 0;
+        const allNums = prod.name.match(/\d+/g);
+        if (allNums && allNums.length > 0) {
+            price = Number(allNums[allNums.length - 1]);
+        }
+
+        const lowerProd = prod.name.toLowerCase();
+        let actionType = 'like';
+        let productCode = '';
+        let totalDays = 1;
+
+        // 🔧 ফিক্সড এপিআই ম্যাপিং লজিক
+        if (lowerProd.includes('6600')) {
+            actionType = 'auto';
+            productCode = 'AL-55F71F';
+            totalDays = 30;
+        } else if (lowerProd.includes('3300')) {
+            actionType = 'auto';
+            productCode = 'AL-3300';
+            totalDays = 15;
+        } else if (lowerProd.includes('1100')) {
+            actionType = 'auto';
+            productCode = 'AL-1100';
+            totalDays = 5;
+        } else {
+            actionType = 'like'; 
+            productCode = '';
+            totalDays = 1;
+        }
+
+        db.sessions[userId] = { 
+            product: prod.name, 
+            price, 
+            catIdx, 
+            totalDays,
+            actionType,
+            productCode,
+            isFFLikes: true
+        };
+        saveDatabase(db);
+
+        await ctx.editMessageText(t(userId, 'serverTitle') + `\`${prod.name}\`\n💵 Price: \`${price} BDT\`\n\n👇 Select Server:`, {
             parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'backBtn'), 'back_to_clock'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🇧🇩 BD', 'region_bd'), Markup.button.callback('🇮🇩 ID', 'region_id')],
+                [Markup.button.callback(t(userId, 'backBtn'), 'custom_cat_' + catIdx), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
+            ])
         });
     } catch (e) {}
 });
 
-bot.action('back_to_clock', async (ctx) => {
-    await ctx.editMessageText("🌍 **World Clock & Date**\n\n👇 Select country:", {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🇧🇩 Bangladesh', 'clock_bd'), Markup.button.callback('🇳🇵 Nepal', 'clock_np')],
-            [Markup.button.callback('🇮🇳 India', 'clock_in'), Markup.button.callback('🇵🇰 Pakistan', 'clock_pk')],
-            [Markup.button.callback('🇸🇦 Saudi Arabia', 'clock_sa'), Markup.button.callback('🇦🇪 Dubai (UAE)', 'clock_ae')],
-            [Markup.button.callback('🇲🇾 Malaysia', 'clock_my'), Markup.button.callback('🇸🇬 Singapore', 'clock_sg')],
-            [Markup.button.callback('🇺🇸 USA (NY)', 'clock_us'), Markup.button.callback('🇬🇧 UK (London)', 'clock_gb')],
-            [Markup.button.callback('🇨🇦 Canada', 'clock_ca'), Markup.button.callback('🇦🇺 Australia', 'clock_au')],
-            [Markup.button.callback('🔙 Main Menu 🏠', 'back_start_inline')]
-        ])
-    });
-});
-
-bot.action('shop_now_back', async (ctx) => {
-    const userId = ctx.from.id.toString();
-    const db = loadDatabase();
-    let inlineButtons = [];
-    const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
-    cats.forEach((c, index) => {
-        inlineButtons.push([Markup.button.callback(c, 'custom_cat_' + index)]);
-    });
-    if (userId === ADMIN_ID.toString()) {
-        inlineButtons.push([Markup.button.callback('➕ Create New Category', 'admin_create_cat')]);
-    }
-    inlineButtons.push([Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
-    await ctx.editMessageText(t(userId, 'shopMenuTitle'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
-});
-
-bot.action('admin_create_cat', async (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_ID.toString()) return;
-    const db = loadDatabase();
-    db.adminInputSession[ADMIN_ID] = { type: 'add_category' };
-    saveDatabase(db);
-    await ctx.editMessageText('✍️ Enter new category name:', { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Cancel', 'shop_now_back')]]) });
-});
-
-bot.action(/custom_cat_(.+)/, async (ctx) => {
-    const catIdx = parseInt(ctx.match[1]);
-    const userId = ctx.from.id.toString();
-    const db = loadDatabase();
-    const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
-    const catName = cats[catIdx];
-    if (!catName) return;
-
-    let inlineButtons = [];
-    (db.customProducts?.[catName] || []).forEach((p, index) => {
-        inlineButtons.push([Markup.button.callback(p.name, `sub_prod_idx_${catIdx}_${index}`)]);
-    });
-    inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
-    await ctx.editMessageText(`📂 **${catName}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
-});
-
-bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
-    const catIdx = parseInt(ctx.match[1]);
-    const index = parseInt(ctx.match[2]);
-    const userId = ctx.from.id.toString();
-    const db = loadDatabase();
-    const cats = Array.isArray(db.categories) ? db.categories : Object.keys(db.categories || {});
-    const catName = cats[catIdx];
-    const prod = db.customProducts[catName]?.[index] || { name: 'Package' };
-
-    let price = 0;
-    const allNums = prod.name.match(/\d+/g);
-    if (allNums && allNums.length > 0) price = Number(allNums[allNums.length - 1]);
-
-    const lowerProd = prod.name.toLowerCase();
-    let actionType = 'like';
-    let productCode = '';
-    let totalDays = 1;
-
-    if (lowerProd.includes('6600')) {
-        actionType = 'auto'; productCode = 'AL-55F71F'; totalDays = 30;
-    } else if (lowerProd.includes('3300')) {
-        actionType = 'auto'; productCode = 'AL-3300'; totalDays = 15;
-    } else if (lowerProd.includes('1100')) {
-        actionType = 'auto'; productCode = 'AL-1100'; totalDays = 5;
-    } else {
-        actionType = 'like'; productCode = ''; totalDays = 1;
-    }
-
-    db.sessions[userId] = { product: prod.name, price, catIdx, totalDays, actionType, productCode, isFFLikes: true };
-    saveDatabase(db);
-
-    await ctx.editMessageText(t(userId, 'serverTitle') + `\`${prod.name}\`\n💵 Price: \`${price} BDT\`\n\n👇 Select Server:`, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-            [Markup.button.callback('🇧🇩 BD', 'region_bd'), Markup.button.callback('🇮🇩 ID', 'region_id')],
-            [Markup.button.callback(t(userId, 'backBtn'), 'custom_cat_' + catIdx), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
-        ])
-    });
-});
-
 bot.action(/region_(bd|id)/, async (ctx) => {
-    const userId = ctx.from.id.toString(), region = ctx.match[1].toUpperCase();
-    const db = loadDatabase();
-    const session = db.sessions?.[userId];
-    if (session) {
-        session.region = region;
-        session.step = 'awaiting_uid';
-        saveDatabase(db);
-    }
-    await ctx.editMessageText(`🎮 **Enter UID (${region})**\n\n✍️ Please type and send your UID:`, {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'backBtn'), 'custom_cat_' + (session?.catIdx || 0)), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
-    });
+    try {
+        const userId = ctx.from.id.toString(), region = ctx.match[1].toUpperCase();
+        const db = loadDatabase();
+        const session = db.sessions?.[userId];
+        if (session) {
+            session.region = region;
+            session.step = 'awaiting_uid';
+            saveDatabase(db);
+        }
+        await ctx.editMessageText(`🎮 **Enter UID (${region})**\n\n✍️ Please type and send your UID:`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'backBtn'), 'custom_cat_' + (session?.catIdx || 0)), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+        });
+    } catch (e) {}
 });
 
 bot.action('cancel_order_review', async (ctx) => {
-    const userId = ctx.from.id.toString();
-    const db = loadDatabase();
-    if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
-    await ctx.editMessageText("❌ **Order Cancelled**", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
+    try {
+        const userId = ctx.from.id.toString();
+        const db = loadDatabase();
+        if (db.sessions?.[userId]) { delete db.sessions[userId]; saveDatabase(db); }
+        await ctx.editMessageText("❌ **Order Cancelled**", { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]]) });
+    } catch (e) {}
 });
 
+// 🔧 ফিক্সড অর্ডার কনফার্মেশন ও রিয়েল-টাইম লাইক কাউন্টিং লজিক
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -852,6 +602,8 @@ bot.action('confirm_order', async (ctx) => {
 
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+            
+            // ৩৫ সেকেন্ড ওয়েটিং টাইম যাতে সার্ভারে লাইক আপডেট হয়
             await new Promise(r => setTimeout(r, 35000));
 
             const postCheck = await checkFreeFireUID(session.uid);
@@ -864,9 +616,17 @@ bot.action('confirm_order', async (ctx) => {
                 const remainingDays = totalDays - 1;
                 const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
                 db.subscriptions[subId] = {
-                    userId, uid: session.uid, nickname: session.nickname || 'Unknown',
-                    region: session.region, product: session.product, actionType: session.actionType,
-                    productCode: session.productCode, totalDays, deliveredDays: 1, remainingDays, lastDeliveredDate: getTodayDateBD()
+                    userId: userId,
+                    uid: session.uid,
+                    nickname: session.nickname || 'Unknown',
+                    region: session.region,
+                    product: session.product,
+                    actionType: session.actionType,
+                    productCode: session.productCode,
+                    totalDays: totalDays,
+                    deliveredDays: 1,
+                    remainingDays: remainingDays,
+                    lastDeliveredDate: getTodayDateBD()
                 };
                 subStatusText = `\n📅 **Subscription:** \`Day 1 of total ${totalDays} (${remainingDays} Days Auto-Remaining)\``;
             }
@@ -894,8 +654,14 @@ bot.action('confirm_order', async (ctx) => {
         } else {
             const uniqueOrderId = userId + '_' + Date.now();
             db.adminSessions[uniqueOrderId] = {
-                targetUserId: userId, loadingMessageId: procMsgId, product: session.product,
-                uid: session.uid, nickname: session.nickname || 'Unknown', region: session.region, price: session.price, isFFLikeCategory: true
+                targetUserId: userId,
+                loadingMessageId: procMsgId,
+                product: session.product,
+                uid: session.uid,
+                nickname: session.nickname || 'Unknown',
+                region: session.region,
+                price: session.price,
+                isFFLikeCategory: true
             };
             saveDatabase(db);
 
