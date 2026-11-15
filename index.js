@@ -226,7 +226,8 @@ async function processDailySubscriptions() {
             const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
 
             if (apiRes.success) {
-                await new Promise(r => setTimeout(r, 3000));
+                // 🔥 সাবস্ক্রিপশন ডেইলি ডেলিভারির জন্য ৩৫ সেকেন্ড (35000ms) হিউজ ওয়েটিং ডিলে
+                await new Promise(r => setTimeout(r, 35000));
                 const postCheck = await checkFreeFireUID(sub.uid);
                 const currLikes = postCheck.likes || prevLikes;
                 const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : 0;
@@ -1646,7 +1647,6 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         const isFFLikes = lowerCatName.includes('like') || lowerCatName.includes('লাইক') || catName.includes('🔥');
         const totalDays = extractPackageDays(prod.name);
 
-        // 🔥 সুনির্দিষ্টভাবে এপিআই অ্যাকশন ও প্রডাক্ট কোড নির্ধারণ করা হলো
         let actionType = 'like';
         let productCode = '';
         const lowerProdName = prod.name.toLowerCase();
@@ -1661,7 +1661,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
             actionType = 'auto';
             productCode = 'AL-1100';
         } else {
-            actionType = 'like'; // ২২০ লাইক বা অন্যান্য ইনস্ট্যান্ট লাইক
+            actionType = 'like'; 
             productCode = '';
         }
 
@@ -1753,7 +1753,6 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        // ১০০ লাইক ম্যানুয়াল থাকবে
         const isManualPackage = lowerProd.includes('100');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
@@ -1762,7 +1761,6 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled) {
             let apiParams = {};
             
-            // 🔥 সেশন থেকে সরাসরি সঠিক action এবং product কোড নিয়ে রিকোয়েস্ট পাঠানো হচ্ছে
             if (session.actionType === 'auto' && session.productCode) {
                 apiParams = { action: 'auto', product: session.productCode, uid: session.uid, server: session.region };
             } else {
@@ -1775,7 +1773,8 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             
-            await new Promise(r => setTimeout(r, 3000));
+            // 🔥 ইনস্ট্যান্ট অর্ডার ডেলিভারির জন্য ৩৫ সেকেন্ড (35000ms) হিউজ ওয়েটিং ডিলে
+            await new Promise(r => setTimeout(r, 35000));
 
             const postCheck = await checkFreeFireUID(session.uid);
             const prevLikes = session.initialLikes || 0;
