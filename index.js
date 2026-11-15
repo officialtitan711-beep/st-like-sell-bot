@@ -876,10 +876,9 @@ bot.on('message', async (ctx) => {
                 session.initialLikes = resInfo.likes;
                 saveDatabase(db);
 
-                // 🔥 অর্ডার কনফার্মেশন স্ক্রিনে এপিআই টাইপ ও প্রোডাক্ট কোডের স্পষ্ট ডিসপ্লে যোগ করা হলো
                 let apiInfoLine = session.actionType === 'auto' 
-                    ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`[span_0](start_span)[span_0](end_span)\n🏷️ **Product Code:** \`${session.productCode}\`[span_1](start_span)[span_1](end_span)`
-                    : `⚡ **API Type:** \`Instant (action=like)\`[span_2](start_span)[span_2](end_span)`;
+                    ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`\n🏷️ **Product Code:** \`${session.productCode}\``
+                    : `⚡ **API Type:** \`Instant (action=like)\``;
 
                 const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n${apiInfoLine}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n❤️ **Current Likes:** \`${resInfo.likes}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
@@ -1738,6 +1737,7 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
+// 🔥 ৩ বার অটো-রিট্রাই লজিকসহ আপডেটকৃত কনফার্ম অর্ডার ফাংশন
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1771,7 +1771,18 @@ bot.action('confirm_order', async (ctx) => {
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
-            apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
+            // 🔥 ৩ বার পর্যন্ত অটো-রিট্রাই লজিক (কনফার্ম না হওয়া পর্যন্ত লোডিঙেই থাকবে, কোনো হাবিজাবি টেক্সট দেখাবে না)
+            let retryCount = 0;
+            const maxRetries = 3;
+
+            while (retryCount < maxRetries && !apiRes.success) {
+                retryCount++;
+                apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
+                
+                if (!apiRes.success && retryCount < maxRetries) {
+                    await new Promise(r => setTimeout(r, 5000));
+                }
+            }
         }
 
         if (isAutoEnabled && apiRes.success) {
@@ -1850,7 +1861,7 @@ bot.action('confirm_order', async (ctx) => {
             };
             saveDatabase(db);
 
-            await bot.telegram.sendMessage(ADMIN_ID, `⚠️ API Failed / Fallback Order (Manual Needed)\n\n📦 Package: \`${session.product}\` (${totalDays} Days)\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
+            await bot.telegram.sendMessage(ADMIN_ID, `⚠️ API Failed / Fallback Order (Manual Needed after 3 Retries)\n\n📦 Package: \`${session.product}\` (${totalDays} Days)\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
