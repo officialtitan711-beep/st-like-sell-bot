@@ -1650,6 +1650,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         let productCode = '';
         const lowerProdName = prod.name.toLowerCase();
 
+        // 🔥 একদম নিরাপদ ও নির্ভুল এপিআই ম্যাপিং (কাস্টমার সুন্দর নাম দেখতে পাবে, এপিআই সঠিক কোড রিড করবে)
         if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন')) {
             actionType = 'auto';
             productCode = 'AL-55F71F';
@@ -1659,6 +1660,12 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         } else if (lowerProdName.includes('1100') || lowerProdName.includes('৫ দিন')) {
             actionType = 'auto';
             productCode = 'AL-1100';
+        } else if (lowerProdName.includes('220') || lowerProdName.includes('২২০')) {
+            actionType = 'like'; // 220 Likes = Instant Action (action=like)
+            productCode = '';
+        } else if (lowerProdName.includes('100') || lowerProdName.includes('১০০')) {
+            actionType = 'like'; // 100 Likes = Manual / Instant Like
+            productCode = '';
         } else {
             actionType = 'like'; 
             productCode = '';
@@ -1752,7 +1759,6 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        // 🔥 ফিক্সড: শুধুমাত্র ১০০ লাইক বাদে বাকি সব ডেইলি/অটো প্যাকেজ সরাসরি এপিআইতে হিট করবে
         const isManualPackage = lowerProd.includes('100') && !lowerProd.includes('1100') && !lowerProd.includes('3300') && !lowerProd.includes('6600');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
@@ -1772,7 +1778,7 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             
-            // 🔥 রিয়াল-টাইম লাইক আপডেট নিখুঁতভাবে দেখানোর জন্য ৩৫ সেকেন্ড ওয়েটিং টাইম
+            // 🔥 রিয়াল-টাইম লাইক কাউন্টের জন্য ৩৫ সেকেন্ড অপেক্ষা
             await new Promise(r => setTimeout(r, 35000));
 
             const postCheck = await checkFreeFireUID(session.uid);
