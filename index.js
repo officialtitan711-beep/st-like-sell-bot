@@ -27,11 +27,11 @@ let cachedDb = {
     categories: ['🔥 Free Fire Likes ❤️‍🔥'], 
     customProducts: { 
         '🔥 Free Fire Likes ❤️‍🔥': [
-            { name: '100 LIKE' },
-            { name: '220 LIKE' },
-            { name: '1100 LIKE (AUTO)' },
-            { name: '3300 LIKE (AUTO)' },
-            { name: '6600 LIKE (AUTO)' }
+            { name: '100 LIKE (INSTANT) - ৳5' },
+            { name: '220 LIKE (INSTANT) - ৳10' },
+            { name: '1100 LIKE (5 Days Auto) - ৳50' },
+            { name: '3300 LIKE (15 Days Auto) - ৳150' },
+            { name: '6600 LIKE (30 Days Auto) - ৳300' }
         ]
     }, 
     subscriptions: {}, 
@@ -116,12 +116,13 @@ function saveDatabase(data) {
 syncDataFromFirebase();
 setInterval(syncDataFromFirebase, 5 * 60 * 1000);
 
-// 🔥 এপিআই রিকোয়েস্ট এবং রেসপন্স হ্যান্ডলিং একদম সহজ ও রিলায়েবল করা হলো
+// 🔥 রাইজেন এপিআই রেসপন্স হ্যান্ডলিং ও সঠিক জাস্টিফিকেশন ফিক্স করা হলো
 function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
     return new Promise((resolve) => {
         const queryParams = new URLSearchParams({ key: API_KEY, ...params });
         const url = `${API_BASE}?${queryParams.toString()}`;
         let isFinished = false;
+        
         const req = https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }, (res) => {
             let data = '';
             res.on('data', (chunk) => { data += chunk; });
@@ -130,7 +131,14 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
                 isFinished = true;
                 try { 
                     const parsed = JSON.parse(data);
-                    resolve({ success: true, ...parsed });
+                    // রাইজানের এপিআই থেকে রেসপন্স সফল আসলে যেন সেটি সঠিকভাবে ধরা পড়ে
+                    if (parsed && (parsed.status === 'success' || parsed.success === true || parsed.order_id || parsed.message)) {
+                        resolve({ success: true, ...parsed });
+                    } else if (parsed && (parsed.error || parsed.status === 'error')) {
+                        resolve({ success: false, error: parsed.error || 'API Error' });
+                    } else {
+                        resolve({ success: true, ...parsed });
+                    }
                 } catch (err) { 
                     if (data && data.length > 0) {
                         resolve({ success: true, raw: data });
@@ -140,6 +148,7 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
                 }
             });
         });
+        
         req.on('error', () => { if (!isFinished) { isFinished = true; resolve({ success: false, error: 'Failed' }); } });
         setTimeout(() => { if (!isFinished) { isFinished = true; req.destroy(); resolve({ success: false, error: 'Timeout' }); } }, timeoutMs);
     });
@@ -1737,7 +1746,7 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
-// 🔥 ৩ বার অটো-রিট্রাই লজিকসহ আপডেটকৃত কনফার্ম অর্ডার ফাংশন
+// 🔥 রাইজেন এপিআই রিকোয়েস্ট হিট এবং অর্ডার কনফার্মেশন লজিক পারফেক্ট করা হলো
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1766,12 +1775,14 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled) {
             let apiParams = {};
             if (session.actionType === 'auto' && session.productCode) {
+                // অটো সাবস্ক্রিপশনের জন্য সঠিক প্যারামিটার
                 apiParams = { action: 'auto', product: session.productCode, uid: session.uid, server: session.region };
             } else {
+                // ইনস্ট্যান্ট লাইকের জন্য রাইজেন এপিআই-এর সঠিক প্যারামিটার নিয়ম
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
-            // 🔥 ৩ বার পর্যন্ত অটো-রিট্রাই লজিক (কনফার্ম না হওয়া পর্যন্ত লোডিঙেই থাকবে, কোনো হাবিজাবি টেক্সট দেখাবে না)
+            // 🔥 ৩ বার পর্যন্ত অটো-রিট্রাই লজিক
             let retryCount = 0;
             const maxRetries = 3;
 
@@ -1924,7 +1935,7 @@ const server = http.createServer((req, res) => {
     try {
         if (req.url === webhookPath && req.method === 'POST') {
             return bot.webhookCallback(webhookPath)(req, res, (err) => {
-                if (err) {
+                if, (err) {
                     console.error("Webhook Handling Error:", err.message);
                 }
             });
