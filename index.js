@@ -1727,7 +1727,7 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        // ১০০ লাইক বাদে ২২০ লাইক এবং অন্যান্য সব প্যাকেজ সরাসরি এপিআইতে হিট করবে
+        // ১০০ লাইক ম্যানুয়াল থাকবে, বাকি ২২০ লাইক এবং সাবস্ক্রিপশন অটো এপিআইতে যাবে
         const isManualPackage = lowerProd.includes('100');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
@@ -1735,7 +1735,7 @@ bot.action('confirm_order', async (ctx) => {
         let apiRes = { success: false };
         if (isAutoEnabled) {
             let apiParams = {};
-            // ব্যাকএন্ড সরাসরি নাম বা সংখ্যা চেক করবে (বাটনের লেখা বা ফরম্যাট এখানে কোনো প্রভাব ফেলবে না)
+            // রিসেলার প্যানেলের সঠিক নিয়ম অনুযায়ী প্যারামিটার সেট করা হলো
             if (lowerProd.includes('6600') || lowerProd.includes('৩০ দিন')) {
                 apiParams = { action: 'auto', product: 'AL-55F71F', uid: session.uid, server: session.region };
             } else if (lowerProd.includes('3300') || lowerProd.includes('১৫ দিন')) {
@@ -1743,7 +1743,7 @@ bot.action('confirm_order', async (ctx) => {
             } else if (lowerProd.includes('1100') || lowerProd.includes('৫ দিন')) {
                 apiParams = { action: 'auto', product: 'AL-1100', uid: session.uid, server: session.region };
             } else {
-                // ২২০ লাইক বা অন্যান্য ইনস্ট্যান্ট প্যাকেজের জন্য সঠিক action: 'like'
+                // ২২০ লাইকের জন্য সঠিক action: 'like' এবং কোনো প্রডাক্ট কোড পাঠানো যাবে না
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
