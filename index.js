@@ -28,7 +28,7 @@ let cachedDb = {
     customProducts: { 
         '🔥 Free Fire Likes ❤️‍🔥': [
             { name: '100 LIKE - 5৳ [ DAILY ]' },
-            { name: '220 LIKE - 7৳ [ INSTANT ]' },
+            { name: '220 LIKE - 7৳ [ DAILY ]' },
             { name: '1100 LIKE - 50৳ [ 5 DAYS ] ( AUTO ) 🚀⚡' },
             { name: '3300 LIKE - 150৳ [ 15 DAYS ] ( AUTO ) 🚀⚡' },
             { name: '6600 LIKE - 300৳ [ 30 DAYS ] ( AUTO ) 🚀⚡' }
@@ -1752,8 +1752,8 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        // 🔥 ফিক্সড: শুধুমাত্র ১০০ লাইক (ডেইলিরটি) ম্যানুয়াল থাকবে। ২২০ লাইক বা অটো প্যাকেজগুলো কখনোই ম্যানুয়ালে যাবে না, সরাসরি এপিআইতে হিট করবে।
-        const isManualPackage = lowerProd.includes('100') && !lowerProd.includes('220') && !lowerProd.includes('1100');
+        // 🔥 ফিক্সড: শুধুমাত্র ১০০ লাইক ম্যানুয়াল থাকবে। ২২০ লাইক বা অন্য অটো প্যাকেজগুলো সরাসরি এপিআইতে হিট করবে।
+        const isManualPackage = lowerProd.includes('100') && !lowerProd.includes('220');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
         
