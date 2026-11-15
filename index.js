@@ -226,7 +226,6 @@ async function processDailySubscriptions() {
             const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
 
             if (apiRes.success) {
-                // 🔥 ডেইলি সাবস্ক্রিপশনের ক্ষেত্রেও টাইম বাড়িয়ে ৩৫ সেকেন্ড করা হলো
                 await new Promise(r => setTimeout(r, 35000));
                 const postCheck = await checkFreeFireUID(sub.uid);
                 const currLikes = postCheck.likes || prevLikes;
@@ -1753,7 +1752,8 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        const isManualPackage = lowerProd.includes('100');
+        // 🔥 ফিক্সড: শুধুমাত্র ১০০ লাইক বাদে বাকি সব ডেইলি/অটো প্যাকেজ সরাসরি এপিআইতে হিট করবে
+        const isManualPackage = lowerProd.includes('100') && !lowerProd.includes('1100') && !lowerProd.includes('3300') && !lowerProd.includes('6600');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
         
@@ -1772,7 +1772,7 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             
-            // 🔥 এখানে টাইম ৫ সেকেন্ডের পরিবর্তে ৩৫ সেকেন্ড (`35000`) করে দেওয়া হলো যাতে রিয়াল-টাইম লাইক আপডেট নিখুঁতভাবে আসে
+            // 🔥 রিয়াল-টাইম লাইক আপডেট নিখুঁতভাবে দেখানোর জন্য ৩৫ সেকেন্ড ওয়েটিং টাইম
             await new Promise(r => setTimeout(r, 35000));
 
             const postCheck = await checkFreeFireUID(session.uid);
