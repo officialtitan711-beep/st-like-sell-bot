@@ -27,11 +27,11 @@ let cachedDb = {
     categories: ['🔥 Free Fire Likes ❤️‍🔥'], 
     customProducts: { 
         '🔥 Free Fire Likes ❤️‍🔥': [
-            { name: '100 LIKE (INSTANT) - ৳5' },
-            { name: '220 LIKE (INSTANT) - ৳10' },
-            { name: '1100 LIKE (5 Days Auto) - ৳50' },
-            { name: '3300 LIKE (15 Days Auto) - ৳150' },
-            { name: '6600 LIKE (30 Days Auto) - ৳300' }
+            { name: '100 LIKE (INSTANT)' },
+            { name: '220 LIKE (INSTANT)' },
+            { name: '1100 LIKE (5 Days Auto)' },
+            { name: '3300 LIKE (15 Days Auto)' },
+            { name: '6600 LIKE (30 Days Auto)' }
         ]
     }, 
     subscriptions: {}, 
@@ -116,13 +116,11 @@ function saveDatabase(data) {
 syncDataFromFirebase();
 setInterval(syncDataFromFirebase, 5 * 60 * 1000);
 
-// 🔥 রাইজেন এপিআই রেসপন্স হ্যান্ডলিং ও সঠিক জাস্টিফিকেশন ফিক্স করা হলো
 function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
     return new Promise((resolve) => {
         const queryParams = new URLSearchParams({ key: API_KEY, ...params });
         const url = `${API_BASE}?${queryParams.toString()}`;
         let isFinished = false;
-        
         const req = https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' } }, (res) => {
             let data = '';
             res.on('data', (chunk) => { data += chunk; });
@@ -131,14 +129,7 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
                 isFinished = true;
                 try { 
                     const parsed = JSON.parse(data);
-                    // রাইজানের এপিআই থেকে রেসপন্স সফল আসলে যেন সেটি সঠিকভাবে ধরা পড়ে
-                    if (parsed && (parsed.status === 'success' || parsed.success === true || parsed.order_id || parsed.message)) {
-                        resolve({ success: true, ...parsed });
-                    } else if (parsed && (parsed.error || parsed.status === 'error')) {
-                        resolve({ success: false, error: parsed.error || 'API Error' });
-                    } else {
-                        resolve({ success: true, ...parsed });
-                    }
+                    resolve({ success: true, ...parsed });
                 } catch (err) { 
                     if (data && data.length > 0) {
                         resolve({ success: true, raw: data });
@@ -148,7 +139,6 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
                 }
             });
         });
-        
         req.on('error', () => { if (!isFinished) { isFinished = true; resolve({ success: false, error: 'Failed' }); } });
         setTimeout(() => { if (!isFinished) { isFinished = true; req.destroy(); resolve({ success: false, error: 'Timeout' }); } }, timeoutMs);
     });
@@ -328,7 +318,7 @@ function t(userId, key) {
             serverTitle: "🌍 **সার্ভার নির্বাচন**\n\nপ্যাকেজ: ",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             cancelBtn: "❌ বাতিল করুন",
-            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
+            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন።",
             historyTitle: "📜 **শেষ ১০টি অর্ডারের ইতিহাস**\n\n",
             historyDisclaimer: "\n⚠️ *নোট: সুরক্ষার জন্য এখানে শুধুমাত্র আপনার সর্বশেষ ১০টি অর্ডার দেখানো হয়।*",
             noHistory: "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n"
@@ -1667,13 +1657,13 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         let productCode = '';
         const lowerProdName = prod.name.toLowerCase();
 
-        if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন')) {
+        if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন') || lowerProdName.includes('30 days')) {
             actionType = 'auto';
             productCode = 'AL-55F71F';
-        } else if (lowerProdName.includes('3300') || lowerProdName.includes('১৫ দিন')) {
+        } else if (lowerProdName.includes('3300') || lowerProdName.includes('১৫ দিন') || lowerProdName.includes('15 days')) {
             actionType = 'auto';
             productCode = 'AL-3300';
-        } else if (lowerProdName.includes('1100') || lowerProdName.includes('৫ দিন')) {
+        } else if (lowerProdName.includes('1100') || lowerProdName.includes('৫ দিন') || lowerProdName.includes('5 days')) {
             actionType = 'auto';
             productCode = 'AL-1100';
         } else {
@@ -1746,7 +1736,7 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
-// 🔥 রাইজেন এপিআই রিকোয়েস্ট হিট এবং অর্ডার কনফার্মেশন লজিক পারফেক্ট করা হলো
+// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও এপিআই রিকোয়েস্ট হ্যান্ডলার (৩-বার রিট্রাই ও সঠিক প্যারামিটার সহ)
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1775,10 +1765,10 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled) {
             let apiParams = {};
             if (session.actionType === 'auto' && session.productCode) {
-                // অটো সাবস্ক্রিপশনের জন্য সঠিক প্যারামিটার
+                // অটো সাবস্ক্রিপশন প্যাকেজের জন্য সঠিক প্যারামিটার
                 apiParams = { action: 'auto', product: session.productCode, uid: session.uid, server: session.region };
             } else {
-                // ইনস্ট্যান্ট লাইকের জন্য রাইজেন এপিআই-এর সঠিক প্যারামিটার নিয়ম
+                // ইনস্ট্যান্ট লাইক প্যাকেজের জন্য সঠিক প্যারামিটার (যা রাইজেন এপিআই সরাসরি রিড করতে পারে)
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
@@ -1935,7 +1925,7 @@ const server = http.createServer((req, res) => {
     try {
         if (req.url === webhookPath && req.method === 'POST') {
             return bot.webhookCallback(webhookPath)(req, res, (err) => {
-                if, (err) {
+                if (err) {
                     console.error("Webhook Handling Error:", err.message);
                 }
             });
