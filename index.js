@@ -28,7 +28,7 @@ let cachedDb = {
     customProducts: { 
         '🔥 Free Fire Likes ❤️‍🔥': [
             { name: '100 LIKE - 5৳ [ DAILY ]' },
-            { name: '220 LIKE - 7৳ [ DAILY ]' },
+            { name: '220 LIKE - 7৳ [ INSTANT ]' },
             { name: '1100 LIKE - 50৳ [ 5 DAYS ] ( AUTO ) 🚀⚡' },
             { name: '3300 LIKE - 150৳ [ 15 DAYS ] ( AUTO ) 🚀⚡' },
             { name: '6600 LIKE - 300৳ [ 30 DAYS ] ( AUTO ) 🚀⚡' }
@@ -1592,7 +1592,7 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
         const catName = cats[catIdx];
         if (!catName) return;
 
-    let inlineButtons = [];
+        let inlineButtons = [];
         (db.customProducts?.[catName] || []).forEach((p, idx) => {
             let row = [Markup.button.callback(translateProductName(p.name, userId), `sub_prod_idx_${catIdx}_${idx}`)];
             if (userId === ADMIN_ID.toString()) {
@@ -1650,6 +1650,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         let productCode = '';
         const lowerProdName = prod.name.toLowerCase();
 
+        // 🔥 স্ক্রিনশট ও সঠিক API লজিক অনুযায়ী সেট করা হলো
         if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন')) {
             actionType = 'auto';
             productCode = 'AL-55F71F';
@@ -1659,6 +1660,9 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         } else if (lowerProdName.includes('1100') || lowerProdName.includes('৫ দিন')) {
             actionType = 'auto';
             productCode = 'AL-1100';
+        } else if (lowerProdName.includes('220')) {
+            actionType = 'like'; // ২২০ লাইক ইনস্ট্যান্ট প্যাকেজের জন্য action=like
+            productCode = '';
         } else {
             actionType = 'like'; 
             productCode = '';
@@ -1748,7 +1752,8 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        const isManualPackage = lowerProd.includes('100');
+        // 🔥 শুধুমাত্র ১০০ লাইক (ডেইলিরটি) ম্যানুয়াল থাকবে। ২২০ লাইক সহ ৫, ১৫, ৩০ দিনের প্যাকেজগুলো এপিআইতে হিট করবে।
+        const isManualPackage = lowerProd.includes('100') && !lowerProd.includes('220') && !lowerProd.includes('1100');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
         
@@ -1756,7 +1761,6 @@ bot.action('confirm_order', async (ctx) => {
         delete db.sessions[userId];
         saveDatabase(db);
 
-        // 🔥 টেলিগ্রাম টাইমআউট এড়াতে ব্যাকগ্রাউন্ডে প্রসেস রান করানো হলো (Non-blocking)
         setImmediate(async () => {
             try {
                 let apiRes = { success: false };
@@ -1776,7 +1780,6 @@ bot.action('confirm_order', async (ctx) => {
                 if (isAutoEnabled && apiRes.success) {
                     try { await bot.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
                     
-                    // 🔥 রাইজন এপিআই হিট হওয়ার পর সার্ভারে লাইক আপডেট হওয়ার জন্য ৩৫ সেকেন্ড হিউজ ওয়েটিং ডিলে
                     await new Promise(r => setTimeout(r, 35000));
 
                     const postCheck = await checkFreeFireUID(sessionData.uid);
