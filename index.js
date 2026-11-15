@@ -216,14 +216,9 @@ async function processDailySubscriptions() {
             const preCheck = await checkFreeFireUID(sub.uid);
             const prevLikes = preCheck.likes || 0;
 
-            const lowerP = sub.product.toLowerCase();
             let apiParams = {};
-            if (lowerP.includes('6600') || lowerP.includes('৩০ দিন')) {
-                apiParams = { action: 'auto', product: 'AL-55F71F', uid: sub.uid, server: sub.region };
-            } else if (lowerP.includes('3300') || lowerP.includes('১৫ দিন')) {
-                apiParams = { action: 'auto', product: 'AL-3300', uid: sub.uid, server: sub.region };
-            } else if (lowerP.includes('1100') || lowerP.includes('৫ দিন')) {
-                apiParams = { action: 'auto', product: 'AL-1100', uid: sub.uid, server: sub.region };
+            if (sub.actionType === 'auto' && sub.productCode) {
+                apiParams = { action: 'auto', product: sub.productCode, uid: sub.uid, server: sub.region };
             } else {
                 apiParams = { action: 'like', uid: sub.uid, server: sub.region };
             }
@@ -572,6 +567,8 @@ bot.on('message', async (ctx) => {
                                 nickname: orderInfo.nickname || 'Unknown',
                                 region: orderInfo.region,
                                 product: orderInfo.product,
+                                actionType: orderInfo.actionType,
+                                productCode: orderInfo.productCode,
                                 totalDays: totalDays,
                                 deliveredDays: 1,
                                 remainingDays: remainingDays,
@@ -875,7 +872,7 @@ bot.on('message', async (ctx) => {
                 saveDatabase(db);
 
                 const daysInfo = session.totalDays > 1 ? `\n📅 **Duration:** \`${session.totalDays} Days Auto-Delivery\`` : '';
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`${daysInfo}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n❤️ **Current Likes:** \`${resInfo.likes}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`${daysInfo}\n🆔 **API Action / Code:** \`${session.actionType === 'auto' ? 'action=auto & product=' + session.productCode : 'action=like'}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n❤️ **Current Likes:** \`${resInfo.likes}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
                 try {
                     await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, reviewBox, {
@@ -1649,7 +1646,36 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         const isFFLikes = lowerCatName.includes('like') || lowerCatName.includes('লাইক') || catName.includes('🔥');
         const totalDays = extractPackageDays(prod.name);
 
-        db.sessions[userId] = { product: translated, price, activeCategory: catName, prodIndex: index, catIdx: catIdx, isFFLikes, totalDays };
+        // 🔥 সুনির্দিষ্টভাবে এপিআই অ্যাকশন ও প্রডাক্ট কোড নির্ধারণ করা হলো
+        let actionType = 'like';
+        let productCode = '';
+        const lowerProdName = prod.name.toLowerCase();
+
+        if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন')) {
+            actionType = 'auto';
+            productCode = 'AL-55F71F';
+        } else if (lowerProdName.includes('3300') || lowerProdName.includes('১৫ দিন')) {
+            actionType = 'auto';
+            productCode = 'AL-3300';
+        } else if (lowerProdName.includes('1100') || lowerProdName.includes('৫ দিন')) {
+            actionType = 'auto';
+            productCode = 'AL-1100';
+        } else {
+            actionType = 'like'; // ২২০ লাইক বা অন্যান্য ইনস্ট্যান্ট লাইক
+            productCode = '';
+        }
+
+        db.sessions[userId] = { 
+            product: translated, 
+            price, 
+            activeCategory: catName, 
+            prodIndex: index, 
+            catIdx: catIdx, 
+            isFFLikes, 
+            totalDays,
+            actionType,
+            productCode
+        };
         saveDatabase(db);
 
         const prevCatCallback = 'custom_cat_' + catIdx;
@@ -1736,15 +1762,10 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled) {
             let apiParams = {};
             
-            // নিখুঁত এপিআই প্যারামিটার সিলেকশন লজিক (প্যাকেজের সংখ্যা বা দিন চেক করে সরাসরি সঠিক রিকোয়েস্ট পাঠানো হবে)
-            if (lowerProd.includes('6600') || lowerProd.includes('৩০ দিন')) {
-                apiParams = { action: 'auto', product: 'AL-55F71F', uid: session.uid, server: session.region };
-            } else if (lowerProd.includes('3300') || lowerProd.includes('১৫ দিন')) {
-                apiParams = { action: 'auto', product: 'AL-3300', uid: session.uid, server: session.region };
-            } else if (lowerProd.includes('1100') || lowerProd.includes('৫ দিন')) {
-                apiParams = { action: 'auto', product: 'AL-1100', uid: session.uid, server: session.region };
+            // 🔥 সেশন থেকে সরাসরি সঠিক action এবং product কোড নিয়ে রিকোয়েস্ট পাঠানো হচ্ছে
+            if (session.actionType === 'auto' && session.productCode) {
+                apiParams = { action: 'auto', product: session.productCode, uid: session.uid, server: session.region };
             } else {
-                // ২২0 লাইক বা যেকোনো ইনস্ট্যান্ট লাইকের জন্য একদম সুনির্দিষ্টভাবে action: 'like' পাঠানো হবে
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
@@ -1771,12 +1792,14 @@ bot.action('confirm_order', async (ctx) => {
                     nickname: session.nickname || 'Unknown',
                     region: session.region,
                     product: session.product,
+                    actionType: session.actionType,
+                    productCode: session.productCode,
                     totalDays: totalDays,
                     deliveredDays: 1,
                     remainingDays: remainingDays,
                     lastDeliveredDate: getTodayDateBD()
                 };
-                subStatusText = `\n📅 **Subscription:** \`Day 1 of ${totalDays} (${remainingDays} Days Auto-Remaining)\`\n🆔 **Sub Tracking ID:** \`${subId}\``;
+                subStatusText = `\n📅 **Subscription:** \`Day 1 of total ${totalDays} (${remainingDays} Days Auto-Remaining)\`\n🆔 **Sub Tracking ID:** \`${subId}\``;
             }
 
             if (!db.orderHistories[userId]) db.orderHistories[userId] = [];
@@ -1818,6 +1841,8 @@ bot.action('confirm_order', async (ctx) => {
                 region: session.region,
                 price: session.price,
                 totalDays: totalDays,
+                actionType: session.actionType,
+                productCode: session.productCode,
                 isFFLikeCategory: true,
                 step: 'awaiting_prev_likes'
             };
