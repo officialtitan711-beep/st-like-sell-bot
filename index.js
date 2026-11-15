@@ -127,7 +127,15 @@ function callLikesFFApiWithTimeout(params, timeoutMs = 30000) {
             res.on('end', () => {
                 if (isFinished) return;
                 isFinished = true;
-                try { resolve(JSON.parse(data)); } catch (err) { resolve({ success: false, error: 'Invalid JSON' }); }
+                try { 
+                    const parsed = JSON.parse(data);
+                    // প্যানেল থেকে সফল রেসপন্স এসেছে কিনা তা যাচাই করা
+                    if (parsed && (parsed.status === true || parsed.success === true || parsed.order_id || parsed.status === 'success')) {
+                        resolve({ success: true, ...parsed });
+                    } else {
+                        resolve({ success: false, ...parsed });
+                    }
+                } catch (err) { resolve({ success: false, error: 'Invalid JSON' }); }
             });
         });
         req.on('error', () => { if (!isFinished) { isFinished = true; resolve({ success: false, error: 'Failed' }); } });
@@ -1650,7 +1658,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         let productCode = '';
         const lowerProdName = prod.name.toLowerCase();
 
-        // 🔥 একদম নিরাপদ ও নির্ভুল এপিআই ম্যাপিং (কাস্টমার সুন্দর নাম দেখতে পাবে, এপিআই সঠিক কোড রিড করবে)
+        // 🔥 সুনির্দিষ্ট ও নিরাপদ এপিআই ম্যাপিং (২২0 লাইক ও ১০০ লাইক সরাসরি action=like এ যাবে)
         if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন')) {
             actionType = 'auto';
             productCode = 'AL-55F71F';
@@ -1661,10 +1669,10 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
             actionType = 'auto';
             productCode = 'AL-1100';
         } else if (lowerProdName.includes('220') || lowerProdName.includes('২২০')) {
-            actionType = 'like'; // 220 Likes = Instant Action (action=like)
+            actionType = 'like'; 
             productCode = '';
         } else if (lowerProdName.includes('100') || lowerProdName.includes('১০০')) {
-            actionType = 'like'; // 100 Likes = Manual / Instant Like
+            actionType = 'like'; 
             productCode = '';
         } else {
             actionType = 'like'; 
@@ -1778,7 +1786,6 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             
-            // 🔥 রিয়াল-টাইম লাইক কাউন্টের জন্য ৩৫ সেকেন্ড অপেক্ষা
             await new Promise(r => setTimeout(r, 35000));
 
             const postCheck = await checkFreeFireUID(session.uid);
