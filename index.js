@@ -172,14 +172,6 @@ function extractPackageDays(productName) {
     return 1;
 }
 
-function getApiProductCode(productName) {
-    const lower = productName.toLowerCase();
-    if (lower.includes('6600') || lower.includes('৩০ দিন')) return 'AL-55F71F';
-    if (lower.includes('3300') || lower.includes('১৫ দিন')) return 'AL-3300';
-    if (lower.includes('1100') || lower.includes('৫ দিন')) return 'AL-1100';
-    return ''; 
-}
-
 function getTodayDateBD() {
     const now = new Date();
     const bdTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
@@ -224,8 +216,17 @@ async function processDailySubscriptions() {
             const preCheck = await checkFreeFireUID(sub.uid);
             const prevLikes = preCheck.likes || 0;
 
-            const prodCode = getApiProductCode(sub.product);
-            const apiParams = prodCode ? { action: 'auto', product: prodCode, uid: sub.uid, server: sub.region } : { action: 'like', uid: sub.uid, server: sub.region };
+            const lowerP = sub.product.toLowerCase();
+            let apiParams = {};
+            if (lowerP.includes('6600') || lowerP.includes('৩০ দিন')) {
+                apiParams = { action: 'auto', product: 'AL-55F71F', uid: sub.uid, server: sub.region };
+            } else if (lowerP.includes('3300') || lowerP.includes('১৫ দিন')) {
+                apiParams = { action: 'auto', product: 'AL-3300', uid: sub.uid, server: sub.region };
+            } else if (lowerP.includes('1100') || lowerP.includes('৫ দিন')) {
+                apiParams = { action: 'auto', product: 'AL-1100', uid: sub.uid, server: sub.region };
+            } else {
+                apiParams = { action: 'like', uid: sub.uid, server: sub.region };
+            }
 
             const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
 
@@ -313,7 +314,7 @@ function t(userId, key) {
             serverTitle: "🌍 **সার্ভার নির্বাচন**\n\nপ্যাকেজ: ",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             cancelBtn: "❌ বাতিল করুন",
-            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন።",
+            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **শেষ ১০টি অর্ডারের ইতিহাস**\n\n",
             historyDisclaimer: "\n⚠️ *নোট: সুরক্ষার জন্য এখানে শুধুমাত্র আপনার সর্বশেষ ১০টি অর্ডার দেখানো হয়।*",
             noHistory: "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n"
@@ -1726,18 +1727,25 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        // ফিক্সড লজিক: শুধুমাত্র ১০০ লাইক ম্যানুয়াল থাকবে, বাকি ২২০ লাইক ও সাবস্ক্রিপশন অটো এপিআইতে হিট করবে
+        // ১০০ লাইক বাদে ২২০ লাইক এবং অন্যান্য সব প্যাকেজ সরাসরি এপিআইতে হিট করবে
         const isManualPackage = lowerProd.includes('100');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
         
         let apiRes = { success: false };
         if (isAutoEnabled) {
-            const prodCode = getApiProductCode(session.product);
-            // ২২০ লাইক বা ইনস্ট্যান্ট লাইকের জন্য product কোড ফাঁকা থাকলে action=like কাজ করবে
-            const apiParams = prodCode 
-                ? { action: 'auto', product: prodCode, uid: session.uid, server: session.region } 
-                : { action: 'like', uid: session.uid, server: session.region };
+            let apiParams = {};
+            // ব্যাকএন্ড সরাসরি নাম বা সংখ্যা চেক করবে (বাটনের লেখা বা ফরম্যাট এখানে কোনো প্রভাব ফেলবে না)
+            if (lowerProd.includes('6600') || lowerProd.includes('৩০ দিন')) {
+                apiParams = { action: 'auto', product: 'AL-55F71F', uid: session.uid, server: session.region };
+            } else if (lowerProd.includes('3300') || lowerProd.includes('১৫ দিন')) {
+                apiParams = { action: 'auto', product: 'AL-3300', uid: session.uid, server: session.region };
+            } else if (lowerProd.includes('1100') || lowerProd.includes('৫ দিন')) {
+                apiParams = { action: 'auto', product: 'AL-1100', uid: session.uid, server: session.region };
+            } else {
+                // ২২০ লাইক বা অন্যান্য ইনস্ট্যান্ট প্যাকেজের জন্য সঠিক action: 'like'
+                apiParams = { action: 'like', uid: session.uid, server: session.region };
+            }
 
             apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
         }
