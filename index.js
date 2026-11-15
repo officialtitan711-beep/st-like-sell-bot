@@ -1752,7 +1752,7 @@ bot.action('confirm_order', async (ctx) => {
         const isFFLikeCategory = session.isFFLikes;
         const lowerProd = session.product.toLowerCase();
         
-        // 🔥 শুধুমাত্র ১০০ লাইক (ডেইলিরটি) ম্যানুয়াল থাকবে। ২২০ লাইক সহ ৫, ১৫, ৩০ দিনের প্যাকেজগুলো এপিআইতে হিট করবে।
+        // 🔥 ফিক্সড: শুধুমাত্র ১০০ লাইক (ডেইলিরটি) ম্যানুয়াল থাকবে। ২২০ লাইক বা অটো প্যাকেজগুলো কখনোই ম্যানুয়ালে যাবে না, সরাসরি এপিআইতে হিট করবে।
         const isManualPackage = lowerProd.includes('100') && !lowerProd.includes('220') && !lowerProd.includes('1100');
         const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !isManualPackage;
         const totalDays = session.totalDays || 1;
