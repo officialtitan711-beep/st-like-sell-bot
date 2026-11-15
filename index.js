@@ -318,7 +318,7 @@ function t(userId, key) {
             serverTitle: "🌍 **সার্ভার নির্বাচন**\n\nপ্যাকেজ: ",
             confirmOrderBtn: "✅ অর্ডার কনফার্ম করুন 🚀",
             cancelBtn: "❌ বাতিল করুন",
-            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন።",
+            supportSentSuccess: "✨ আপনার মেসেজ বা স্ক্রিনশট সরাসরি অ্যাডমিনের কাছে পৌঁছে গেছে! দয়া করে অপেক্ষা করুন।",
             historyTitle: "📜 **শেষ ১০টি অর্ডারের ইতিহাস**\n\n",
             historyDisclaimer: "\n⚠️ *নোট: সুরক্ষার জন্য এখানে শুধুমাত্র আপনার সর্বশেষ ১০টি অর্ডার দেখানো হয়।*",
             noHistory: "❌ এখনো কোনো অর্ডার সম্পন্ন হয়নি!\n\n"
@@ -1736,7 +1736,7 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
-// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও এপিআই রিকোয়েস্ট হ্যান্ডলার (৩-বার রিট্রাই ও সঠিক প্যারামিটার সহ)
+// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও এপিআই রিকোয়েস্ট হ্যান্ডলার (ইনস্ট্যান্ট ও অটো উভয়ের জন্য ৩৫ সেকেন্ড বিরতি সহ)
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1765,10 +1765,8 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled) {
             let apiParams = {};
             if (session.actionType === 'auto' && session.productCode) {
-                // অটো সাবস্ক্রিপশন প্যাকেজের জন্য সঠিক প্যারামিটার
                 apiParams = { action: 'auto', product: session.productCode, uid: session.uid, server: session.region };
             } else {
-                // ইনস্ট্যান্ট লাইক প্যাকেজের জন্য সঠিক প্যারামিটার (যা রাইজেন এপিআই সরাসরি রিড করতে পারে)
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
@@ -1789,6 +1787,7 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             
+            // 🔥 ইনস্ট্যান্ট এবং অটো উভয় অর্ডারের জন্যই ৩৫ সেকেন্ড বিরতি নিশ্চিত করা হলো যাতে রিয়েল-টাইম লাইক আপডেট পাওয়া যায়
             await new Promise(r => setTimeout(r, 35000));
 
             const postCheck = await checkFreeFireUID(session.uid);
