@@ -876,7 +876,12 @@ bot.on('message', async (ctx) => {
                 session.initialLikes = resInfo.likes;
                 saveDatabase(db);
 
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n❤️ **Current Likes:** \`${resInfo.likes}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
+                // 🔥 অর্ডার কনফার্মেশন স্ক্রিনে এপিআই টাইপ ও প্রোডাক্ট কোডের স্পষ্ট ডিসপ্লে যোগ করা হলো
+                let apiInfoLine = session.actionType === 'auto' 
+                    ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`[span_0](start_span)[span_0](end_span)\n🏷️ **Product Code:** \`${session.productCode}\`[span_1](start_span)[span_1](end_span)`
+                    : `⚡ **API Type:** \`Instant (action=like)\`[span_2](start_span)[span_2](end_span)`;
+
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n${apiInfoLine}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n❤️ **Current Likes:** \`${resInfo.likes}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
                 try {
                     await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, reviewBox, {
