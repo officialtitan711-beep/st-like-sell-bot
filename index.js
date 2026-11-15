@@ -167,6 +167,19 @@ function checkFreeFireUID(uid) {
     });
 }
 
+// 🎯 প্যাকেজ নাম থেকে ফিক্সড এডেড লাইক বের করার ফাংশন
+function extractDefaultAddedLikes(productName) {
+    const lower = productName.toLowerCase();
+    if (lower.includes('100')) return '100 Likes';
+    if (lower.includes('220') || lower.includes('1100') || lower.includes('3300') || lower.includes('6600')) return '220 Likes';
+    
+    const match = productName.match(/(\d+)\s*like/i);
+    if (match && match[1]) {
+        return match[1] + ' Likes';
+    }
+    return '220 Likes';
+}
+
 function extractPackageDays(productName) {
     const lower = productName.toLowerCase();
     if (lower.includes('100') || lower.includes('220')) return 1; 
@@ -222,9 +235,6 @@ async function processDailySubscriptions() {
         }
 
         if (db.settings && db.settings.autoApiEnabled) {
-            const preCheck = await checkFreeFireUID(sub.uid);
-            const prevLikes = preCheck.likes || 0;
-
             let apiParams = {};
             if (sub.actionType === 'auto' && sub.productCode) {
                 apiParams = { action: 'auto', product: sub.productCode, uid: sub.uid, server: sub.region };
@@ -235,11 +245,7 @@ async function processDailySubscriptions() {
             const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
 
             if (apiRes.success) {
-                await new Promise(r => setTimeout(r, 35000));
-                const postCheck = await checkFreeFireUID(sub.uid);
-                const currLikes = postCheck.likes || prevLikes;
-                const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : 0;
-
+                const addedLikesText = extractDefaultAddedLikes(sub.product);
                 const isLastDay = sub.remainingDays === 1;
 
                 sub.remainingDays -= 1;
@@ -274,7 +280,7 @@ async function processDailySubscriptions() {
                     ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
                     : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
 
-                const dailyReceipt = `💠 ════════════════════════════ 💠\n           ✅ DAILY AUTO-LIKE COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${sub.product}\`\n📅 Progress: \`Day ${sub.deliveredDays} of ${sub.totalDays}\`\n🆔 Sub ID: \`${subId}\`\n\n👤 Name: \`${sub.nickname || 'Unknown'}\`\n🛡️ UID: \`${sub.uid}\`\n🌍 Server: \`${sub.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n${statusLine}\n💰 Daily Charge: \`0 BDT (Pre-Paid)\`\n💳 Current Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                const dailyReceipt = `💠 ════════════════════════════ 💠\n           ✅ DAILY AUTO-LIKE COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${sub.product}\`\n📅 Progress: \`Day ${sub.deliveredDays} of ${sub.totalDays}\`\n🆔 Sub ID: \`${subId}\`\n\n👤 Name: \`${sub.nickname || 'Unknown'}\`\n🛡️ UID: \`${sub.uid}\`\n🌍 Server: \`${sub.region}\`\n\n📈 **Added Likes:** \`+${addedLikesText}\`\n\n${statusLine}\n💰 Daily Charge: \`0 BDT (Pre-Paid)\`\n💳 Current Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                 await bot.telegram.sendMessage(userId, dailyReceipt, {
                     parse_mode: 'Markdown',
@@ -542,76 +548,62 @@ bot.on('message', async (ctx) => {
                 const orderInfo = db.adminSessions[uniqueOrderId];
 
                 if (orderInfo.isFFLikeCategory) {
-                    if (!orderInfo.step || orderInfo.step === 'awaiting_prev_likes') {
-                        orderInfo.prevLikes = text;
-                        orderInfo.step = 'awaiting_curr_likes';
-                        saveDatabase(db);
-                        return ctx.reply('✍️ এখন **কারেন্ট লাইক (Current Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
+                    orderInfo.addedLikes = text;
+                    
+                    const targetUid = orderInfo.targetUserId;
+                    const currentBal = db.balances[targetUid] || 0;
+                    const totalDays = orderInfo.totalDays || 1;
+                    const remainingDays = totalDays - 1;
+
+                    let subNote = '';
+                    if (totalDays > 1) {
+                        const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+                        db.subscriptions[subId] = {
+                            userId: targetUid,
+                            uid: orderInfo.uid,
+                            nickname: orderInfo.nickname || 'Unknown',
+                            region: orderInfo.region,
+                            product: orderInfo.product,
+                            actionType: orderInfo.actionType,
+                            productCode: orderInfo.productCode,
+                            totalDays: totalDays,
+                            deliveredDays: 1,
+                            remainingDays: remainingDays,
+                            lastDeliveredDate: getTodayDateBD()
+                        };
+                        subNote = `\n📅 **Subscription:** \`Day 1 of ${totalDays} (${remainingDays} Days Left)\``;
                     }
-                    else if (orderInfo.step === 'awaiting_curr_likes') {
-                        orderInfo.currLikes = text;
-                        orderInfo.step = 'awaiting_added_likes';
-                        saveDatabase(db);
-                        return ctx.reply('✍️ এখন **এডেড লাইক (Added Likes)** কত (কত যোগ হলো) সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
-                    }
-                    else if (orderInfo.step === 'awaiting_added_likes') {
-                        orderInfo.addedLikes = text;
-                        
-                        const targetUid = orderInfo.targetUserId;
-                        const currentBal = db.balances[targetUid] || 0;
-                        const totalDays = orderInfo.totalDays || 1;
-                        const remainingDays = totalDays - 1;
 
-                        let subNote = '';
-                        if (totalDays > 1) {
-                            const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
-                            db.subscriptions[subId] = {
-                                userId: targetUid,
-                                uid: orderInfo.uid,
-                                nickname: orderInfo.nickname || 'Unknown',
-                                region: orderInfo.region,
-                                product: orderInfo.product,
-                                actionType: orderInfo.actionType,
-                                productCode: orderInfo.productCode,
-                                totalDays: totalDays,
-                                deliveredDays: 1,
-                                remainingDays: remainingDays,
-                                lastDeliveredDate: getTodayDateBD()
-                            };
-                            subNote = `\n📅 **Subscription:** \`Day 1 of ${totalDays} (${remainingDays} Days Left)\``;
-                        }
+                    if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
+                    const orderNow = new Date();
+                    db.orderHistories[targetUid].unshift({
+                        timestamp: orderNow.getTime(),
+                        date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
+                        time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
+                        product: totalDays > 1 ? `${orderInfo.product} (Day 1/${totalDays})` : orderInfo.product,
+                        uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
+                    });
+                    if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
+                    saveDatabase(db);
 
-                        if (!db.orderHistories[targetUid]) db.orderHistories[targetUid] = [];
-                        const orderNow = new Date();
-                        db.orderHistories[targetUid].unshift({
-                            timestamp: orderNow.getTime(),
-                            date: orderNow.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
-                            time: orderNow.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
-                            product: totalDays > 1 ? `${orderInfo.product} (Day 1/${totalDays})` : orderInfo.product,
-                            uid: orderInfo.uid, nickname: orderInfo.nickname || 'Unknown', region: orderInfo.region, price: orderInfo.price, status: 'Complete'
-                        });
-                        if (db.orderHistories[targetUid].length > 10) db.orderHistories[targetUid].pop();
-                        saveDatabase(db);
+                    const userLangChoice = getUserLang(targetUid);
+                    const warningText = userLangChoice === 'bn' 
+                        ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
+                        : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
 
-                        const userLangChoice = getUserLang(targetUid);
-                        const warningText = userLangChoice === 'bn' 
-                            ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
-                            : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
+                    const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`${subNote}\n\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
-                        const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`${subNote}\n\n👍 **Previous Likes:** \`${orderInfo.prevLikes}\`\n👍 **Current Likes:** \`${orderInfo.currLikes}\`\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                    await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
+                        parse_mode: 'Markdown',
+                        ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
+                    }).catch(() => {});
 
-                        await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
-                            parse_mode: 'Markdown',
-                            ...Markup.inlineKeyboard([[Markup.button.callback(t(targetUid, 'mainMenuBack'), 'back_start_inline')]])
-                        }).catch(() => {});
-
-                        await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Manual Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
-                        await ctx.reply('✅ Order successfully completed & receipt updated to customer!');
-                        delete db.adminInputSession[userId];
-                        delete db.adminSessions[uniqueOrderId];
-                        saveDatabase(db);
-                        return;
-                    }
+                    await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Manual Completed Order]**\n\n" + completedReceipt + "\n\n👤 **Customer ID:** `" + targetUid + "`", { parse_mode: 'Markdown' }).catch(() => {});
+                    await ctx.reply('✅ Order successfully completed & receipt updated to customer!');
+                    delete db.adminInputSession[userId];
+                    delete db.adminSessions[uniqueOrderId];
+                    saveDatabase(db);
+                    return;
                 } else {
                     const targetUid = orderInfo.targetUserId;
                     const currentBal = db.balances[targetUid] || 0;
@@ -872,14 +864,13 @@ bot.on('message', async (ctx) => {
                 level = resInfo.level;
                 session.nickname = nickname;
                 session.level = level;
-                session.initialLikes = resInfo.likes;
                 saveDatabase(db);
 
                 let apiInfoLine = session.actionType === 'auto' 
                     ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`\n🏷️ **Product Code:** \`${session.productCode}\``
                     : `⚡ **API Type:** \`Instant (action=like)\``;
 
-                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n${apiInfoLine}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n❤️ **Current Likes:** \`${resInfo.likes}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
+                const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n${apiInfoLine}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
                 try {
                     await ctx.telegram.editMessageText(userId, loadingMsg.message_id, null, reviewBox, {
@@ -1444,10 +1435,9 @@ bot.action(/admin_input_(.+)/, async (ctx) => {
         
         if (orderInfo) {
             if (orderInfo.isFFLikeCategory) {
-                orderInfo.step = 'awaiting_prev_likes';
                 db.adminInputSession[ADMIN_ID] = { uniqueOrderId: uniqueOrderId };
                 saveDatabase(db);
-                await ctx.reply('✍️ অর্ডার কমপ্লিট করার জন্য স্টেপ বাই স্টেপ লাইক সংখ্যা দিন:\n\nপ্রথমে **প্রিভিয়াস লাইক (Previous Likes)** কত সেটা লিখে পাঠান:', { parse_mode: 'Markdown' });
+                await ctx.reply('✍️ অর্ডার কমপ্লিট করার জন্য **এডেড লাইক (Added Likes)** কত সেটা লিখে পাঠান:\n(যেমন: `100` বা `220`)', { parse_mode: 'Markdown' });
             } else {
                 db.adminInputSession[ADMIN_ID] = { uniqueOrderId: uniqueOrderId };
                 saveDatabase(db);
@@ -1736,7 +1726,7 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
-// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও এপিআই রিকোয়েস্ট হ্যান্ডলার (ইনস্ট্যান্ট ও অটো উভয়ের জন্য ৩৫ সেকেন্ড বিরতি সহ)
+// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও এপিআই রিকোয়েস্ট হ্যান্ডলার (রাইজন থেকে সাকসেস আসলে ফিক্সড প্যাকেজ লাইক শো করার লজিক সহ)
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1770,7 +1760,6 @@ bot.action('confirm_order', async (ctx) => {
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
-            // 🔥 ৩ বার পর্যন্ত অটো-রিট্রাই লজিক
             let retryCount = 0;
             const maxRetries = 3;
 
@@ -1787,13 +1776,8 @@ bot.action('confirm_order', async (ctx) => {
         if (isAutoEnabled && apiRes.success) {
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             
-            // 🔥 ইনস্ট্যান্ট এবং অটো উভয় অর্ডারের জন্যই ৩৫ সেকেন্ড বিরতি নিশ্চিত করা হলো যাতে রিয়েল-টাইম লাইক আপডেট পাওয়া যায়
-            await new Promise(r => setTimeout(r, 35000));
-
-            const postCheck = await checkFreeFireUID(session.uid);
-            const prevLikes = session.initialLikes || 0;
-            const currLikes = postCheck.likes || prevLikes;
-            const addedLikes = currLikes >= prevLikes ? (currLikes - prevLikes) : 0;
+            // 🔥 রাইজন থেকে সাকসেস পাওয়ার পর আর গেম সার্ভারে প্রিভিয়াস/কারেন্ট লাইক চেক না করে সরাসরি প্যাকেজ অনুযায়ী ফিক্সড এডেড লাইক সেট করা হলো
+            const addedLikesText = extractDefaultAddedLikes(session.product);
 
             let subStatusText = '';
             if (totalDays > 1) {
@@ -1832,7 +1816,7 @@ bot.action('confirm_order', async (ctx) => {
                 ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
                 : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
 
-            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n👍 **Previous Likes:** \`${prevLikes}\`\n👍 **Current Likes:** \`${currLikes}\`\n📈 **Added Likes:** \`+${addedLikes} Likes\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📈 **Added Likes:** \`+${addedLikesText}\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
             await ctx.telegram.editMessageText(userId, procMsgId, null, autoReceipt, {
                 parse_mode: 'Markdown',
@@ -1856,8 +1840,7 @@ bot.action('confirm_order', async (ctx) => {
                 totalDays: totalDays,
                 actionType: session.actionType,
                 productCode: session.productCode,
-                isFFLikeCategory: true,
-                step: 'awaiting_prev_likes'
+                isFFLikeCategory: true
             };
             saveDatabase(db);
 
