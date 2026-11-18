@@ -1728,7 +1728,6 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
-// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও রিয়েল-টাইম API স্ট্যাটাস হ্যান্ডলার (রসিদে Name ও UID সহ)
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1929,7 +1928,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, async () => {
-    console.log(`Webhook HTTP Server listening on port `${PORT}`);
+    console.log(`Webhook HTTP Server listening on port ${PORT}`);
     
     try {
         await bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true });
