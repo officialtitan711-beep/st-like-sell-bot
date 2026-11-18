@@ -868,9 +868,11 @@ bot.on('message', async (ctx) => {
                 const isAutoOn = db.settings && db.settings.autoApiEnabled;
                 let apiInfoLine = !isAutoOn 
                     ? `🛠️ **Mode:** \`Manual Review (API is OFF)\``
-                    : (session.actionType === 'auto' 
-                        ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`\n🏷️ **Product Code:** \`${session.productCode}\``
-                        : `⚡ **API Type:** \`Instant (action=like)\``);
+                    : (session.is100Like 
+                        ? `🛠️ **Mode:** \`Manual Review (100 Likes Package)\``
+                        : (session.actionType === 'auto' 
+                            ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`\n🏷️ **Product Code:** \`${session.productCode}\``
+                            : `⚡ **API Type:** \`Instant (action=like)\``));
 
                 const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n${apiInfoLine}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
@@ -1648,6 +1650,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
         let actionType = 'like';
         let productCode = '';
         const lowerProdName = prod.name.toLowerCase();
+        const is100Like = lowerProdName.includes('100');
 
         if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন') || lowerProdName.includes('30 days')) {
             actionType = 'auto';
@@ -1670,6 +1673,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
             prodIndex: index, 
             catIdx: catIdx, 
             isFFLikes, 
+            is100Like,
             totalDays,
             actionType,
             productCode
@@ -1749,7 +1753,7 @@ bot.action('confirm_order', async (ctx) => {
         await new Promise(r => setTimeout(r, 200));
 
         const isFFLikeCategory = session.isFFLikes;
-        const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory;
+        const isAutoEnabled = db.settings && db.settings.autoApiEnabled && isFFLikeCategory && !session.is100Like;
         const totalDays = session.totalDays || 1;
         
         let apiRes = { success: false };
