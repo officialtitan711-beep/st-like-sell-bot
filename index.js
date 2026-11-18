@@ -12,7 +12,7 @@ const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
 const API_BASE = "https://raigen.site/likesff/reseller.php";
-const API_KEY = "likesff-shop-11935-mbqgvd7f"; // 🔒 Updated with your new secure API key
+const API_KEY = "likesff-shop-11935-mbqgvd7f"; // 🔒 Updated API Key
 const PORT = process.env.PORT || 3000;
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com';
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
@@ -167,7 +167,6 @@ function checkFreeFireUID(uid) {
     });
 }
 
-// 🎯 প্যাকেজ নাম থেকে ফিক্সড এডেড লাইক বের করার ফাংশন
 function extractDefaultAddedLikes(productName) {
     const lower = productName.toLowerCase();
     if (lower.includes('100')) return '100 Likes';
@@ -244,7 +243,7 @@ async function processDailySubscriptions() {
 
             const apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
 
-            if (apiRes.success) {
+            if (apiRes.success && apiRes.status !== 'failed' && apiRes.status !== 'cancelled') {
                 const addedLikesText = extractDefaultAddedLikes(sub.product);
                 const isLastDay = sub.remainingDays === 1;
 
@@ -646,7 +645,7 @@ bot.on('message', async (ctx) => {
                     if (!db.customProducts[catName]) db.customProducts[catName] = [];
                     saveDatabase(db);
                     delete db.adminInputSession[userId];
-                    return ctx.reply(`✅ Category "${catName}" created successfully! Now go to Shop Menu, enter this category and add products.`);
+                    return ctx.reply(`✅ Category "${catName}" created successfully!`);
                 }
                 delete db.adminInputSession[userId];
                 return ctx.reply('❌ Invalid category name.');
@@ -866,9 +865,12 @@ bot.on('message', async (ctx) => {
                 session.level = level;
                 saveDatabase(db);
 
-                let apiInfoLine = session.actionType === 'auto' 
-                    ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`\n🏷️ **Product Code:** \`${session.productCode}\``
-                    : `⚡ **API Type:** \`Instant (action=like)\``;
+                const isAutoOn = db.settings && db.settings.autoApiEnabled;
+                let apiInfoLine = !isAutoOn 
+                    ? `🛠️ **Mode:** \`Manual Review (API is OFF)\``
+                    : (session.actionType === 'auto' 
+                        ? `🤖 **API Type:** \`Auto Subscription (action=auto)\`\n🏷️ **Product Code:** \`${session.productCode}\``
+                        : `⚡ **API Type:** \`Instant (action=like)\``);
 
                 const reviewBox = `╭────────────────────────────╮\n      📦 ORDER CONFIRMATION\n╰────────────────────────────╯\n\n🛍️ **Package:** \`${session.product}\`\n${apiInfoLine}\n💵 **Price:** \`${session.price} BDT\`\n🌍 **Server:** \`${session.region}\`\n\n👤 **Game Name:** \`${nickname}\`\n🛡️ **UID:** \`${idText}\`\n\n⚠️ Please verify your in-game name & UID before confirming.`;
 
@@ -1193,7 +1195,7 @@ bot.action(/admin_rem_prod_idx_(.+)_(.+)/, async (ctx) => {
             inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_idx_' + catIdx)]);
             inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_idx_' + catIdx)]);
         }
-        inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'back_start_inline')]);
+        inlineButtons.push([Markup.button.callback(t(ADMIN_ID, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(ADMIN_ID, 'mainMenuBack'), 'mainMenuBack')]);
         
         await ctx.editMessageText(`📂 **${translateCategoryName(catName, ADMIN_ID)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
@@ -1726,7 +1728,7 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
-// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও এপিআই রিকোয়েস্ট হ্যান্ডলার (রাইজন থেকে সাকসেস আসলে ফিক্সড প্যাকেজ লাইক শো করার লজিক সহ)
+// 🔥 সম্পূর্ণ আপডেট করা অর্ডার কনফার্মেশন ও রিয়েল-টাইম API স্ট্যাটাস হ্যান্ডলার (Processing / Completed / Failed & Refund)
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1760,105 +1762,107 @@ bot.action('confirm_order', async (ctx) => {
                 apiParams = { action: 'like', uid: session.uid, server: session.region };
             }
 
-            let retryCount = 0;
-            const maxRetries = 3;
-
-            while (retryCount < maxRetries && !apiRes.success) {
-                retryCount++;
-                apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
-                
-                if (!apiRes.success && retryCount < maxRetries) {
-                    await new Promise(r => setTimeout(r, 5000));
-                }
-            }
+            apiRes = await callLikesFFApiWithTimeout(apiParams, 30000);
         }
 
         if (isAutoEnabled && apiRes.success) {
-            try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
-            
-            // 🔥 রাইজন থেকে সাকসেস পাওয়ার পর আর গেম সার্ভারে প্রিভিয়াস/কারেন্ট লাইক চেক না করে সরাসরি প্যাকেজ অনুযায়ী ফিক্সড এডেড লাইক সেট করা হলো
+            const apiStatus = (apiRes.status || '').toLowerCase();
             const addedLikesText = extractDefaultAddedLikes(session.product);
 
-            let subStatusText = '';
-            if (totalDays > 1) {
-                const remainingDays = totalDays - 1;
-                const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
-                db.subscriptions[subId] = {
-                    userId: userId,
-                    uid: session.uid,
-                    nickname: session.nickname || 'Unknown',
-                    region: session.region,
-                    product: session.product,
-                    actionType: session.actionType,
-                    productCode: session.productCode,
-                    totalDays: totalDays,
-                    deliveredDays: 1,
-                    remainingDays: remainingDays,
-                    lastDeliveredDate: getTodayDateBD()
-                };
-                subStatusText = `\n📅 **Subscription:** \`Day 1 of total ${totalDays} (${remainingDays} Days Auto-Remaining)\`\n🆔 **Sub Tracking ID:** \`${subId}\``;
+            // 🔄 যদি রাইজেন সার্ভারে স্ট্যাটাস 'processing' থাকে
+            if (apiStatus === 'processing' || apiRes.processing === true) {
+                try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Order is Processing...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+
+                const processingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PROCESSING\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`PROC-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Processing in Raizen Server\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি রাইজেন সার্ভারে প্রসেসিং এ রয়েছে। কাজ সম্পন্ন হলে অটোমেটিক কমপ্লিট স্ট্যাটাস দেখতে পাবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+
+                await ctx.telegram.editMessageText(userId, procMsgId, null, processingReceipt, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+                });
+
+                if (!db.orderHistories[userId]) db.orderHistories[userId] = [];
+                const now = new Date();
+                db.orderHistories[userId].unshift({
+                    timestamp: now.getTime(),
+                    date: now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
+                    time: now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
+                    product: session.product, uid: session.uid, nickname: session.nickname || 'Unknown', region: session.region, price: session.price, status: 'Processing'
+                });
+                if (db.orderHistories[userId].length > 10) db.orderHistories[userId].pop();
+                saveDatabase(db);
+
+            } else if (apiStatus === 'failed' || apiStatus === 'cancelled' || apiRes.success === false) {
+                // ❌ **যদি রাইজেন থেকে ফেইল বা ক্যানসেল দেখায় -> অটো রিফান্ড**
+                db.balances[userId] += Number(session.price);
+                saveDatabase(db);
+
+                const failReason = apiRes.error || apiRes.message || 'Raizen API Rejected Order';
+                const failedReceipt = `❌ **Order Failed & Refunded**\n\n📦 Package: \`${session.product}\`\n🛡️ UID: \`${session.uid}\`\n💵 Price Refunded: \`${session.price} BDT\`\n\n⚠️ **Reason:** \`${failReason}\`\n\nআপনার ব্যালেন্স স্বয়ংক্রয়ভাবে রিফান্ড করে দেওয়া হয়েছে।`;
+
+                await ctx.telegram.editMessageText(userId, procMsgId, null, failedReceipt, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+                });
+
+            } else {
+                // ✅ **সাকসেস বা কমপ্লিট হলে**
+                try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
+
+                let subStatusText = '';
+                if (totalDays > 1) {
+                    const remainingDays = totalDays - 1;
+                    const subId = `SUB-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+                    db.subscriptions[subId] = {
+                        userId: userId,
+                        uid: session.uid,
+                        nickname: session.nickname || 'Unknown',
+                        region: session.region,
+                        product: session.product,
+                        actionType: session.actionType,
+                        productCode: session.productCode,
+                        totalDays: totalDays,
+                        deliveredDays: 1,
+                        remainingDays: remainingDays,
+                        lastDeliveredDate: getTodayDateBD()
+                    };
+                    subStatusText = `\n📅 **Subscription:** \`Day 1 of total ${totalDays} (${remainingDays} Days Auto-Remaining)\`\n🆔 **Sub Tracking ID:** \`${subId}\``;
+                }
+
+                if (!db.orderHistories[userId]) db.orderHistories[userId] = [];
+                const now = new Date();
+                db.orderHistories[userId].unshift({
+                    timestamp: now.getTime(),
+                    date: now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
+                    time: now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
+                    product: totalDays > 1 ? `${session.product} (Day 1/${totalDays})` : session.product,
+                    uid: session.uid, nickname: session.nickname || 'Unknown', region: session.region, price: session.price, status: 'Complete'
+                });
+                if (db.orderHistories[userId].length > 10) db.orderHistories[userId].pop();
+                saveDatabase(db);
+
+                const userLangChoice = getUserLang(userId);
+                const warningText = userLangChoice === 'bn' 
+                    ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
+                    : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
+
+                const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📈 **Added Likes:** \`+${addedLikesText}\`\n\n📊 Status: \`Completed Successfully\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+
+                await ctx.telegram.editMessageText(userId, procMsgId, null, autoReceipt, {
+                    parse_mode: 'Markdown',
+                    ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
+                });
+
+                await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Auto Order]**\n\n" + autoReceipt + "\n\n👤 **Customer ID:** `" + userId + "`", { parse_mode: 'Markdown' }).catch(() => {});
             }
 
-            if (!db.orderHistories[userId]) db.orderHistories[userId] = [];
-            const now = new Date();
-            db.orderHistories[userId].unshift({
-                timestamp: now.getTime(),
-                date: now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
-                time: now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true }),
-                product: totalDays > 1 ? `${session.product} (Day 1/${totalDays})` : session.product,
-                uid: session.uid, nickname: session.nickname || 'Unknown', region: session.region, price: session.price, status: 'Complete'
-            });
-            if (db.orderHistories[userId].length > 10) db.orderHistories[userId].pop();
-            saveDatabase(db);
-
-            const userLangChoice = getUserLang(userId);
-            const warningText = userLangChoice === 'bn' 
-                ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
-                : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
-
-            const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📈 **Added Likes:** \`+${addedLikesText}\`\n\n📊 Status: \`Completed Successfully\`\n📝 Note/Details: \`Delivered automatically via API\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
-
-            await ctx.telegram.editMessageText(userId, procMsgId, null, autoReceipt, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([[Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]])
-            });
-
-            await bot.telegram.sendMessage(ADMIN_ID, "📋 **[Duplicate Copy - Auto Order]**\n\n" + autoReceipt + "\n\n👤 **Customer ID:** `" + userId + "`", { parse_mode: 'Markdown' }).catch(() => {});
-
-        } else if (isFFLikeCategory) {
-            try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▱ 95% (Pending Admin Review)\``, { parse_mode: 'Markdown' }); } catch (e) {}
-
-            const uniqueOrderId = userId + '_' + Date.now();
-            db.adminSessions[uniqueOrderId] = {
-                targetUserId: userId,
-                loadingMessageId: procMsgId,
-                product: session.product,
-                uid: session.uid,
-                nickname: session.nickname || 'Unknown',
-                region: session.region,
-                price: session.price,
-                totalDays: totalDays,
-                actionType: session.actionType,
-                productCode: session.productCode,
-                isFFLikeCategory: true
-            };
-            saveDatabase(db);
-
-            await bot.telegram.sendMessage(ADMIN_ID, `⚠️ API Failed / Fallback Order (Manual Needed after 3 Retries)\n\n📦 Package: \`${session.product}\` (${totalDays} Days)\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🆔 UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
-                parse_mode: 'Markdown',
-                ...Markup.inlineKeyboard([
-                    [Markup.button.callback('✏️ Enter Details', 'admin_input_' + uniqueOrderId)],
-                    [Markup.button.callback('❌ Cancel & Refund', 'admin_can_' + uniqueOrderId)]
-                ])
-            });
-
         } else {
+            // 🛠️ **যদি API OFF থাকে অথবা এপিআই ফেইল করে, তবে ম্যানুয়াল অর্ডারে চলে যাবে**
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             await new Promise(r => setTimeout(r, 200));
 
             const uniqueOrderId = userId + '_' + Date.now();
             
-            const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target Guild ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+            const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target UID/Guild: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
             await ctx.editMessageText(userId, procMsgId, null, pendingReceipt, {
                 parse_mode: 'Markdown',
@@ -1870,14 +1874,17 @@ bot.action('confirm_order', async (ctx) => {
                 loadingMessageId: procMsgId,
                 product: session.product,
                 uid: session.uid,
-                nickname: session.nickname || 'Guild ID Service',
+                nickname: session.nickname || 'Unknown',
                 region: session.region,
                 price: session.price,
-                isFFLikeCategory: false
+                totalDays: totalDays,
+                actionType: session.actionType,
+                productCode: session.productCode,
+                isFFLikeCategory: isFFLikeCategory
             };
             saveDatabase(db);
 
-            await bot.telegram.sendMessage(ADMIN_ID, `🛠️ **New Guild/Service Order (Pending)**\n\n📦 Package: \`${session.product}\`\n🛡️ Target Guild ID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
+            await bot.telegram.sendMessage(ADMIN_ID, `🛠️ **New Manual/Fallback Order (Pending Review)**\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n💵 Price: \`${session.price} BDT\`\n👤 Customer ID: \`${userId}\``, {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
                     [Markup.button.callback('✅ Complete Order', 'admin_input_' + uniqueOrderId)],
