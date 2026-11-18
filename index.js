@@ -590,7 +590,7 @@ bot.on('message', async (ctx) => {
                         ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
                         : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
 
-                    const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target ID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`${subNote}\n\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                    const completedReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${orderInfo.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${orderInfo.nickname || 'Unknown'}\`\n🛡️ UID: \`${orderInfo.uid}\`\n🌍 Server: \`${orderInfo.region}\`\n\n📊 Status: \`Completed by Admin\`${subNote}\n\n📈 **Added Likes:** \`+${orderInfo.addedLikes} Likes\`\n\n💰 Price: \`${orderInfo.price} BDT\`\n💳 Remaining Balance: \`${currentBal} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                     await bot.telegram.editMessageText(targetUid, orderInfo.loadingMessageId, null, completedReceipt, {
                         parse_mode: 'Markdown',
@@ -1604,7 +1604,7 @@ bot.action(/custom_cat_(.+)/, async (ctx) => {
             inlineButtons.push([Markup.button.callback('➕ Add Product', 'admin_add_prod_idx_' + catIdx)]);
             inlineButtons.push([Markup.button.callback('❌ Remove Category', 'admin_rem_cat_idx_' + catIdx)]);
         }
-        inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]);
+        inlineButtons.push([Markup.button.callback(t(userId, 'backBtn'), 'shop_now_back'), Markup.button.callback(t(userId, 'mainMenuBack'), 'mainMenuBack')]);
         await ctx.editMessageText(`📂 **${translateCategoryName(catName, userId)}**`, { parse_mode: 'Markdown', ...Markup.inlineKeyboard(inlineButtons) });
     } catch (e) {}
 });
@@ -1681,7 +1681,7 @@ bot.action(/sub_prod_idx_(.+)_(.+)/, async (ctx) => {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('🇧🇩 BD', 'region_bd'), Markup.button.callback('🇮🇩 ID', 'region_id')],
-                [Markup.button.callback(t(userId, 'backBtn'), prevCatCallback), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
+                [Markup.button.callback(t(userId, 'backBtn'), prevCatCallback), Markup.button.callback(t(userId, 'mainMenuBack'), 'mainMenuBack')]
             ])
         });
     } catch (e) {}
@@ -1710,7 +1710,7 @@ bot.action(/region_(bd|id)/, async (ctx) => {
         await ctx.editMessageText(promptText, {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-                [Markup.button.callback(t(userId, 'backBtn'), prevProdCallback), Markup.button.callback(t(userId, 'mainMenuBack'), 'back_start_inline')]
+                [Markup.button.callback(t(userId, 'backBtn'), prevProdCallback), Markup.button.callback(t(userId, 'mainMenuBack'), 'mainMenuBack')]
             ])
         });
     } catch (e) {}
@@ -1728,7 +1728,7 @@ bot.action('cancel_order_review', async (ctx) => {
     } catch (e) {}
 });
 
-// 🔥 সম্পূর্ণ আপডেট করা অর্ডার কনফার্মেশন ও রিয়েল-টাইম API স্ট্যাটাস হ্যান্ডলার (Processing / Completed / Failed & Refund)
+// 🔥 ফিক্সড অর্ডার কনফার্মেশন ও রিয়েল-টাইম API স্ট্যাটাস হ্যান্ডলার (রসিদে Name ও UID সহ)
 bot.action('confirm_order', async (ctx) => {
     try {
         const userId = ctx.from.id.toString();
@@ -1769,7 +1769,6 @@ bot.action('confirm_order', async (ctx) => {
             const apiStatus = (apiRes.status || '').toLowerCase();
             const addedLikesText = extractDefaultAddedLikes(session.product);
 
-            // 🔄 যদি রাইজেন সার্ভারে স্ট্যাটাস 'processing' থাকে
             if (apiStatus === 'processing' || apiRes.processing === true) {
                 try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Order is Processing...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
 
@@ -1792,12 +1791,11 @@ bot.action('confirm_order', async (ctx) => {
                 saveDatabase(db);
 
             } else if (apiStatus === 'failed' || apiStatus === 'cancelled' || apiRes.success === false) {
-                // ❌ **যদি রাইজেন থেকে ফেইল বা ক্যানসেল দেখায় -> অটো রিফান্ড**
                 db.balances[userId] += Number(session.price);
                 saveDatabase(db);
 
                 const failReason = apiRes.error || apiRes.message || 'Raizen API Rejected Order';
-                const failedReceipt = `❌ **Order Failed & Refunded**\n\n📦 Package: \`${session.product}\`\n🛡️ UID: \`${session.uid}\`\n💵 Price Refunded: \`${session.price} BDT\`\n\n⚠️ **Reason:** \`${failReason}\`\n\nআপনার ব্যালেন্স স্বয়ংক্রয়ভাবে রিফান্ড করে দেওয়া হয়েছে।`;
+                const failedReceipt = `❌ **Order Failed & Refunded**\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n💵 Price Refunded: \`${session.price} BDT\`\n\n⚠️ **Reason:** \`${failReason}\`\n\nআপনার ব্যালেন্স স্বয়ংক্রয়ভাবে রিফান্ড করে দেওয়া হয়েছে।`;
 
                 await ctx.telegram.editMessageText(userId, procMsgId, null, failedReceipt, {
                     parse_mode: 'Markdown',
@@ -1805,7 +1803,6 @@ bot.action('confirm_order', async (ctx) => {
                 });
 
             } else {
-                // ✅ **সাকসেস বা কমপ্লিট হলে**
                 try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
 
                 let subStatusText = '';
@@ -1856,13 +1853,12 @@ bot.action('confirm_order', async (ctx) => {
             }
 
         } else {
-            // 🛠️ **যদি API OFF থাকে অথবা এপিআই ফেইল করে, তবে ম্যানুয়াল অর্ডারে চলে যাবে**
             try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Processing Order...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
             await new Promise(r => setTimeout(r, 200));
 
             const uniqueOrderId = userId + '_' + Date.now();
             
-            const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n🛡️ Target UID/Guild: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+            const pendingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PENDING REVIEW\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`SRV-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Pending Admin Approval\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সফলভাবে সাবমিট হয়েছে এবং টাকা কেটে নেওয়া হয়েছে। অ্যাডমিন চেক করে শীঘ্রই এটি কমপ্লিট করে দেবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
             await ctx.editMessageText(userId, procMsgId, null, pendingReceipt, {
                 parse_mode: 'Markdown',
@@ -1933,7 +1929,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, async () => {
-    console.log(`Webhook HTTP Server listening on port ${PORT}`);
+    console.log(`Webhook HTTP Server listening on port `${PORT}`);
     
     try {
         await bot.telegram.setWebhook(`${RENDER_URL}${webhookPath}`, { drop_pending_updates: true });
