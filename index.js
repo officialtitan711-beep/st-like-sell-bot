@@ -1775,7 +1775,7 @@ bot.action('confirm_order', async (ctx) => {
             if (apiStatus === 'processing' || apiRes.processing === true) {
                 try { await ctx.telegram.editMessageText(userId, procMsgId, null, `⏳ Order is Processing...\n\`▰▰▰▰▰▰▰▰▰▰ 100%\``, { parse_mode: 'Markdown' }); } catch (e) {}
 
-                const processingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PROCESSING\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`PROC-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Processing in Server\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সার্ভারে প্রসেসিং এ রয়েছে। কাজ সম্পন্ন হলে অটোমেটিক কমপ্লিট স্ট্যাটাস দেখতে পাবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                const processingReceipt = `💠 ════════════════════════════ 💠\n           ⏳ ORDER PROCESSING\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`PROC-${Math.floor(10000 + Math.random() * 90000)}\`\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📊 Status: \`Processing\`\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n✨ আপনার অর্ডারটি সার্ভারে প্রসেসিং-এ রয়েছে। কাজ সম্পন্ন হলে অটোমেটিক কমপ্লিট স্ট্যাটাস দেখতে পাবেন!\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                 await ctx.telegram.editMessageText(userId, procMsgId, null, processingReceipt, {
                     parse_mode: 'Markdown',
@@ -1798,7 +1798,7 @@ bot.action('confirm_order', async (ctx) => {
                 saveDatabase(db);
 
                 const failReason = apiRes.error || apiRes.message || 'API Rejected';
-                const failedReceipt = `❌ **Order Failed & Refunded**\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n💵 Price Refunded: \`${session.price} BDT\`\n\n⚠️ **Reason:** \`${failReason}\`\n\nআপনার ব্যালেন্স স্বয়ংক্রয়ভাবে রিফান্ড করে দেওয়া হয়েছে।`;
+                const failedReceipt = `❌ **Order Failed & Refunded**\n\n📦 Package: \`${session.product}\`\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n💵 Price Refunded: \`${session.price} BDT\`\n\n⚠️ **Reason:** \`${failReason}\`\n\nএপিআই থেকে অর্ডারটি ফেইল করায় আপনার ব্যালেন্স স্বয়ংক্রয়ভাবে রিফান্ড করা হয়েছে।`;
 
                 await ctx.telegram.editMessageText(userId, procMsgId, null, failedReceipt, {
                     parse_mode: 'Markdown',
@@ -1845,7 +1845,7 @@ bot.action('confirm_order', async (ctx) => {
                     ? "⚠️ **সতর্কতা: ২৪ ঘণ্টার মধ্যে একই ইউআইডিতে পুনরায় লাইক নিলে লাইক না-ও যোগ হতে পারে!**"
                     : "⚠️ **Warning: Taking likes again on this UID within 24 hours may result in likes not being added!**";
 
-                const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📈 **Added Likes:** \`+${addedLikesText}\`\n\n📊 Status: \`Completed Successfully\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
+                const autoReceipt = `💠 ════════════════════════════ 💠\n           ✅ ORDER SUCCESSFULLY COMPLETED\n💠 ════════════════════════════ 💠\n\n📦 Package: \`${session.product}\`\n🆔 Order ID: \`AUTO-${Math.floor(10000 + Math.random() * 90000)}\`${subStatusText}\n\n👤 Name: \`${session.nickname || 'Unknown'}\`\n🛡️ UID: \`${session.uid}\`\n🌍 Server: \`${session.region}\`\n\n📈 **Added Likes:** \`+${addedLikesText}\`\n\n📊 Status: \`Completed\`\n\n💰 Price: \`${session.price} BDT\`\n💳 Remaining Balance: \`${db.balances[userId]} BDT\`\n\n${warningText}\n\n💠 ════════════════════════════ 💠\nStay with SIR TOPUP 💙`;
 
                 await ctx.telegram.editMessageText(userId, procMsgId, null, autoReceipt, {
                     parse_mode: 'Markdown',
