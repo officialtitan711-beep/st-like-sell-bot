@@ -12,7 +12,7 @@ const CHANNEL_ID = process.env.CHANNEL_ID || '@shohan2004';
 const YOUTUBE_URL = process.env.YOUTUBE_URL || 'https://m.youtube.com/@ShohanSir18';
 
 const API_BASE = "https://raigen.site/likesff/reseller.php";
-const API_KEY = "likesff-shop-11935-c3rp5src";
+const API_KEY = "likesff-shop-11935-mbqgvd7f"; // 🔒 Updated with your new secure API key
 const PORT = process.env.PORT || 3000;
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com';
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
