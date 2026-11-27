@@ -19,6 +19,17 @@ const RENDER_URL = (process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
 const DEFAULT_CAT = '🔥 Free Fire Likes ❤️‍🔥';
 
+// চ্যানেল/গ্রুপ চেক কনফিগ (চাইলে Render env-এ REQUIRED_CHATS="-1001234567890,-1009876543210" দিতে পারেন)
+const REQUIRED_CHATS = (process.env.REQUIRED_CHATS || '@flexsecrect,@shohan2004')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const CHANNEL_LINKS = [
+    { label: '📢 Channel 1 (Flex Secret)', url: process.env.CHANNEL_1_URL || 'https://t.me/flexsecrect' },
+    { label: '📢 Channel 2 (Shohan)', url: process.env.CHANNEL_2_URL || 'https://t.me/shohan2004' }
+];
+
 const bot = new Telegraf(BOT_TOKEN);
 
 // ───────────────────────── HELPERS ─────────────────────────
@@ -44,6 +55,67 @@ function nowStamp() {
         date: now.toLocaleDateString('en-GB', { timeZone: 'Asia/Dhaka' }),
         time: now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: true })
     };
+}
+
+// ───────────────────────── ACCESS & MEMBERSHIP GUARD ─────────────────────────
+function isAuthorizedUser(db, userId) {
+    if (String(userId) === ADMIN_ID) return true;
+    return Boolean(db && db.allowedUsers && db.allowedUsers[String(userId)] === true);
+}
+
+async function isMemberOfRequiredChats(userId) {
+    if (String(userId) === ADMIN_ID) return true;
+    if (!REQUIRED_CHATS.length) return true;
+
+    for (const chatRef of REQUIRED_CHATS) {
+        try {
+            const member = await bot.telegram.getChatMember(chatRef, Number(userId));
+            const status = member && member.status;
+            if (!status || status === 'left' || status === 'kicked') {
+                return false;
+            }
+        } catch (err) {
+            // বট ওই চ্যানেল/গ্রুপে এক্সেস না পেলে বা ইউজার না থাকলে নিরাপদ থাকতে আটকাবে
+            console.error(`getChatMember failed for ${chatRef} user ${userId}:`, err.message);
+            return false;
+        }
+    }
+    return true;
+}
+
+function joinRequiredKb() {
+    const rows = CHANNEL_LINKS.map((c) => [Markup.button.url(c.label, c.url)]);
+    rows.push([Markup.button.callback('✅ Joined — Verify Now', 'verify_sub')]);
+    return Markup.inlineKeyboard(rows);
+}
+
+async function enforceAccess(ctx, userId, isCallback = false) {
+    if (String(userId) === ADMIN_ID) return true;
+    const db = loadDatabase();
+
+    if (!isAuthorizedUser(db, userId)) {
+        const msg = '⛔ **Access Denied!**\n\nআপনাকে এই বট ব্যবহারের অনুমতি দেওয়া হয়নি। অনুমোদনের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।';
+        if (isCallback) {
+            await ctx.answerCbQuery('⛔ Access Denied! Contact Admin.', { show_alert: true }).catch(() => {});
+        } else {
+            await sendMd(userId, msg);
+        }
+        return false;
+    }
+
+    const joined = await isMemberOfRequiredChats(userId);
+    if (!joined) {
+        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে নিচের চ্যানেল/গ্রুপগুলোতে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **Joined — Verify Now** চাপুন:';
+        if (isCallback) {
+            await ctx.answerCbQuery('⚠️ Join required channels first!', { show_alert: true }).catch(() => {});
+            await safeEdit(ctx.chat.id, ctx.callbackQuery.message.message_id, msg, joinRequiredKb());
+        } else {
+            await sendMd(userId, msg, joinRequiredKb());
+        }
+        return false;
+    }
+
+    return true;
 }
 
 // ───────────────────────── DATABASE (Firebase safe) ─────────────────────────
@@ -191,9 +263,7 @@ async function callWithRetry(params) {
     return res;
 }
 
-// এই error হলে অর্ডার ম্যানুয়ালে না ফেলে কাস্টমারকে রিফান্ড + কারণ দেখানো হবে
 const REFUND_CODES = new Set(['UID_LIMIT', 'UID_ACTIVE', 'UID_NOT_FOUND', 'INVALID_UID', 'INVALID_SERVER', 'FF_API_ERROR', 'ORDER_FAILED']);
-// রিসেলার সাইডের সমস্যা — অ্যাডমিনকে জরুরি alert
 const CRITICAL_CODES = new Set(['INVALID_KEY', 'KEY_INACTIVE', 'MISSING_KEY', 'INSUFFICIENT_BALANCE', 'PRODUCT_DISABLED', 'INSTANT_DISABLED', 'PRODUCT_NOT_FOUND', 'MISSING_PRODUCT', 'INVALID_ACTION', 'DB_ERROR']);
 
 const REASONS = {
@@ -535,7 +605,6 @@ async function processDailySubscriptions() {
             if (sub.lastDeliveredDate === today || sub.startDate === today) continue;
 
             if (sub.manual) {
-                // ম্যানুয়াল সাবস্ক্রিপশন: অ্যাডমিনকে প্রতিদিন রিমাইন্ডার
                 if (sub.remindedDate !== today) {
                     sub.remindedDate = today; modified = true;
                     await notifyAdmin(`🔔 **Manual Package Reminder**\n\n📦 ${m(sub.product)}\n🛡️ UID: ${m(sub.uid)} (${m(sub.region)})\n📅 Day ${sub.deliveredDays + 1} of ${sub.totalDays}\n👤 Customer: ${m(sub.userId)}\n\nআজকের লাইক দিয়ে নিচের বাটন চাপো 👇`,
@@ -544,7 +613,6 @@ async function processDailySubscriptions() {
                 continue;
             }
 
-            // অটো অর্ডার: LikesFF নিজেই প্রতিদিন ডেলিভারি দেয়। বট আর API কল করে নতুন অর্ডার দেবে না!
             if (sub.orderId) {
                 const st = await callLikesFF({ action: 'status', order_id: sub.orderId }, 30000);
                 if (st.ok && /fail|cancel|refund/i.test(String(st.status || ''))) {
@@ -691,8 +759,13 @@ bot.start(async (ctx) => {
     try {
         const userId = String(ctx.from.id);
         const db = loadDatabase();
-        delete db.sessions[userId];
         db.users[userId] = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
+        saveDatabase(db);
+
+        const allowed = await enforceAccess(ctx, userId, false);
+        if (!allowed) return;
+
+        delete db.sessions[userId];
         saveDatabase(db);
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
     } catch (e) { console.error(e); }
@@ -707,9 +780,18 @@ bot.command('api', async (ctx) => {
     } catch (e) { console.error(e); }
 });
 
-// callback query এর spinner বন্ধ করা (যেসব হ্যান্ডলার নিজে alert/toast দেয় সেগুলো বাদে)
 bot.action(/.*/, async (ctx, next) => {
+    const userId = String(ctx.from && ctx.from.id);
     const data = (ctx.callbackQuery && ctx.callbackQuery.data) || '';
+
+    if (data === 'verify_sub') {
+        try { await ctx.answerCbQuery(); } catch (e) { /* ignore */ }
+        return next();
+    }
+
+    const ok = await enforceAccess(ctx, userId, true);
+    if (!ok) return;
+
     if (!/^(confirm_order|dep_app_|dep_can_|admin_can_|admin_rem_cat_idx_|admin_rem_prod_idx_|set_lang_|verify_sub|sub_done_)/.test(data)) {
         try { await ctx.answerCbQuery(); } catch (e) { /* ignore */ }
     }
@@ -719,6 +801,16 @@ bot.action(/.*/, async (ctx, next) => {
 bot.action('verify_sub', async (ctx) => {
     try {
         const userId = String(ctx.from.id);
+        const db = loadDatabase();
+        if (!isAuthorizedUser(db, userId)) {
+            await ctx.answerCbQuery('⛔ Access Denied! Contact Admin.', { show_alert: true }).catch(() => {});
+            return;
+        }
+        const joined = await isMemberOfRequiredChats(userId);
+        if (!joined) {
+            await ctx.answerCbQuery('⚠️ এখনো সব চ্যানেল/গ্রুপে জয়েন করা হয়নি!', { show_alert: true }).catch(() => {});
+            return;
+        }
         await ctx.answerCbQuery('🎉 ভেরিফিকেশন সফল!').catch(() => {});
         try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
@@ -740,6 +832,9 @@ bot.on('message', async (ctx) => {
         const info = { id: userId, first_name: ctx.from.first_name || 'N/A', username: ctx.from.username ? '@' + ctx.from.username : 'N/A' };
         const prevU = db.users[userId];
         if (!prevU || prevU.first_name !== info.first_name || prevU.username !== info.username) { db.users[userId] = info; saveDatabase(db); }
+
+        const allowed = await enforceAccess(ctx, userId, false);
+        if (!allowed) return;
 
         if (isMenuCommand(text)) {
             if (db.sessions[userId]) { delete db.sessions[userId]; saveDatabase(db); }
@@ -766,7 +861,7 @@ bot.on('message', async (ctx) => {
                 if (targetUid) {
                     db.allowedUsers[targetUid] = true;
                     saveDatabase(db);
-                    await sendMd(targetUid, '🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। এখন থেকে আপনি বট ব্যবহার করতে পারবেন। /start লিখে শুরু করুন।');
+                    await sendMd(targetUid, '🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। এখন থেকে আপনি বট ব্যবহার করতে পারবেন। /start লিখে শুরু করুন।', joinRequiredKb());
                     return ctx.reply(`✅ সফলভাবে ইউজার আইডি \`${targetUid}\`-কে বট ব্যবহারের এক্সেস দেওয়া হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 saveDatabase(db);
@@ -778,6 +873,7 @@ bot.on('message', async (ctx) => {
                 delete db.adminInputSession[userId];
                 if (targetUid) {
                     delete db.allowedUsers[targetUid];
+                    delete db.sessions[targetUid];
                     saveDatabase(db);
                     await sendMd(targetUid, '⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন।');
                     return ctx.reply(`❌ সফলভাবে ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে!`, { parse_mode: 'Markdown' });
@@ -864,7 +960,7 @@ bot.on('message', async (ctx) => {
             const actionType = sessionData.type;
 
             if (actionType === 'add_category') {
-                const catName = text.replace(/[.$#\[\]\/]/g, '-').trim(); // Firebase key-তে এই ক্যারেক্টার চলে না
+                const catName = text.replace(/[.$#\[\]\/]/g, '-').trim();
                 delete db.adminInputSession[userId];
                 if (catName) {
                     if (!db.categories.includes(catName)) db.categories.push(catName);
@@ -1124,7 +1220,6 @@ bot.on('message', async (ctx) => {
                 return ctx.reply('📢 Enter broadcast message for all users:');
             }
             if (text.includes('Auto API: ON') || text.includes('Auto API: OFF')) {
-                // বাটনের লেখা দেখে সেট করা হয় (OFF বাটন চাপলে ON, ON বাটন চাপলে OFF) — পুরনো কিবোর্ডেও ভুল উল্টাবে না
                 db.settings.autoApiEnabled = text.includes('Auto API: OFF');
                 saveDatabase(db);
                 const msg = db.settings.autoApiEnabled
@@ -1141,6 +1236,7 @@ bot.on('message', async (ctx) => {
 
         if (cleanText.includes('calculator') || cleanText.includes('ক্যালকুলেটর') || text.includes('🧮')) {
             db.calcStates[userId] = '0';
+            saveDatabase(db);
             return ctx.reply('🧮 **Calculator**\n\nScreen: `0`', { parse_mode: 'Markdown', ...getCalcKeyboard() });
         }
 
@@ -1487,6 +1583,7 @@ bot.action(/^calc_(.+)$/, async (ctx) => {
         else current += val;
 
         db.calcStates[userId] = current;
+        saveDatabase(db);
         await ctx.editMessageText(`🧮 **Calculator**\n\nScreen: \`${clean(current)}\``, { parse_mode: 'Markdown', ...getCalcKeyboard() });
     } catch (e) { /* message not modified etc. */ }
 });
@@ -1616,17 +1713,14 @@ bot.action('confirm_order', async (ctx) => {
         const price = Number(session.price) || 0;
         if ((db.balances[userId] || 0) < price) return ctx.answerCbQuery('❌ Insufficient balance!', { show_alert: true }).catch(() => {});
 
-        // 🔒 ডাবল-ট্যাপ লক: সেশন সরিয়ে + টাকা কেটে তারপর প্রসেস
         delete db.sessions[userId];
         db.balances[userId] = (db.balances[userId] || 0) - price;
         saveDatabase(db);
         await ctx.answerCbQuery('⏳ Processing...').catch(() => {});
 
         const msgId = ctx.callbackQuery.message.message_id;
-        // API অনেক সময় নিতে পারে (instant like ডেলিভারির অপেক্ষা করে) — তাই webhook আটকে না রেখে ব্যাকগ্রাউন্ডে চালানো হয়
         processOrder(userId, msgId, session).catch(async (err) => {
             console.error('processOrder crashed:', err);
-            // ক্র্যাশ করলে টাকা হারাবে না: ম্যানুয়াল রিভিউয়ে পাঠানো
             try {
                 const d = loadDatabase();
                 const uniqueOrderId = userId + '_' + Date.now();
@@ -1645,7 +1739,6 @@ bot.action('confirm_order', async (ctx) => {
     } catch (e) { console.error('confirm_order error:', e); }
 });
 
-// 'mainMenuBack' পুরনো মেসেজের বাটনের জন্যও কাজ করবে
 bot.action(/^(back_start_inline|mainMenuBack)$/, async (ctx) => {
     try {
         const userId = String(ctx.from.id);
@@ -1659,14 +1752,13 @@ bot.action(/^(back_start_inline|mainMenuBack)$/, async (ctx) => {
 bot.catch((err) => { console.error('Telegraf error:', err && err.message ? err.message : err); });
 
 // ───────────────────────── SERVER / WEBHOOK ─────────────────────────
-// ওয়েবহুক পাথ আগে শুধু bot id ছিল (যেটা পাবলিক) — এখন টোকেনের হ্যাশ, কেউ আন্দাজ করে ফেক আপডেট পাঠাতে পারবে না
 const webhookPath = '/hook-' + crypto.createHash('sha256').update(BOT_TOKEN).digest('hex').slice(0, 32);
 const handleWebhook = bot.webhookCallback(webhookPath);
 
 const server = http.createServer((req, res) => {
     try {
         if (req.url === webhookPath && req.method === 'POST') {
-            if (!dbReady) { res.writeHead(503); return res.end('db loading'); } // Telegram পরে আবার পাঠাবে
+            if (!dbReady) { res.writeHead(503); return res.end('db loading'); }
             return handleWebhook(req, res);
         }
         if (req.url === '/ping') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('OK'); }
@@ -1690,6 +1782,5 @@ server.listen(PORT, async () => {
     }
     setTimeout(processDailySubscriptions, 60 * 1000);
     setInterval(processDailySubscriptions, 15 * 60 * 1000);
-    // Render ঘুমিয়ে না যেতে নিজেকে পিং (UptimeRobot-ও লাগাও)
     setInterval(() => { https.get(`${RENDER_URL}/ping`, (r) => r.resume()).on('error', () => {}); }, 4 * 60 * 1000);
 });
