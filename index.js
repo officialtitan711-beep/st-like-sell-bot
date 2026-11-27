@@ -9,11 +9,11 @@ process.on('uncaughtException', (err) => { console.error('Uncaught Exception:', 
 process.on('unhandledRejection', (reason) => { console.error('Unhandled Rejection:', reason); });
 
 // ───────────────────────── CONFIG ─────────────────────────
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const BOT_TOKEN = process.env.BOT_TOKEN || '9030947504:AAF8-c78QWRGLz1y1uPmmnXds_lDWevGxk0'; // ⚠️ ২-৩ দিন পর বদলে নিও (Render env BOT_TOKEN দিলে সেটাই আগে ব্যবহার হবে)
 if (!BOT_TOKEN) { console.error('❌ BOT_TOKEN env variable missing! Render > Environment এ BOT_TOKEN দাও।'); process.exit(1); }
 const ADMIN_ID = String(process.env.ADMIN_ID || '5932254012');
 const API_BASE = process.env.LIKESFF_API_BASE || 'https://raigen.site/likesff/reseller.php';
-const API_KEY = process.env.LIKESFF_API_KEY || 'likesff-shop-11935-mbqgvd7f'; // ⚠️ Regenerate করে Render env LIKESFF_API_KEY এ রাখো
+const API_KEY = process.env.LIKESFF_API_KEY || 'likesff-shop-11935-mbqgvd7f'; // ⚠️ ২-৩ দিন পর বদলে নিও (Render env LIKESFF_API_KEY দিলে সেটাই আগে ব্যবহার হবে)
 const PORT = process.env.PORT || 3000;
 const RENDER_URL = (process.env.RENDER_EXTERNAL_URL || 'https://st-like-sell-bot.onrender.com').replace(/\/+$/, '');
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL;
@@ -22,6 +22,7 @@ const DEFAULT_CAT = '🔥 Free Fire Likes ❤️‍🔥';
 const bot = new Telegraf(BOT_TOKEN);
 
 // ───────────────────────── HELPERS ─────────────────────────
+const hasNum = (s, n) => new RegExp('(^|[^0-9])' + n + '([^0-9]|$)').test(s); // '1100' এর ভেতরে '100' ধরবে না
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clean = (s) => String(s === undefined || s === null ? '' : s).replace(/[`\\]/g, '');
 const m = (v) => '`' + clean(v) + '`';
@@ -245,7 +246,7 @@ function checkFreeFireUID(uid) {
 
 function extractDefaultAddedLikes(productName) {
     const lower = productName.toLowerCase();
-    if (lower.includes('100')) return '100 Likes';
+    if (hasNum(lower, '100')) return '100 Likes';
     if (lower.includes('220') || lower.includes('1100') || lower.includes('3300') || lower.includes('6600')) return '220 Likes';
     const mt = productName.match(/(\d+)\s*like/i);
     if (mt && mt[1]) return mt[1] + ' Likes';
@@ -254,7 +255,7 @@ function extractDefaultAddedLikes(productName) {
 
 function extractPackageDays(productName) {
     const lower = productName.toLowerCase();
-    if (lower.includes('100') || lower.includes('220')) return 1;
+    if (hasNum(lower, '100') || hasNum(lower, '220')) return 1;
     if (lower.includes('5 days') || lower.includes('৫ দিন') || lower.includes('15 days') || lower.includes('১৫ দিন') || lower.includes('30 days') || lower.includes('৩০ দিন')) {
         const mt = productName.match(/(\d+)\s*(days?|দিন)/i);
         if (mt && mt[1]) { const days = parseInt(mt[1], 10); return days > 1 ? days : 1; }
@@ -1559,7 +1560,7 @@ bot.action(/^sub_prod_idx_(\d+)_(\d+)$/, async (ctx) => {
         let actionType = 'like';
         let productCode = '';
         const lowerProdName = prod.name.toLowerCase();
-        const is100Like = lowerProdName.includes('100');
+        const is100Like = hasNum(lowerProdName, '100');
 
         if (lowerProdName.includes('6600') || lowerProdName.includes('৩০ দিন') || lowerProdName.includes('30 days')) { actionType = 'auto'; productCode = 'AL-55F71F'; }
         else if (lowerProdName.includes('3300') || lowerProdName.includes('১৫ দিন') || lowerProdName.includes('15 days')) { actionType = 'auto'; productCode = 'AL-3300'; }
@@ -1689,4 +1690,6 @@ server.listen(PORT, async () => {
     }
     setTimeout(processDailySubscriptions, 60 * 1000);
     setInterval(processDailySubscriptions, 15 * 60 * 1000);
+    // Render ঘুমিয়ে না যেতে নিজেকে পিং (UptimeRobot-ও লাগাও)
+    setInterval(() => { https.get(`${RENDER_URL}/ping`, (r) => r.resume()).on('error', () => {}); }, 4 * 60 * 1000);
 });
