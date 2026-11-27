@@ -12,6 +12,7 @@ process.on('unhandledRejection', (reason) => { console.error('Unhandled Rejectio
 const BOT_TOKEN = process.env.BOT_TOKEN || '9030947504:AAF8-c78QWRGLz1y1uPmmnXds_lDWevGxk0'; // ⚠️ ২-৩ দিন পর বদলে নিও (Render env BOT_TOKEN দিলে সেটাই আগে ব্যবহার হবে)
 if (!BOT_TOKEN) { console.error('❌ BOT_TOKEN env variable missing! Render > Environment এ BOT_TOKEN দাও।'); process.exit(1); }
 const ADMIN_ID = String(process.env.ADMIN_ID || '5932254012');
+const ADMIN_USERNAME = String(process.env.ADMIN_USERNAME || 'sonu1813').replace(/^@/, '');
 const API_BASE = process.env.LIKESFF_API_BASE || 'https://raigen.site/likesff/reseller.php';
 const API_KEY = process.env.LIKESFF_API_KEY || 'likesff-shop-11935-mbqgvd7f'; // ⚠️ ২-৩ দিন পর বদলে নিও (Render env LIKESFF_API_KEY দিলে সেটাই আগে ব্যবহার হবে)
 const PORT = process.env.PORT || 3000;
@@ -40,6 +41,10 @@ const m = (v) => '`' + clean(v) + '`';
 const stripMd = (s) => String(s).replace(/[*`_]/g, '');
 const LINE = '💠 ════════════════════════════ 💠';
 const receipt = (title, lines) => `${LINE}\n           ${title}\n${LINE}\n\n${lines.join('\n')}\n\n${LINE}\nStay with SIR TOPUP 💙`;
+
+const adminContactText = ADMIN_USERNAME
+    ? `@${ADMIN_USERNAME} (${m('ID: ' + ADMIN_ID)})`
+    : `[Admin](tg://user?id=${ADMIN_ID}) (${m('ID: ' + ADMIN_ID)})`;
 
 function getTodayDateBD() {
     const bd = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
@@ -89,28 +94,38 @@ function joinRequiredKb() {
     return Markup.inlineKeyboard(rows);
 }
 
+function getAccessPendingMessage(userId, joinedVerified = false) {
+    if (joinedVerified) {
+        return `✅ **চ্যানেল/গ্রুপ জয়েন ভেরিফাই হয়েছে!**\n\n⛔ তবে বট ব্যবহারের জন্য আপনার **Bot Access** এখনো অনুমোদন করা হয়নি।\n\n📩 এক্সেস নিতে অ্যাডমিনের সাথে যোগাযোগ করুন: ${adminContactText}\n🆔 আপনার User ID: ${m(userId)}`;
+    }
+    return `⛔ **Access Denied!**\n\nআপনাকে এই বট ব্যবহারের অনুমতি দেওয়া হয়নি।\n\n📩 বট এক্সেস নিতে অ্যাডমিনের সাথে যোগাযোগ করুন: ${adminContactText}\n🆔 আপনার User ID: ${m(userId)}`;
+}
+
 async function enforceAccess(ctx, userId, isCallback = false) {
     if (String(userId) === ADMIN_ID) return true;
     const db = loadDatabase();
 
-    if (!isAuthorizedUser(db, userId)) {
-        const msg = '⛔ **Access Denied!**\n\nআপনাকে এই বট ব্যবহারের অনুমতি দেওয়া হয়নি। অনুমোদনের জন্য অ্যাডমিনের সাথে যোগাযোগ করুন।';
+    // ১. আগে দুই চ্যানেল/গ্রুপে জয়েন আছে কি না চেক
+    const joined = await isMemberOfRequiredChats(userId);
+    if (!joined) {
+        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে আগে নিচের উভয় চ্যানেল/গ্রুপে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **Joined — Verify Now** চাপুন:';
         if (isCallback) {
-            await ctx.answerCbQuery('⛔ Access Denied! Contact Admin.', { show_alert: true }).catch(() => {});
+            await ctx.answerCbQuery('⚠️ Join required channels/groups first!', { show_alert: true }).catch(() => {});
+            await safeEdit(ctx.chat.id, ctx.callbackQuery.message.message_id, msg, joinRequiredKb());
         } else {
-            await sendMd(userId, msg);
+            await sendMd(userId, msg, joinRequiredKb());
         }
         return false;
     }
 
-    const joined = await isMemberOfRequiredChats(userId);
-    if (!joined) {
-        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে নিচের চ্যানেল/গ্রুপগুলোতে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **Joined — Verify Now** চাপুন:';
+    // ২. জয়েন থাকলে এরপর অ্যাডমিন অনুমোদিত (allowedUsers) কি না চেক
+    if (!isAuthorizedUser(db, userId)) {
+        const msg = getAccessPendingMessage(userId, true);
         if (isCallback) {
-            await ctx.answerCbQuery('⚠️ Join required channels first!', { show_alert: true }).catch(() => {});
-            await safeEdit(ctx.chat.id, ctx.callbackQuery.message.message_id, msg, joinRequiredKb());
+            await ctx.answerCbQuery('⛔ Contact @' + ADMIN_USERNAME + ' for bot access!', { show_alert: true }).catch(() => {});
+            await sendMd(userId, msg, Markup.removeKeyboard());
         } else {
-            await sendMd(userId, msg, joinRequiredKb());
+            await sendMd(userId, msg, Markup.removeKeyboard());
         }
         return false;
     }
@@ -802,15 +817,19 @@ bot.action('verify_sub', async (ctx) => {
     try {
         const userId = String(ctx.from.id);
         const db = loadDatabase();
-        if (!isAuthorizedUser(db, userId)) {
-            await ctx.answerCbQuery('⛔ Access Denied! Contact Admin.', { show_alert: true }).catch(() => {});
-            return;
-        }
+
         const joined = await isMemberOfRequiredChats(userId);
         if (!joined) {
             await ctx.answerCbQuery('⚠️ এখনো সব চ্যানেল/গ্রুপে জয়েন করা হয়নি!', { show_alert: true }).catch(() => {});
             return;
         }
+
+        if (!isAuthorizedUser(db, userId)) {
+            await ctx.answerCbQuery('✅ Join verified! Contact @' + ADMIN_USERNAME + ' for access.', { show_alert: true }).catch(() => {});
+            try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
+            return sendMd(userId, getAccessPendingMessage(userId, true), Markup.removeKeyboard());
+        }
+
         await ctx.answerCbQuery('🎉 ভেরিফিকেশন সফল!').catch(() => {});
         try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
         return ctx.reply(t(userId, 'welcome'), { parse_mode: 'Markdown', ...getMainKeyboard(userId) });
@@ -875,7 +894,7 @@ bot.on('message', async (ctx) => {
                     delete db.allowedUsers[targetUid];
                     delete db.sessions[targetUid];
                     saveDatabase(db);
-                    await sendMd(targetUid, '⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন।');
+                    await sendMd(targetUid, `⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন। যোগাযোগ: ${adminContactText}`, Markup.removeKeyboard());
                     return ctx.reply(`❌ সফলভাবে ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 saveDatabase(db);
