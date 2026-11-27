@@ -27,8 +27,8 @@ const REQUIRED_CHATS = (process.env.REQUIRED_CHATS || '@flexsecrect,@shohan2004'
     .filter(Boolean);
 
 const CHANNEL_LINKS = [
-    { label: '📢 Channel 1 (Flex Secret)', url: process.env.CHANNEL_1_URL || 'https://t.me/flexsecrect' },
-    { label: '📢 Channel 2 (Shohan)', url: process.env.CHANNEL_2_URL || 'https://t.me/shohan2004' }
+    { label: 'Join Channel 1', url: process.env.CHANNEL_1_URL || 'https://t.me/flexsecrect' },
+    { label: 'Join Channel 2', url: process.env.CHANNEL_2_URL || 'https://t.me/shohan2004' }
 ];
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -80,7 +80,6 @@ async function isMemberOfRequiredChats(userId) {
                 return false;
             }
         } catch (err) {
-            // বট ওই চ্যানেল/গ্রুপে এক্সেস না পেলে বা ইউজার না থাকলে নিরাপদ থাকতে আটকাবে
             console.error(`getChatMember failed for ${chatRef} user ${userId}:`, err.message);
             return false;
         }
@@ -90,7 +89,7 @@ async function isMemberOfRequiredChats(userId) {
 
 function joinRequiredKb() {
     const rows = CHANNEL_LINKS.map((c) => [Markup.button.url(c.label, c.url)]);
-    rows.push([Markup.button.callback('✅ Joined — Verify Now', 'verify_sub')]);
+    rows.push([Markup.button.callback('♻️ VERIFY  ♻️', 'verify_sub')]);
     return Markup.inlineKeyboard(rows);
 }
 
@@ -104,16 +103,17 @@ function getAccessPendingMessage(userId, joinedVerified = false) {
 async function enforceAccess(ctx, userId, isCallback = false) {
     if (String(userId) === ADMIN_ID) return true;
     const db = loadDatabase();
+    const kb = getMainKeyboard(userId);
 
     // ১. আগে দুই চ্যানেল/গ্রুপে জয়েন আছে কি না চেক
     const joined = await isMemberOfRequiredChats(userId);
     if (!joined) {
-        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে আগে নিচের উভয় চ্যানেল/গ্রুপে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **Joined — Verify Now** চাপুন:';
+        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে আগে নিচের চ্যানেলগুলোতে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **♻️ VERIFY  ♻️** চাপুন:';
         if (isCallback) {
-            await ctx.answerCbQuery('⚠️ Join required channels/groups first!', { show_alert: true }).catch(() => {});
+            await ctx.answerCbQuery('⚠️ Join required channels first!', { show_alert: true }).catch(() => {});
             await safeEdit(ctx.chat.id, ctx.callbackQuery.message.message_id, msg, joinRequiredKb());
         } else {
-            await sendMd(userId, msg, joinRequiredKb());
+            await sendMd(userId, msg, { ...joinRequiredKb(), ...kb });
         }
         return false;
     }
@@ -123,9 +123,9 @@ async function enforceAccess(ctx, userId, isCallback = false) {
         const msg = getAccessPendingMessage(userId, true);
         if (isCallback) {
             await ctx.answerCbQuery('⛔ Contact @' + ADMIN_USERNAME + ' for bot access!', { show_alert: true }).catch(() => {});
-            await sendMd(userId, msg, Markup.removeKeyboard());
+            await sendMd(userId, msg, kb);
         } else {
-            await sendMd(userId, msg, Markup.removeKeyboard());
+            await sendMd(userId, msg, kb);
         }
         return false;
     }
@@ -800,7 +800,6 @@ bot.action(/.*/, async (ctx, next) => {
     const data = (ctx.callbackQuery && ctx.callbackQuery.data) || '';
 
     if (data === 'verify_sub') {
-        try { await ctx.answerCbQuery(); } catch (e) { /* ignore */ }
         return next();
     }
 
@@ -820,14 +819,14 @@ bot.action('verify_sub', async (ctx) => {
 
         const joined = await isMemberOfRequiredChats(userId);
         if (!joined) {
-            await ctx.answerCbQuery('⚠️ এখনো সব চ্যানেল/গ্রুপে জয়েন করা হয়নি!', { show_alert: true }).catch(() => {});
+            await ctx.answerCbQuery('⚠️ Join both channels first, then click VERIFY!', { show_alert: true }).catch(() => {});
             return;
         }
 
         if (!isAuthorizedUser(db, userId)) {
             await ctx.answerCbQuery('✅ Join verified! Contact @' + ADMIN_USERNAME + ' for access.', { show_alert: true }).catch(() => {});
             try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
-            return sendMd(userId, getAccessPendingMessage(userId, true), Markup.removeKeyboard());
+            return sendMd(userId, getAccessPendingMessage(userId, true), getMainKeyboard(userId));
         }
 
         await ctx.answerCbQuery('🎉 ভেরিফিকেশন সফল!').catch(() => {});
@@ -894,7 +893,7 @@ bot.on('message', async (ctx) => {
                     delete db.allowedUsers[targetUid];
                     delete db.sessions[targetUid];
                     saveDatabase(db);
-                    await sendMd(targetUid, `⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন। যোগাযোগ: ${adminContactText}`, Markup.removeKeyboard());
+                    await sendMd(targetUid, `⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন। যোগাযোগ: ${adminContactText}`, getMainKeyboard(targetUid));
                     return ctx.reply(`❌ সফলভাবে ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 saveDatabase(db);
