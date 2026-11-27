@@ -95,9 +95,9 @@ function joinRequiredKb() {
 
 function getAccessPendingMessage(userId, joinedVerified = false) {
     if (joinedVerified) {
-        return `✅ **চ্যানেল/গ্রুপ জয়েন ভেরিফাই হয়েছে!**\n\n⛔ তবে বট ব্যবহারের জন্য আপনার **Bot Access** এখনো অনুমোদন করা হয়নি।\n\n📩 এক্সেস নিতে অ্যাডমিনের সাথে যোগাযোগ করুন: ${adminContactText}\n🆔 আপনার User ID: ${m(userId)}`;
+        return `✅ চ্যানেল/গ্রুপ জয়েন ভেরিফাই হয়েছে!\n\n⛔ তবে বট ব্যবহারের জন্য আপনার Bot Access এখনো অনুমোদন করা হয়নি।\n\n📩 এক্সেস নিতে অ্যাডমিনের সাথে যোগাযোগ করুন: ${adminContactText}\n🆔 আপনার User ID: ${m(userId)}`;
     }
-    return `⛔ **Access Denied!**\n\nআপনাকে এই বট ব্যবহারের অনুমতি দেওয়া হয়নি।\n\n📩 বট এক্সেস নিতে অ্যাডমিনের সাথে যোগাযোগ করুন: ${adminContactText}\n🆔 আপনার User ID: ${m(userId)}`;
+    return `⛔ Access Denied!\n\nআপনাকে এই বট ব্যবহারের অনুমতি দেওয়া হয়নি।\n\n📩 বট এক্সেস নিতে অ্যাডমিনের সাথে যোগাযোগ করুন: ${adminContactText}\n🆔 আপনার User ID: ${m(userId)}`;
 }
 
 async function enforceAccess(ctx, userId, isCallback = false) {
@@ -111,12 +111,24 @@ async function enforceAccess(ctx, userId, isCallback = false) {
             delete db.sessions[userId];
             saveDatabase(db);
         }
-        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে আগে নিচের উভয় চ্যানেল/গ্রুপে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **♻️ VERIFY  ♻️** চাপুন:';
+        const msg = '⚠️ চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!\n\nবটটি ব্যবহার করতে আগে নিচের উভয় চ্যানেল/গ্রুপে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর ♻️ VERIFY  ♻️ চাপুন:';
+        const inlineMarkup = joinRequiredKb().reply_markup;
         if (isCallback) {
             await ctx.answerCbQuery('⚠️ Join required channels first!', { show_alert: true }).catch(() => {});
-            await safeEdit(ctx.chat.id, ctx.callbackQuery.message.message_id, msg, joinRequiredKb());
+            try {
+                await bot.telegram.editMessageText(ctx.chat.id, ctx.callbackQuery.message.message_id, null, msg, {
+                    reply_markup: inlineMarkup
+                });
+            } catch (e) {
+                await bot.telegram.sendMessage(userId, msg, { reply_markup: inlineMarkup }).catch(() => {});
+            }
         } else {
-            await sendMd(userId, msg, { ...joinRequiredKb(), ...Markup.removeKeyboard() });
+            await bot.telegram.sendMessage(userId, msg, {
+                reply_markup: inlineMarkup
+            }).catch((e) => console.error('join prompt send error:', e.message));
+            await bot.telegram.sendMessage(userId, '⌨️ মেনু আপডেট করা হয়েছে।', Markup.removeKeyboard())
+                .then((mObj) => bot.telegram.deleteMessage(userId, mObj.message_id).catch(() => {}))
+                .catch(() => {});
         }
         return false;
     }
