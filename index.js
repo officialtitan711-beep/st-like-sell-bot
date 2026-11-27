@@ -103,17 +103,20 @@ function getAccessPendingMessage(userId, joinedVerified = false) {
 async function enforceAccess(ctx, userId, isCallback = false) {
     if (String(userId) === ADMIN_ID) return true;
     const db = loadDatabase();
-    const kb = getMainKeyboard(userId);
 
-    // ১. আগে দুই চ্যানেল/গ্রুপে জয়েন আছে কি না চেক
+    // ১. রিয়েল-টাইম চেক: সব চ্যানেল/গ্রুপে জয়েন আছে কি না (লিভ নিলে সাথে সাথে আটকাবে)
     const joined = await isMemberOfRequiredChats(userId);
     if (!joined) {
-        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে আগে নিচের চ্যানেলগুলোতে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **♻️ VERIFY  ♻️** চাপুন:';
+        if (db.sessions[userId]) {
+            delete db.sessions[userId];
+            saveDatabase(db);
+        }
+        const msg = '⚠️ **চ্যানেল/গ্রুপ মেম্বারশিপ প্রয়োজন!**\n\nবটটি ব্যবহার করতে আগে নিচের উভয় চ্যানেল/গ্রুপে জয়েন করুন (অথবা লিভ নিয়ে থাকলে আবার জয়েন করুন), তারপর **♻️ VERIFY  ♻️** চাপুন:';
         if (isCallback) {
             await ctx.answerCbQuery('⚠️ Join required channels first!', { show_alert: true }).catch(() => {});
             await safeEdit(ctx.chat.id, ctx.callbackQuery.message.message_id, msg, joinRequiredKb());
         } else {
-            await sendMd(userId, msg, { ...joinRequiredKb(), ...kb });
+            await sendMd(userId, msg, { ...joinRequiredKb(), ...Markup.removeKeyboard() });
         }
         return false;
     }
@@ -123,9 +126,9 @@ async function enforceAccess(ctx, userId, isCallback = false) {
         const msg = getAccessPendingMessage(userId, true);
         if (isCallback) {
             await ctx.answerCbQuery('⛔ Contact @' + ADMIN_USERNAME + ' for bot access!', { show_alert: true }).catch(() => {});
-            await sendMd(userId, msg, kb);
+            await sendMd(userId, msg, Markup.removeKeyboard());
         } else {
-            await sendMd(userId, msg, kb);
+            await sendMd(userId, msg, Markup.removeKeyboard());
         }
         return false;
     }
@@ -826,7 +829,7 @@ bot.action('verify_sub', async (ctx) => {
         if (!isAuthorizedUser(db, userId)) {
             await ctx.answerCbQuery('✅ Join verified! Contact @' + ADMIN_USERNAME + ' for access.', { show_alert: true }).catch(() => {});
             try { await ctx.deleteMessage(); } catch (e) { /* ignore */ }
-            return sendMd(userId, getAccessPendingMessage(userId, true), getMainKeyboard(userId));
+            return sendMd(userId, getAccessPendingMessage(userId, true), Markup.removeKeyboard());
         }
 
         await ctx.answerCbQuery('🎉 ভেরিফিকেশন সফল!').catch(() => {});
@@ -879,7 +882,12 @@ bot.on('message', async (ctx) => {
                 if (targetUid) {
                     db.allowedUsers[targetUid] = true;
                     saveDatabase(db);
-                    await sendMd(targetUid, '🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। এখন থেকে আপনি বট ব্যবহার করতে পারবেন। /start লিখে শুরু করুন।', joinRequiredKb());
+                    const joinedTarget = await isMemberOfRequiredChats(targetUid);
+                    if (joinedTarget) {
+                        await sendMd(targetUid, '🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। এখন থেকে আপনি বট ব্যবহার করতে পারবেন। /start লিখে শুরু করুন।', getMainKeyboard(targetUid));
+                    } else {
+                        await sendMd(targetUid, '🎉 অভিনন্দন! অ্যাডমিন আপনার বট এক্সেস অনুমোদন করেছেন। বট ব্যবহার করতে আগে নিচের চ্যানেলগুলোতে জয়েন করুন এবং **♻️ VERIFY ♻️** চাপুন।', joinRequiredKb());
+                    }
                     return ctx.reply(`✅ সফলভাবে ইউজার আইডি \`${targetUid}\`-কে বট ব্যবহারের এক্সেস দেওয়া হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 saveDatabase(db);
@@ -893,7 +901,7 @@ bot.on('message', async (ctx) => {
                     delete db.allowedUsers[targetUid];
                     delete db.sessions[targetUid];
                     saveDatabase(db);
-                    await sendMd(targetUid, `⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন। যোগাযোগ: ${adminContactText}`, getMainKeyboard(targetUid));
+                    await sendMd(targetUid, `⚠️ দুঃখিত! অ্যাডমিন আপনার বট এক্সেস রিমুভ করে দিয়েছেন। যোগাযোগ: ${adminContactText}`, Markup.removeKeyboard());
                     return ctx.reply(`❌ সফলভাবে ইউজার আইডি \`${targetUid}\`-এর এক্সেস রিমুভ করা হয়েছে!`, { parse_mode: 'Markdown' });
                 }
                 saveDatabase(db);
